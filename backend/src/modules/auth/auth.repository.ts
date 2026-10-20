@@ -35,7 +35,7 @@ export interface MembershipRow {
 export class AuthRepository {
   async findIdentityByEmail(tx: TenantTx, email: string): Promise<IdentityRow | null> {
     const res = await tx.query<IdentityRow>(
-      `SELECT id, email, password_hash, status, failed_login_count, locked_until 
+      `SELECT id, email, password_hash, status, failed_login_count, locked_until
        FROM platform.identities WHERE email = lower($1)`,
       [email],
     );
@@ -73,8 +73,8 @@ export class AuthRepository {
 
   async recordSuccessfulLogin(tx: TenantTx, identityId: string): Promise<void> {
     await tx.query(
-      `UPDATE platform.identities 
-       SET failed_login_count = 0, locked_until = NULL 
+      `UPDATE platform.identities
+       SET failed_login_count = 0, locked_until = NULL
        WHERE id = $1`,
       [identityId],
     );
@@ -98,7 +98,7 @@ export class AuthRepository {
     expiresAt: Date,
   ): Promise<void> {
     await tx.query(
-      `INSERT INTO platform.auth_sessions (id, identity_id, tenant_id, token_hash, expires_at) 
+      `INSERT INTO platform.auth_sessions (id, identity_id, tenant_id, token_hash, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
       [sessionId, identityId, tenantId, tokenHash, expiresAt],
     );

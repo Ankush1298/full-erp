@@ -1,7 +1,7 @@
 # Smart Campus OS — Complete Product & Architecture Specification
 
-> **Document Status:** Draft v1.0 — Pending Founder Review  
-> **Date:** October 2026  
+> **Document Status:** Draft v1.0 — Pending Founder Review
+> **Date:** October 2026
 > **Classification:** Confidential — Internal Architecture
 
 ---
@@ -385,8 +385,8 @@ Organization
 | created_at | timestamp | |
 | updated_at | timestamp | |
 
-**Relationships:** Has many Campuses, has many Users (via org membership).  
-**Lifecycle:** Created once during onboarding. Rarely modified.  
+**Relationships:** Has many Campuses, has many Users (via org membership).
+**Lifecycle:** Created once during onboarding. Rarely modified.
 **Permissions:** Only Super Admin can create/modify Organizations.
 
 ---
@@ -404,8 +404,8 @@ Organization
 | is_active | boolean | |
 | created_at | timestamp | |
 
-**Relationships:** Belongs to Organization. Has many Departments.  
-**Lifecycle:** Created during setup. Can be deactivated.  
+**Relationships:** Belongs to Organization. Has many Departments.
+**Lifecycle:** Created during setup. Can be deactivated.
 **Notes:** All data is campus-scoped. Multi-campus isolation is at this level.
 
 ---
@@ -472,7 +472,7 @@ Organization
 | is_current | boolean | Only one per batch at a time |
 | is_locked | boolean | Marks/attendance frozen after semester end |
 
-**Lifecycle:** Created before each semester starts. Locked after end.  
+**Lifecycle:** Created before each semester starts. Locked after end.
 **Important:** `is_locked` prevents mutations to attendance/marks from non-admin users.
 
 ---
@@ -902,7 +902,7 @@ fastify.post('/attendance/session/:id/mark', {
 
 **Strategy:** Object storage (S3-compatible)
 
-**For cloud deployments:** AWS S3 or Cloudflare R2 (cheaper egress)  
+**For cloud deployments:** AWS S3 or Cloudflare R2 (cheaper egress)
 **For on-premise deployments:** MinIO (self-hosted S3-compatible)
 
 **Why object storage over filesystem:**
@@ -3101,7 +3101,7 @@ smart-campus-os/
 └── README.md
 ```
 
-**Monorepo tool:** Turborepo (build caching, pipeline orchestration)  
+**Monorepo tool:** Turborepo (build caching, pipeline orchestration)
 **Package manager:** pnpm (fast, strict, disk-efficient)
 
 ---

@@ -129,5 +129,3 @@ CREATE POLICY ra_delete_tenant ON app.role_assignments AS PERMISSIVE FOR DELETE 
 CREATE INDEX role_permissions_permission_code_idx ON app.role_permissions(permission_code);
 CREATE INDEX role_assignments_user_idx ON app.role_assignments(organization_id, user_id);
 CREATE INDEX role_assignments_role_idx ON app.role_assignments(organization_id, role_id);
-
-

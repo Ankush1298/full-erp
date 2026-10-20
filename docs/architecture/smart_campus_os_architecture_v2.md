@@ -1,8 +1,8 @@
 # Smart Campus OS — Architecture Specification v2.0
 
-> **Document Status:** Approved — Decisions Locked  
-> **Date:** October 2026  
-> **Version:** 2.0 (decisions incorporated)  
+> **Document Status:** Approved — Decisions Locked
+> **Date:** October 2026
+> **Version:** 2.0 (decisions incorporated)
 > **Classification:** Confidential — Internal Architecture
 
 ---
@@ -812,8 +812,8 @@ The core domain model from v1.0 remains. The following entities are added/modifi
 | consent_given_at | timestamp | MANDATORY. Null = not consented |
 | consent_ip | inet | IP at time of consent |
 
-**Ownership:** Belongs to student. Student controls it.  
-**Lifecycle:** Created at first enrollment prompt. Revoked on student request or when student leaves.  
+**Ownership:** Belongs to student. Student controls it.
+**Lifecycle:** Created at first enrollment prompt. Revoked on student request or when student leaves.
 **Privacy:** `external_ref` points to embedding in recognition service. Deleting embedding = `revoked_at` set + `external_ref` cleared.
 
 ---
@@ -1501,5 +1501,5 @@ This is the "can we actually deploy this?" proof point before investing in the l
 
 ---
 
-*Smart Campus OS Architecture Specification v2.0 — All Decisions Locked*  
+*Smart Campus OS Architecture Specification v2.0 — All Decisions Locked*
 *Ready for implementation on your approval.*
