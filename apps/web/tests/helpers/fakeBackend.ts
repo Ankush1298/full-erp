@@ -417,6 +417,39 @@ export function createFakeBackend(
         ],
       });
     }
+    if (/^\/organization\/campuses\/[^/]+\/rooms$/.test(path)) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (method === 'GET') {
+        return json(200, {
+          success: true,
+          data: [
+            {
+              id: 'room-1',
+              campusId: 'camp-1',
+              code: 'LH-101',
+              kind: 'Lecture hall',
+              name: 'Lecture Hall 1',
+              capacity: 60,
+            },
+            {
+              id: 'room-2',
+              campusId: 'camp-1',
+              code: 'LAB-2',
+              kind: 'Lab',
+              name: null,
+              capacity: null,
+            },
+          ],
+        });
+      }
+      if (method === 'POST') {
+        if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+        return json(201, {
+          success: true,
+          data: { id: 'room-new-1' },
+        });
+      }
+    }
     if (path.startsWith('/academics/') || /^\/students\/[^/]+\/term-enrollments/.test(path)) {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       const a = state.academics;

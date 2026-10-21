@@ -3,7 +3,7 @@ import type { TenantTx } from '../../shared/database/index.js';
 import { isUuidV7, uuidv7 } from '../../shared/ids/uuidv7.js';
 import { isTrustedContext, type TrustedContext } from '../../shared/tenancy/trusted-context.js';
 import { recordAudit, type AuditRequestMeta } from '../../shared/audit/index.js';
-import { AuthorizationEngine } from '../../shared/authorization/engine.js';
+import { ACTIVE_PRIMARY_POSTING, AuthorizationEngine } from '../../shared/authorization/engine.js';
 import type { ExpectedVersion } from '../../shared/settings/index.js';
 import {
   EMPLOYEE_CODE_PATTERN,
@@ -202,10 +202,11 @@ export class EmployeeService {
     );
     const row = res.rows[0];
     if (!row) throw resourceNotFound();
-    // user_id lets a SELF holder prove the record is their own; no campus/department can be supplied (see class doc).
+    // user_id lets a SELF holder prove the record is their own; employee_id resolves active primary posting scope.
     await AuthorizationEngine.assert(tx, ctx, 'employee.profile.read', {
       organization_id: ctx.tenantId,
       user_id: row.user_id,
+      employee_id: row.id,
     });
     return toDto(row);
   }
@@ -243,16 +244,62 @@ export class EmployeeService {
     // Effective visibility. The grant's scope_mode matters: a FACULTY assignment sits at ORGANIZATION scope but in
     // SELF mode, which must never be read as organization-wide access.
     const grants = await AuthorizationEngine.loadGrants(tx, ctx, 'employee.profile.read');
-    const all = grants.some((g) => g.scope_mode === 'GRANTED' && g.scope_type === 'ORGANIZATION');
-    const own = grants.some((g) => g.scope_mode === 'SELF');
-    if (!all && !own) return []; // campus/department-scoped only: containment cannot be proven
+    const isOrgWide = grants.some(
+      (g) => g.scope_mode === 'GRANTED' && g.scope_type === 'ORGANIZATION',
+    );
+    const hasSelf = grants.some((g) => g.scope_mode === 'SELF');
+
+    const campusIds = [
+      ...new Set(
+        grants
+          .filter(
+            (g) => g.scope_mode === 'GRANTED' && g.scope_type === 'CAMPUS' && g.scope_id !== null,
+          )
+          .map((g) => g.scope_id as string),
+      ),
+    ];
+    const departmentIds = [
+      ...new Set(
+        grants
+          .filter(
+            (g) =>
+              g.scope_mode === 'GRANTED' && g.scope_type === 'DEPARTMENT' && g.scope_id !== null,
+          )
+          .map((g) => g.scope_id as string),
+      ),
+    ];
+
+    if (!isOrgWide && !hasSelf && campusIds.length === 0 && departmentIds.length === 0) {
+      return [];
+    }
 
     const conditions = ['organization_id = $1'];
     const params: unknown[] = [ctx.tenantId];
-    if (!all) {
-      params.push(ctx.userId);
-      conditions.push(`user_id = $${params.length}`);
+
+    if (!isOrgWide) {
+      const scopeConditions: string[] = [];
+      if (hasSelf) {
+        params.push(ctx.userId);
+        scopeConditions.push(`user_id = $${params.length}`);
+      }
+      if (departmentIds.length > 0 || campusIds.length > 0) {
+        params.push(departmentIds);
+        const deptParamIdx = params.length;
+        params.push(campusIds);
+        const campusParamIdx = params.length;
+        scopeConditions.push(`id IN (
+          SELECT p.employee_id
+            FROM app.employee_postings p
+            JOIN app.departments d ON d.organization_id = p.organization_id AND d.id = p.department_id
+            JOIN app.campuses c ON c.organization_id = d.organization_id AND c.id = d.campus_id
+           WHERE p.organization_id = $1
+             AND ${ACTIVE_PRIMARY_POSTING}
+             AND (p.department_id = ANY($${deptParamIdx}::uuid[]) OR d.campus_id = ANY($${campusParamIdx}::uuid[]))
+        )`);
+      }
+      conditions.push(`(${scopeConditions.join(' OR ')})`);
     }
+
     if (filter.status) {
       params.push(filter.status);
       conditions.push(`status = $${params.length}`);
@@ -311,7 +358,6 @@ export class EmployeeService {
     }
     const newJoining =
       input.joiningDate === undefined ? undefined : parseDate(input.joiningDate, 'joiningDate');
-    // undefined = leave unchanged, null = clear, string = set. Independent of status (no coupling is specified).
     const newLeaving =
       input.leavingDate === undefined || input.leavingDate === null
         ? input.leavingDate
@@ -326,10 +372,12 @@ export class EmployeeService {
     );
     const row = current.rows[0];
     if (!row) throw resourceNotFound();
-    // Out of scope (anything but ORGANIZATION: see class doc) ⇒ the same 404 as a missing record.
+
+    // Check authorization with employee scope resolution
     await AuthorizationEngine.assert(tx, ctx, 'employee.record.update', {
       organization_id: ctx.tenantId,
       user_id: row.user_id,
+      employee_id: row.id,
     });
 
     // Only now, after authorization, may the caller learn anything about the stored version.
@@ -344,6 +392,70 @@ export class EmployeeService {
     const finalLeaving = newLeaving === undefined ? row.leaving_date : newLeaving;
     if (finalLeaving !== null && finalLeaving < finalJoining) {
       throw invalid('leavingDate must not be earlier than joiningDate.');
+    }
+
+    // Decision B: Employee separation requires approved leavingDate and atomically closes active postings.
+    if (finalStatus === 'SEPARATED') {
+      if (finalLeaving === null || finalLeaving === undefined) {
+        throw invalid('A leavingDate is required when transitioning status to SEPARATED.');
+      }
+      if (row.status !== 'SEPARATED') {
+        const openPostings = await tx.query<{
+          id: string;
+          valid_from: string;
+          department_id: string;
+        }>(
+          `SELECT id, valid_from::text AS valid_from, department_id
+             FROM app.employee_postings
+            WHERE organization_id = $1 AND employee_id = $2 AND valid_to IS NULL
+            ORDER BY valid_from ASC FOR UPDATE`,
+          [ctx.tenantId, employeeId],
+        );
+
+        for (const posting of openPostings.rows) {
+          if (posting.valid_from > finalLeaving) {
+            throw invalid(
+              `Cannot separate employee on ${finalLeaving} because active posting ${posting.id} started later on ${posting.valid_from}.`,
+            );
+          }
+          await tx.query(
+            `UPDATE app.employee_postings
+                SET valid_to = $3::date
+              WHERE organization_id = $1 AND id = $2 AND valid_to IS NULL`,
+            [ctx.tenantId, posting.id, finalLeaving],
+          );
+          await recordAudit(
+            tx,
+            ctx,
+            {
+              action: 'employee.posting.close',
+              resourceType: 'employee_posting',
+              resourceId: posting.id,
+              departmentId: posting.department_id,
+              riskTier: 2,
+              reasonText: reason,
+              changes: {
+                validTo: { old: null, new: finalLeaving },
+                closedBySeparation: true,
+              },
+            },
+            options.meta ?? {},
+          );
+        }
+      } else if (finalLeaving !== row.leaving_date) {
+        // Already separated: closed history is never rewritten, so the date cannot move before a posting's start or end.
+        const beyond = await tx.query(
+          `SELECT 1 FROM app.employee_postings
+            WHERE organization_id = $1 AND employee_id = $2
+              AND (valid_from > $3::date OR valid_to > $3::date) LIMIT 1`,
+          [ctx.tenantId, employeeId, finalLeaving],
+        );
+        if ((beyond.rowCount ?? 0) > 0) {
+          throw invalid(
+            'The leavingDate of a separated employee cannot be moved before an existing posting starts or ends.',
+          );
+        }
+      }
     }
 
     const changes: Record<string, unknown> = {};

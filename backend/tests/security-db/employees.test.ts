@@ -128,11 +128,12 @@ describe('employees: integrity constraints', () => {
     expect((await runAs(CTX.staffA, insert(ORG_A, TEMP_A, over))).error?.code).toBe('23514');
   });
 
-  // 01 §3.4: leaving_date is optional and no status coupling is specified, so neither combination is a constraint
-  // violation. Only date ordering (08 §4 "Dates ordered") is enforced.
-  it('does not couple status and leaving_date: SEPARATED without a date and ACTIVE with a date are both accepted', async () => {
+  // 01 §3.4: leaving_date is optional. Milestone 2 Decision B (owner): SEPARATED requires the approved leaving date,
+  // enforced by the employees_separation_guard trigger (0034), on INSERT as well as UPDATE. Nothing else is coupled:
+  // an ACTIVE employee may carry a date. Date ordering (08 §4 "Dates ordered") stays a table check.
+  it('SEPARATED requires a leaving_date; ACTIVE with a date and SEPARATED with a date are accepted', async () => {
     const sepNoDate = await runAs(CTX.staffA, insert(ORG_A, TEMP_A, { status: 'SEPARATED' }));
-    expect(sepNoDate.error).toBeUndefined();
+    expect(sepNoDate.error?.code).toBe('23514');
     const activeWithDate = await runAs(
       CTX.staffA,
       insert(ORG_A, TEMP_A, { leaving: '2025-01-01' }),

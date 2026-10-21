@@ -5,6 +5,7 @@ import type { AuditRequestMeta } from '../../shared/audit/index.js';
 import { CampusService } from './campus.service.js';
 import { DepartmentService } from './department.service.js';
 import { DesignationService } from './designation.service.js';
+import { RoomService } from './room.service.js';
 import { SettingsService } from './settings.service.js';
 import { computeCollectionETag, parseIfMatch } from '../../shared/settings/index.js';
 import {
@@ -13,10 +14,21 @@ import {
   CreateCampusBodySchema,
   type CreateCampusBody,
   CreateCampusResponseSchema,
+  CreateResponseSchema,
   GetCampusResponseSchema,
+  GetRoomResponseSchema,
+  IdParamSchema,
+  type IdParam,
   ListCampusesQuerySchema,
   type ListCampusesQuery,
   ListCampusesResponseSchema,
+  ListRoomsQuerySchema,
+  type ListRoomsQuery,
+  ListRoomsResponseSchema,
+  CreateRoomBodySchema,
+  type CreateRoomBody,
+  UpdateRoomBodySchema,
+  type UpdateRoomBody,
   UpdateCampusBodySchema,
   type UpdateCampusBody,
   UpdateCampusResponseSchema,
@@ -400,6 +412,103 @@ export const registerOrganizationRoutes: FastifyPluginAsync<{ db: Database }> = 
       if (data.version !== null) {
         reply.header('ETag', `"${data.version}"`);
       }
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // --- Rooms (Milestone 2 Batch 1) ---
+
+  // GET /campuses/:id/rooms
+  app.get<{ Params: CampusParams; Querystring: ListRoomsQuery }>(
+    '/campuses/:id/rooms',
+    {
+      config: { permission: 'org.structure.read' },
+      schema: {
+        params: CampusParamsSchema,
+        querystring: ListRoomsQuerySchema,
+        response: { 200: ListRoomsResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+
+      const data = await opts.db.withTenant(ctx, async (tx) => {
+        return RoomService.listByCampus(tx, ctx, req.params.id, req.query);
+      });
+
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // POST /campuses/:id/rooms
+  app.post<{ Params: CampusParams; Body: CreateRoomBody }>(
+    '/campuses/:id/rooms',
+    {
+      config: { permission: 'org.campus.manage' },
+      schema: {
+        params: CampusParamsSchema,
+        body: CreateRoomBodySchema,
+        response: { 201: CreateResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+
+      const id = await opts.db.withTenant(ctx, async (tx) => {
+        return RoomService.create(tx, ctx, req.params.id, req.body);
+      });
+
+      return reply.status(201).send({ success: true, data: { id } });
+    },
+  );
+
+  // GET /rooms/:id
+  app.get<{ Params: IdParam }>(
+    '/rooms/:id',
+    {
+      config: { permission: 'org.structure.read' },
+      schema: {
+        params: IdParamSchema,
+        response: { 200: GetRoomResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+
+      const data = await opts.db.withTenant(ctx, async (tx) => {
+        return RoomService.getById(tx, ctx, req.params.id);
+      });
+
+      reply.header('ETag', `"${data.version}"`);
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // PATCH /rooms/:id
+  app.patch<{ Params: IdParam; Body: UpdateRoomBody }>(
+    '/rooms/:id',
+    {
+      config: { permission: 'org.campus.manage' },
+      schema: {
+        params: IdParamSchema,
+        body: UpdateRoomBodySchema,
+        response: { 200: GetRoomResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const ifMatchHeader = req.headers['if-match'];
+      const expected = parseIfMatch(typeof ifMatchHeader === 'string' ? ifMatchHeader : undefined);
+
+      const data = await opts.db.withTenant(ctx, async (tx) => {
+        return RoomService.update(tx, ctx, req.params.id, req.body, { expected });
+      });
+
+      reply.header('ETag', `"${data.version}"`);
       return reply.status(200).send({ success: true, data });
     },
   );

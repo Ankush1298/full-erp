@@ -4,6 +4,7 @@ import { AppError } from '../../shared/errors/http-errors.js';
 import type { AuditRequestMeta } from '../../shared/audit/index.js';
 import { parseIfMatch } from '../../shared/settings/index.js';
 import { EmployeeService } from './employee.service.js';
+import { PostingService } from './posting.service.js';
 import {
   CreateEmployeeBodySchema,
   type CreateEmployeeBody,
@@ -18,6 +19,19 @@ import {
   type UpdateEmployeeBody,
   UpdateEmployeeResponseSchema,
 } from './employee.schemas.js';
+import {
+  ClosePostingBodySchema,
+  type ClosePostingBody,
+  CreatePostingBodySchema,
+  type CreatePostingBody,
+  CreatePostingResponseSchema,
+  GetPostingResponseSchema,
+  ListPostingsResponseSchema,
+  PostingIdParamSchema,
+  type PostingIdParam,
+  UpdatePostingBodySchema,
+  type UpdatePostingBody,
+} from './posting.schemas.js';
 
 function extractAuditMeta(req: FastifyRequest): AuditRequestMeta {
   const meta: AuditRequestMeta = { ip: req.ip, requestId: req.id };
@@ -101,6 +115,126 @@ export const registerPeopleRoutes: FastifyPluginAsync<{ db: Database }> = async 
       const meta = extractAuditMeta(req);
       const data = await opts.db.withTenant(ctx, (tx) =>
         EmployeeService.update(tx, ctx, req.params.id, req.body, { expected, meta }),
+      );
+      reply.header('ETag', `"${data.version}"`);
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // --- Employee Postings (Milestone 2 Batch 1) ---
+
+  // GET /employees/:id/postings
+  app.get<{ Params: EmployeeIdParam }>(
+    '/employees/:id/postings',
+    {
+      config: { permission: 'employee.profile.read' },
+      schema: {
+        params: EmployeeIdParamSchema,
+        response: { 200: ListPostingsResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        PostingService.listByEmployee(tx, ctx, req.params.id),
+      );
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // POST /employees/:id/postings
+  app.post<{ Params: EmployeeIdParam; Body: CreatePostingBody }>(
+    '/employees/:id/postings',
+    {
+      config: { permission: 'employee.record.update' },
+      schema: {
+        params: EmployeeIdParamSchema,
+        body: CreatePostingBodySchema,
+        response: { 201: CreatePostingResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const meta = extractAuditMeta(req);
+
+      const id = await opts.db.withTenant(ctx, (tx) =>
+        PostingService.create(tx, ctx, req.params.id, req.body, meta),
+      );
+      return reply.status(201).send({ success: true, data: { id } });
+    },
+  );
+
+  // GET /postings/:id
+  app.get<{ Params: PostingIdParam }>(
+    '/postings/:id',
+    {
+      config: { permission: 'employee.profile.read' },
+      schema: {
+        params: PostingIdParamSchema,
+        response: { 200: GetPostingResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        PostingService.getById(tx, ctx, req.params.id),
+      );
+      reply.header('ETag', `"${data.version}"`);
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // PATCH /postings/:id
+  app.patch<{ Params: PostingIdParam; Body: UpdatePostingBody }>(
+    '/postings/:id',
+    {
+      config: { permission: 'employee.record.update' },
+      schema: {
+        params: PostingIdParamSchema,
+        body: UpdatePostingBodySchema,
+        response: { 200: GetPostingResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const header = req.headers['if-match'];
+      const expected = parseIfMatch(typeof header === 'string' ? header : undefined);
+      const meta = extractAuditMeta(req);
+
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        PostingService.update(tx, ctx, req.params.id, req.body, { expected, meta }),
+      );
+      reply.header('ETag', `"${data.version}"`);
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // POST /postings/:id/close
+  app.post<{ Params: PostingIdParam; Body: ClosePostingBody }>(
+    '/postings/:id/close',
+    {
+      config: { permission: 'employee.record.update' },
+      schema: {
+        params: PostingIdParamSchema,
+        body: ClosePostingBodySchema,
+        response: { 200: GetPostingResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const header = req.headers['if-match'];
+      const expected = parseIfMatch(typeof header === 'string' ? header : undefined);
+      const meta = extractAuditMeta(req);
+
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        PostingService.close(tx, ctx, req.params.id, req.body, { expected, meta }),
       );
       reply.header('ETag', `"${data.version}"`);
       return reply.status(200).send({ success: true, data });

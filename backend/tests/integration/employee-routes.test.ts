@@ -248,7 +248,7 @@ describe('employee routes: org admin lifecycle and If-Match', () => {
   });
 });
 
-describe('employee routes: leavingDate is independent of status (01 §3.4: optional, no coupling)', () => {
+describe('employee routes: leavingDate and status (SEPARATED requires a date; a date does not imply SEPARATED)', () => {
   const path = (): string => `${BASE}/${lockEmployeeId}`;
   const patchIt = (payload: object) =>
     send('PATCH', 'orgAdminA', path(), { reason: 'Recorded by HR', ...payload }, { ifMatch: '*' });
@@ -264,12 +264,16 @@ describe('employee routes: leavingDate is independent of status (01 §3.4: optio
     const sep = await patchIt({ status: 'SEPARATED' });
     expect(sep.json<{ data: { leavingDate: string } }>().data.leavingDate).toBe('2030-01-31'); // untouched
 
+    // SEPARATED requires the approved leaving date (Milestone 2 Decision B): it cannot be cleared while separated
+    expect((await patchIt({ leavingDate: null })).statusCode).toBe(400);
+    expect((await patchIt({ status: 'ACTIVE' })).statusCode).toBe(200); // reinstatement keeps the recorded date
+
     const cleared = await patchIt({ leavingDate: null });
     expect(cleared.statusCode).toBe(200);
     expect(cleared.json<{ data: { status: string; leavingDate: null } }>().data).toMatchObject({
-      status: 'SEPARATED',
+      status: 'ACTIVE',
       leavingDate: null,
-    }); // SEPARATED needs no date
+    });
 
     expect((await patchIt({ leavingDate: '' })).statusCode).toBe(400);
     expect((await patchIt({ leavingDate: '2030-02-30' })).statusCode).toBe(400);

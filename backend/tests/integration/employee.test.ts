@@ -403,26 +403,26 @@ describe('EmployeeService.update', () => {
     });
   });
 
-  // 01 §3.4 lists leaving_date as OPTIONAL and specifies no coupling with status; transitions are unrestricted.
-  it('status and leavingDate are independent: neither implies, requires, nor alters the other', async () => {
+  // 01 §3.4 lists leaving_date as optional. Milestone 2 Decision B (owner): SEPARATED requires the approved leaving date.
+  // Nothing else is coupled: a date may be recorded on an ACTIVE employee and no transition is forbidden.
+  it('SEPARATED requires a leavingDate; otherwise status and leavingDate are independent', async () => {
     await scratch(CTX.staffA, async (tx, ctx) => {
       const id = await make(tx, ctx);
-      // SEPARATED without a date is accepted (no rule says otherwise)
-      const gone = await EmployeeService.update(tx, ctx, id, patch({ status: 'SEPARATED' }), {
-        expected: ANY,
-      });
-      expect(gone).toMatchObject({ status: 'SEPARATED', leavingDate: null });
-      // a date can be recorded while the status stays as it is
-      const dated = await EmployeeService.update(
+      // SEPARATED without an approved date is refused, in the request or by clearing the date afterwards
+      await expect(
+        EmployeeService.update(tx, ctx, id, patch({ status: 'SEPARATED' }), { expected: ANY }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      const gone = await EmployeeService.update(
         tx,
         ctx,
         id,
-        patch({ leavingDate: '2025-03-31' }),
-        {
-          expected: ANY,
-        },
+        patch({ status: 'SEPARATED', leavingDate: '2025-03-31' }),
+        { expected: ANY },
       );
-      expect(dated).toMatchObject({ status: 'SEPARATED', leavingDate: '2025-03-31' });
+      expect(gone).toMatchObject({ status: 'SEPARATED', leavingDate: '2025-03-31' });
+      await expect(
+        EmployeeService.update(tx, ctx, id, patch({ leavingDate: null }), { expected: ANY }),
+      ).rejects.toMatchObject({ statusCode: 400 });
       // changing status never touches the date: reinstatement keeps whatever was recorded
       const back = await EmployeeService.update(tx, ctx, id, patch({ status: 'ACTIVE' }), {
         expected: ANY,
@@ -433,12 +433,18 @@ describe('EmployeeService.update', () => {
         expected: ANY,
       });
       expect(cleared).toMatchObject({ status: 'ACTIVE', leavingDate: null });
-      // direct ACTIVE -> SEPARATED -> ON_LEAVE: no transition is forbidden
-      await EmployeeService.update(tx, ctx, id, patch({ status: 'SEPARATED' }), { expected: ANY });
+      // ACTIVE -> SEPARATED -> ON_LEAVE: no transition is forbidden
+      await EmployeeService.update(
+        tx,
+        ctx,
+        id,
+        patch({ status: 'SEPARATED', leavingDate: '2025-03-31' }),
+        { expected: ANY },
+      );
       const leave = await EmployeeService.update(tx, ctx, id, patch({ status: 'ON_LEAVE' }), {
         expected: ANY,
       });
-      expect(leave.status).toBe('ON_LEAVE');
+      expect(leave).toMatchObject({ status: 'ON_LEAVE', leavingDate: '2025-03-31' });
     });
   });
 

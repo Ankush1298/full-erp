@@ -360,6 +360,9 @@ describe('no accidental probe or debug objects', () => {
         'student_programs_live_term_enrollments_guard',
         'term_enrollments_guard',
         'terms_guard',
+        'rooms_guard',
+        'employee_postings_guard',
+        'employees_separation_guard',
       ].sort(),
     );
     const rels = await adminQuery<{ relname: string }>(

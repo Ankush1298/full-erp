@@ -14,9 +14,20 @@ export interface ResourceScope {
   organization_id?: string;
   student_id?: string;
   user_id?: string;
+  employee_id?: string;
   campus_id?: string;
   department_id?: string;
 }
+
+/**
+ * SQL predicate (aliases `p` = app.employee_postings, `c` = the posting department's campus) for an employee's ACTIVE
+ * PRIMARY posting, the row that gives an employee a campus and department (doc 06 §3): the open primary posting
+ * (Decision C; the partial unique index allows at most one) that has started, by the campus-local calendar like every
+ * other effective-dated row here. A future-dated posting, a closed posting and a non-primary posting give no scope.
+ * Shared by `assert` and the employee list so point and list visibility cannot drift apart.
+ */
+export const ACTIVE_PRIMARY_POSTING = `p.is_primary = true AND p.valid_to IS NULL
+            AND p.valid_from <= (now() AT TIME ZONE c.timezone)::date`;
 
 /** ASSIGNED relationship proof, registered by the module that owns the relationship (M3/M4). */
 export type AssignedResolver = (
@@ -215,8 +226,30 @@ export class AuthorizationEngine {
       throw scopeNotFound(permission);
     }
 
+    // An employee's campus and department are never taken from the caller (doc 06 §3): they are re-derived from the
+    // persisted active primary posting, and anything the caller supplied for them is discarded. No such posting means
+    // no campus or department, so a CAMPUS/DEPARTMENT grant cannot match (fail closed).
+    let effectiveResource = resource;
+    if (resource.employee_id !== undefined) {
+      effectiveResource = { ...resource };
+      delete effectiveResource.department_id;
+      delete effectiveResource.campus_id;
+      const empScope = await tx.query<{ department_id: string; campus_id: string }>(
+        `SELECT p.department_id, d.campus_id
+           FROM app.employee_postings p
+           JOIN app.departments d ON d.organization_id = p.organization_id AND d.id = p.department_id
+           JOIN app.campuses c ON c.organization_id = d.organization_id AND c.id = d.campus_id
+          WHERE p.organization_id = $1 AND p.employee_id = $2 AND ${ACTIVE_PRIMARY_POSTING}`,
+        [ctx.tenantId, resource.employee_id],
+      );
+      if (empScope.rows[0]) {
+        effectiveResource.department_id = empScope.rows[0].department_id;
+        effectiveResource.campus_id = empScope.rows[0].campus_id;
+      }
+    }
+
     for (const grant of grants) {
-      if (await this.grantAllows(tx, ctx, permission, grant, resource)) return;
+      if (await this.grantAllows(tx, ctx, permission, grant, effectiveResource)) return;
     }
     throw scopeNotFound(permission);
   }
@@ -230,6 +263,15 @@ export class AuthorizationEngine {
   ): Promise<boolean> {
     switch (grant.scope_mode) {
       case 'SELF': {
+        // For employee resources, SELF is strictly determined by the authenticated actor's employee ownership
+        // (doc 20 §6.2). A caller-supplied user_id must never permit access to a different employee record.
+        if (resource.employee_id !== undefined) {
+          const ownEmp = await tx.query<{ id: string }>(
+            'SELECT id FROM app.employees WHERE organization_id = $1 AND user_id = $2',
+            [ctx.tenantId, ctx.userId],
+          );
+          return ownEmp.rows[0]?.id === resource.employee_id;
+        }
         if (resource.user_id !== undefined && resource.user_id === ctx.userId) return true;
         if (resource.student_id === undefined) return false;
         const own = await tx.query<{ id: string }>(

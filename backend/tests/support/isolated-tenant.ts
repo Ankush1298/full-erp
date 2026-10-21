@@ -148,6 +148,8 @@ export async function createIsolatedTenant(passwordHash: string): Promise<Isolat
           'app.student_guardians',
           'app.guardians',
           'app.students',
+          // postings reference employees (RESTRICT)
+          'app.employee_postings',
           'app.employees',
           'app.role_assignments',
         ]) {

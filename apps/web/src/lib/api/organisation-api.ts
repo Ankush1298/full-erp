@@ -50,3 +50,56 @@ export function fetchDepartments(client: ApiClient): Promise<DepartmentItem[]> {
     })
     .then((res) => res.data);
 }
+
+// Canonical room (docs 01 Room, 02 §4.2): code and kind required; name and capacity optional. No status, building or
+// floor. `kind` is free text: the specification defines no values.
+export const RoomItemSchema = z.object({
+  id: z.string(),
+  organizationId: z.string().optional(),
+  campusId: z.string().optional(),
+  code: z.string(),
+  kind: z.string(),
+  name: z.string().nullable(),
+  capacity: z.number().nullable(),
+  version: z.number().optional(),
+});
+
+export type RoomItem = z.infer<typeof RoomItemSchema>;
+
+export const ListRoomsResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(RoomItemSchema),
+});
+
+export const CreateRoomResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({ id: z.string() }),
+});
+
+export interface CreateRoomInput {
+  code: string;
+  kind: string;
+  name?: string;
+  capacity?: number;
+}
+
+export function fetchRooms(client: ApiClient, campusId: string): Promise<RoomItem[]> {
+  return client
+    .get(`/organization/campuses/${campusId}/rooms`, {
+      schema: ListRoomsResponseSchema,
+    })
+    .then((res) => res.data);
+}
+
+export function createRoom(
+  client: ApiClient,
+  campusId: string,
+  input: CreateRoomInput,
+): Promise<string> {
+  return client
+    .post(`/organization/campuses/${encodeURIComponent(campusId)}/rooms`, {
+      schema: CreateRoomResponseSchema,
+      body: input,
+    })
+    .then((res) => res.data.id);
+}

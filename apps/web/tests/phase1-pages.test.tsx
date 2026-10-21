@@ -74,6 +74,24 @@ describe('Phase 1 Pages (Web Integration)', () => {
       expect(await screen.findByText('Computer Science')).toBeInTheDocument();
       expect(screen.getByText('CS')).toBeInTheDocument();
     });
+
+    it('renders rooms tab and displays rooms list', async () => {
+      const b = createFakeBackend({
+        session: true,
+        me: ADMIN,
+      });
+      renderApp(b, '/organisation');
+
+      const roomsTab = await screen.findByRole('button', { name: /Rooms/ });
+      await userEvent.click(roomsTab);
+
+      expect(await screen.findByText('Lecture Hall 1')).toBeInTheDocument();
+      expect(screen.getByText('LH-101')).toBeInTheDocument();
+      expect(screen.getByText('Lecture hall')).toBeInTheDocument();
+      // optional name/capacity may be absent: the card falls back to the code and shows no capacity row
+      expect(screen.getAllByText('LAB-2')).toHaveLength(2); // title fallback + code row
+      expect(screen.queryByText(/Building|Floor|ACTIVE|INACTIVE/)).not.toBeInTheDocument();
+    });
   });
 
   describe('DocumentsPage', () => {

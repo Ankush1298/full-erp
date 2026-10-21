@@ -420,3 +420,92 @@ export const SetSettingResponseSchema = Type.Object(
   { additionalProperties: false },
 );
 export type SetSettingResponse = Static<typeof SetSettingResponseSchema>;
+
+// ============================================================================
+// Room Schemas (Milestone 2 Batch 1). Canonical model: docs 01 Room and 02 §4.2 rooms.
+// campus_id, code, kind (required); name, capacity (optional). No status, no building/floor, no audit (A0).
+// `kind` has no vocabulary in the documents: free text, length-bounded only.
+// ============================================================================
+
+export const ROOM_KIND_MAX = 50;
+export const ROOM_CAPACITY_MAX = 32767; // smallint storage limit, not a business rule
+
+const RoomKindSchema = Type.String({
+  minLength: 1,
+  maxLength: ROOM_KIND_MAX,
+  description: 'Room classification; free text (the specification defines no values)',
+});
+const RoomNameSchema = Type.String({ minLength: 1, maxLength: 255 });
+const RoomCapacitySchema = Type.Integer({ minimum: 1, maximum: ROOM_CAPACITY_MAX });
+
+export const CampusIdParamSchema = Type.Object(
+  {
+    campusId: UuidV7Schema,
+  },
+  { additionalProperties: false },
+);
+export type CampusIdParam = Static<typeof CampusIdParamSchema>;
+
+export const RoomRecordSchema = Type.Object(
+  {
+    id: UuidV7Schema,
+    organizationId: UuidV7Schema,
+    campusId: UuidV7Schema,
+    code: CodeSchema,
+    kind: RoomKindSchema,
+    name: Type.Union([RoomNameSchema, Type.Null()]),
+    capacity: Type.Union([RoomCapacitySchema, Type.Null()]),
+    version: Type.Integer({ minimum: 1 }),
+    createdAt: Type.String(),
+    updatedAt: Type.String(),
+  },
+  { additionalProperties: false },
+);
+export type RoomRecordDto = Static<typeof RoomRecordSchema>;
+
+export const CreateRoomBodySchema = Type.Object(
+  {
+    code: CodeSchema,
+    kind: RoomKindSchema,
+    name: Type.Optional(RoomNameSchema),
+    capacity: Type.Optional(RoomCapacitySchema),
+  },
+  { additionalProperties: false },
+);
+export type CreateRoomBody = Static<typeof CreateRoomBodySchema>;
+
+export const UpdateRoomBodySchema = Type.Object(
+  {
+    kind: Type.Optional(RoomKindSchema),
+    name: Type.Optional(Type.Union([RoomNameSchema, Type.Null()])),
+    capacity: Type.Optional(Type.Union([RoomCapacitySchema, Type.Null()])),
+  },
+  { additionalProperties: false, minProperties: 1 },
+);
+export type UpdateRoomBody = Static<typeof UpdateRoomBodySchema>;
+
+export const ListRoomsQuerySchema = Type.Object(
+  {
+    kind: Type.Optional(RoomKindSchema),
+  },
+  { additionalProperties: false },
+);
+export type ListRoomsQuery = Static<typeof ListRoomsQuerySchema>;
+
+export const GetRoomResponseSchema = Type.Object(
+  {
+    success: Type.Literal(true),
+    data: RoomRecordSchema,
+  },
+  { additionalProperties: false },
+);
+export type GetRoomResponse = Static<typeof GetRoomResponseSchema>;
+
+export const ListRoomsResponseSchema = Type.Object(
+  {
+    success: Type.Literal(true),
+    data: Type.Array(RoomRecordSchema),
+  },
+  { additionalProperties: false },
+);
+export type ListRoomsResponse = Static<typeof ListRoomsResponseSchema>;
