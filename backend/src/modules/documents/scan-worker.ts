@@ -117,12 +117,14 @@ export class DocumentScanWorker {
     });
 
     readStream.stream.pipe(meteringStream);
-    meteringStream.resume();
 
     let scanResult;
     try {
       const streamFinished = finished(meteringStream);
       const scanPromise = this.#scanner.scanStream(meteringStream);
+      // The scanner has attached to the stream synchronously above; only now let it flow, and
+      // drain it even if the scanner returns early so hashing and size checks still complete.
+      meteringStream.resume();
       const [, result] = await Promise.all([streamFinished, scanPromise]);
       scanResult = result;
     } catch (err) {

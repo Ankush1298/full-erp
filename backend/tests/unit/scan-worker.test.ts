@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import * as net from 'node:net';
+import { Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 import type { Database, TenantTx } from '../../src/shared/database/index.js';
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
@@ -13,7 +15,7 @@ import type {
   ScannableFile,
 } from '../../src/modules/documents/document.service.js';
 import { DocumentScanWorker } from '../../src/modules/documents/scan-worker.js';
-import { MockMalwareScanner } from '../../src/modules/documents/scanner.js';
+import { ClamAvScanner, MockMalwareScanner } from '../../src/modules/documents/scanner.js';
 
 const PDF = Buffer.from('%PDF-1.4 sample content');
 const sha256Of = (buf: Buffer): string => createHash('sha256').update(buf).digest('hex');
@@ -327,5 +329,185 @@ describe('DocumentScanWorker (unit)', () => {
     expect(results).toHaveLength(2);
     expect(results[0]?.outcome).toBe('AVAILABLE');
     expect(results[1]?.outcome).toBe('AVAILABLE');
+  });
+});
+
+describe('DocumentScanWorker with a real ClamAvScanner over TCP', () => {
+  const orgId = uuidv7();
+  const ctx = issueTrustedContext({ tenantId: orgId, userId: uuidv7(), actorKind: 'STAFF' });
+  const mockTx = {} as TenantTx;
+  // 16 distinct 64 KiB chunks so lost, duplicated or reordered bytes change the digest.
+  const BYTES = Buffer.concat(
+    Array.from({ length: 16 }, (_, i) => Buffer.alloc(64 * 1024, 0x41 + i)),
+  );
+
+  type Mode = 'clean' | 'silent' | 'infected-early';
+
+  // clamd stand-in speaking the real zINSTREAM framing. Records the payload it was given.
+  async function withClamd(
+    mode: Mode,
+    body: (port: number, received: () => Buffer) => Promise<void>,
+  ): Promise<void> {
+    const sockets = new Set<net.Socket>();
+    const payload: Buffer[] = [];
+    const server = net.createServer((socket) => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
+      socket.on('error', () => {});
+      let buf = Buffer.alloc(0);
+      let commandSeen = false;
+      let answered = false;
+      socket.on('data', (data) => {
+        buf = Buffer.concat([buf, data]);
+        if (!commandSeen) {
+          if (buf.length < 10) return;
+          commandSeen = buf.subarray(0, 10).toString('utf8') === 'zINSTREAM\0';
+          buf = buf.subarray(10);
+        }
+        while (buf.length >= 4) {
+          const len = buf.readUInt32BE(0);
+          if (len === 0) {
+            if (mode === 'clean' && !answered) socket.write('stream: OK\0');
+            answered = true;
+            return;
+          }
+          if (buf.length < 4 + len) return;
+          payload.push(Buffer.from(buf.subarray(4, 4 + len)));
+          buf = buf.subarray(4 + len);
+          if (mode === 'infected-early' && !answered) {
+            answered = true;
+            socket.write('stream: Win.Test.EICAR_HDB-1 FOUND\0');
+          }
+        }
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      await body((server.address() as net.AddressInfo).port, () => Buffer.concat(payload));
+    } finally {
+      for (const s of sockets) s.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  }
+
+  async function runWorker(
+    port: number,
+    opts: { maxBytes?: number; timeoutMs?: number; tamperSize?: boolean } = {},
+  ) {
+    const fileId = uuidv7();
+    const storageKey = `${orgId}/GENERAL/2026/${fileId}`;
+    const inner = new MemoryStorageDriver();
+    await inner.presignUpload({
+      storageClass: 'GENERAL',
+      key: storageKey,
+      contentType: 'application/pdf',
+      maxBytes: 10 * 1024 * 1024,
+      ttlSeconds: 60,
+    });
+    inner.putObject('GENERAL', storageKey, BYTES, 'application/pdf');
+    // Adverse scheduling: bytes are available immediately (the source starts flowing on the very
+    // next tick, long before the TCP connect completes) and arrive as separate chunks spread over
+    // many event-loop turns, some before and some after the connection is established.
+    const storage = {
+      openReadStream: async (input: Parameters<StorageDriver['openReadStream']>[0]) => {
+        const opened = await inner.openReadStream(input);
+        return {
+          ...opened,
+          stream: Readable.from(
+            (async function* () {
+              for (let o = 0; o < BYTES.length; o += 64 * 1024) {
+                yield BYTES.subarray(o, o + 64 * 1024);
+                await new Promise((resolve) => setImmediate(resolve));
+              }
+            })(),
+          ),
+        };
+      },
+    } as unknown as StorageDriver;
+    const file: ScannableFile = {
+      id: fileId,
+      organizationId: orgId,
+      storageClass: 'GENERAL',
+      storageKey,
+      originalName: 'big.pdf',
+      declaredMime: 'application/pdf',
+      detectedMime: 'application/pdf',
+      sizeBytes: BYTES.length + (opts.tamperSize ? 10 : 0),
+      sha256: sha256Of(BYTES),
+    };
+    const finalizeScan = vi.fn().mockResolvedValue({});
+    const worker = new DocumentScanWorker({
+      db: {} as unknown as Database,
+      documentService: { finalizeScan } as unknown as DocumentService,
+      storage,
+      scanner: new ClamAvScanner({
+        host: '127.0.0.1',
+        port,
+        timeoutMs: opts.timeoutMs ?? 5000,
+        ...(opts.maxBytes !== undefined ? { maxBytes: opts.maxBytes } : {}),
+      }),
+      maxRetries: 1,
+    });
+    return { result: await worker.processFile(mockTx, ctx, file), finalizeScan, fileId };
+  }
+
+  it('delivers every byte to clamd in order and promotes the file to AVAILABLE on a clean verdict', async () => {
+    await withClamd('clean', async (port, received) => {
+      const { result, finalizeScan, fileId } = await runWorker(port);
+
+      expect(result).toEqual({ outcome: 'AVAILABLE', fileId });
+      expect(finalizeScan).toHaveBeenCalledWith(mockTx, ctx, fileId, 'CLEAN');
+      const got = received();
+      expect(got.length).toBe(BYTES.length);
+      expect(sha256Of(got)).toBe(sha256Of(BYTES));
+    });
+  });
+
+  it('keeps draining after an early INFECTED answer and persists INFECTED', async () => {
+    await withClamd('infected-early', async (port) => {
+      const { result, finalizeScan, fileId } = await runWorker(port);
+
+      expect(result).toEqual({ outcome: 'INFECTED', fileId, threat: 'Win.Test.EICAR_HDB-1' });
+      expect(finalizeScan).toHaveBeenCalledWith(mockTx, ctx, fileId, 'INFECTED', {
+        details: 'Win.Test.EICAR_HDB-1',
+      });
+    });
+  });
+
+  it('drains the stream and persists ERROR when the scanner gives up on the byte limit', async () => {
+    await withClamd('silent', async (port) => {
+      const { result, finalizeScan, fileId } = await runWorker(port, { maxBytes: 10 });
+
+      expect(result.outcome).toBe('ERROR');
+      expect(finalizeScan).toHaveBeenCalledTimes(1);
+      expect(finalizeScan).toHaveBeenCalledWith(mockTx, ctx, fileId, 'ERROR', {
+        details: expect.stringMatching(/exceeded scan limit/i) as string,
+      });
+    });
+  });
+
+  it('still runs the integrity check and REJECTs a size mismatch after an early scanner result', async () => {
+    await withClamd('silent', async (port) => {
+      const { result, finalizeScan, fileId } = await runWorker(port, {
+        maxBytes: 10,
+        tamperSize: true,
+      });
+
+      expect(result.outcome).toBe('REJECTED');
+      expect(finalizeScan).toHaveBeenCalledWith(mockTx, ctx, fileId, 'REJECTED', {
+        details: expect.stringMatching(/Size mismatch/) as string,
+      });
+    });
+  });
+
+  it('persists ERROR (fail closed) when clamd never answers and the scanner times out', async () => {
+    await withClamd('silent', async (port) => {
+      const { result, finalizeScan, fileId } = await runWorker(port, { timeoutMs: 300 });
+
+      expect(result.outcome).toBe('ERROR');
+      expect(finalizeScan).toHaveBeenCalledWith(mockTx, ctx, fileId, 'ERROR', {
+        details: expect.stringMatching(/timed out/i) as string,
+      });
+    });
   });
 });

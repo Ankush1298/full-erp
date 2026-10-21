@@ -52,10 +52,14 @@ export class ClamAvScanner implements MalwareScanner {
       let resolved = false;
       const socket = new net.Socket();
       socket.setTimeout(this.#timeoutMs);
+      // Detaches the scanner's own listeners from the caller-owned stream. It never ends,
+      // pauses or destroys that stream: callers (e.g. scan-worker) keep consuming it.
+      let releaseStream = (): void => {};
 
       function finish(result: ScanResult): void {
         if (!resolved) {
           resolved = true;
+          releaseStream();
           clearTimeout(connectTimer);
           clearTimeout(responseTimer);
           socket.removeAllListeners();
@@ -74,54 +78,77 @@ export class ClamAvScanner implements MalwareScanner {
         finish({ verdict: 'INDETERMINATE', details: 'ClamAV response timed out' });
       }, this.#timeoutMs);
 
+      // Listeners are attached synchronously, before connecting, so a source that starts flowing on
+      // the next tick (e.g. scan-worker's resume()) cannot lose bytes while the TCP connect is in
+      // flight. Chunks received before the connection is ready are queued; the queue is bounded by
+      // the maxBytes check below.
+      let connected = false;
+      let sourceEnded = false;
+      let totalBytesSent = 0;
+      const pending: Buffer[] = [];
+
+      const sendFrames = (buf: Buffer): void => {
+        // Slice chunk into maximum 64KB sub-chunks if needed
+        let offset = 0;
+        while (offset < buf.length) {
+          const slice = buf.subarray(offset, offset + MAX_CHUNK_SIZE);
+          offset += slice.length;
+
+          const header = Buffer.alloc(4);
+          header.writeUInt32BE(slice.length, 0);
+          socket.write(header);
+          socket.write(slice);
+        }
+      };
+
+      const onData = (chunk: Buffer | string): void => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        totalBytesSent += buf.length;
+
+        if (totalBytesSent > this.#maxBytes) {
+          finish({
+            verdict: 'INDETERMINATE',
+            details: `File size exceeded scan limit of ${this.#maxBytes} bytes`,
+          });
+          return;
+        }
+
+        if (connected) {
+          sendFrames(buf);
+        } else {
+          pending.push(buf);
+        }
+      };
+
+      const onEnd = (): void => {
+        sourceEnded = true;
+        // Zero-length chunk signals end of stream
+        if (connected) socket.write(Buffer.alloc(4, 0));
+      };
+
+      const onError = (err: Error): void => {
+        finish({ verdict: 'INDETERMINATE', details: `Stream error: ${err.message}` });
+      };
+
+      releaseStream = (): void => {
+        stream.removeListener('data', onData);
+        stream.removeListener('end', onEnd);
+        stream.removeListener('error', onError);
+        // The verdict is final; a late error must not become an unhandled 'error' event.
+        // Other consumers' own error listeners are unaffected.
+        stream.on('error', () => {});
+      };
+      stream.on('data', onData);
+      stream.once('end', onEnd);
+      stream.once('error', onError);
+
       socket.connect(this.#port, this.#host, () => {
         clearTimeout(connectTimer);
         // Begin zINSTREAM session (null-terminated command)
         socket.write(Buffer.from('zINSTREAM\0', 'utf8'));
-
-        let totalBytesSent = 0;
-
-        const onData = (chunk: Buffer | string): void => {
-          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          totalBytesSent += buf.length;
-
-          if (totalBytesSent > this.#maxBytes) {
-            stream.removeListener('data', onData);
-            stream.removeListener('end', onEnd);
-            stream.removeListener('error', onError);
-            finish({
-              verdict: 'INDETERMINATE',
-              details: `File size exceeded scan limit of ${this.#maxBytes} bytes`,
-            });
-            return;
-          }
-
-          // Slice chunk into maximum 64KB sub-chunks if needed
-          let offset = 0;
-          while (offset < buf.length) {
-            const slice = buf.subarray(offset, offset + MAX_CHUNK_SIZE);
-            offset += slice.length;
-
-            const header = Buffer.alloc(4);
-            header.writeUInt32BE(slice.length, 0);
-            socket.write(header);
-            socket.write(slice);
-          }
-        };
-
-        const onEnd = (): void => {
-          // Zero-length chunk signals end of stream
-          const term = Buffer.alloc(4, 0);
-          socket.write(term);
-        };
-
-        const onError = (err: Error): void => {
-          finish({ verdict: 'INDETERMINATE', details: `Stream error: ${err.message}` });
-        };
-
-        stream.on('data', onData);
-        stream.once('end', onEnd);
-        stream.once('error', onError);
+        connected = true;
+        for (const buf of pending.splice(0)) sendFrames(buf);
+        if (sourceEnded) socket.write(Buffer.alloc(4, 0));
       });
 
       let responseBuffer = '';

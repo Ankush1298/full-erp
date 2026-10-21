@@ -125,8 +125,16 @@ describe('ClamAvScanner (streaming TCP zINSTREAM protocol)', () => {
     }
   });
 
-  it('reports INDETERMINATE when file exceeds maxBytes limit', async () => {
-    const server = net.createServer((_socket) => {});
+  it('reports INDETERMINATE when file exceeds maxBytes limit without taking over the stream', async () => {
+    const sockets = new Set<net.Socket>();
+    let serverSawClose!: () => void;
+    const closed = new Promise<void>((resolve) => (serverSawClose = resolve));
+    const server = net.createServer((socket) => {
+      sockets.add(socket);
+      socket.on('close', serverSawClose);
+      // Drain like clamd does; an unread socket never observes the client's close.
+      socket.resume();
+    });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const port = (server.address() as net.AddressInfo).port;
 
@@ -137,12 +145,32 @@ describe('ClamAvScanner (streaming TCP zINSTREAM protocol)', () => {
         timeoutMs: 2000,
         maxBytes: 10, // tiny max limit
       });
-      const stream = Readable.from([Buffer.from('This chunk is longer than 10 bytes')]);
+      // Delay the oversized chunk so zINSTREAM reaches the server before the limit trips.
+      const payload = [
+        Buffer.from('This chunk is longer than 10 bytes'),
+        Buffer.from('tail bytes'),
+      ];
+      const stream = Readable.from(
+        (async function* () {
+          await new Promise((r) => setTimeout(r, 50));
+          yield* payload;
+        })(),
+      );
+      // Independent consumer, as scan-worker's metering/hash path is.
+      const seen: Buffer[] = [];
+      stream.on('data', (c: Buffer) => seen.push(c));
+      const ended = new Promise<void>((resolve) => stream.once('end', resolve));
       const result = await scanner.scanStream(stream);
 
       expect(result.verdict).toBe('INDETERMINATE');
       expect(result.details).toMatch(/exceeded scan limit/i);
+      // Caller-owned stream: not destroyed by the scanner, and it still drains completely.
+      expect(stream.destroyed).toBe(false);
+      await ended;
+      expect(Buffer.concat(seen)).toEqual(Buffer.concat(payload));
+      await closed; // scanner released its socket without help from the fixture
     } finally {
+      for (const s of sockets) s.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
