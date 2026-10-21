@@ -38,6 +38,33 @@ export const STAFF: MeData = {
   roles: ['HOD'],
   capabilities: ['session.read', 'session.revoke', 'student.profile.read'],
 };
+export const ACADEMIC_ADMIN: MeData = {
+  tenant_id: 't1',
+  user_id: 'u4',
+  actor_kind: 'STAFF',
+  display_name: 'Rita Registrar',
+  roles: ['REGISTRAR'],
+  capabilities: [
+    'session.read',
+    'session.revoke',
+    'org.structure.read',
+    'academic.program.read',
+    'academic.term.manage',
+    'academic.course.manage',
+    'academic.section.manage',
+    'enrollment.term.read',
+    'enrollment.term.manage',
+  ],
+};
+/** Read-only: a head of department sees academics and enrolments but can change nothing. */
+export const ACADEMIC_READER: MeData = {
+  ...ACADEMIC_ADMIN,
+  user_id: 'u5',
+  display_name: 'Hari HOD',
+  roles: ['HOD'],
+  capabilities: ['session.read', 'academic.program.read', 'enrollment.term.read'],
+};
+
 export const ADMIN: MeData = {
   tenant_id: 't1',
   user_id: 'u3',
@@ -71,6 +98,47 @@ export function createFakeBackend(
     meMode: 'ok' as Mode | 'noaccess',
     logoutMode: 'ok' as Mode,
     calls: [] as Call[],
+    academics: {
+      years: [
+        {
+          id: 'y1',
+          label: '2026-27',
+          startDate: '2026-06-01',
+          endDate: '2027-05-31',
+          status: 'PLANNED',
+          version: 1,
+        },
+      ] as Array<Record<string, unknown>>,
+      terms: [
+        {
+          id: 't1',
+          campusId: 'camp-1',
+          academicYearId: 'y1',
+          code: 'ODD',
+          name: 'Odd semester',
+          startDate: '2026-06-01',
+          endDate: '2026-12-31',
+          status: 'PLANNED',
+          version: 1,
+        },
+      ] as Array<Record<string, unknown>>,
+      courses: [] as Array<Record<string, unknown>>,
+      periods: [
+        {
+          id: 'cp1',
+          cohortId: 'co1',
+          termId: 't1',
+          periodNo: 1,
+          isExtension: false,
+          status: 'ACTIVE',
+          version: 1,
+        },
+      ] as Array<Record<string, unknown>>,
+      sections: [] as Array<Record<string, unknown>>,
+      enrollments: {} as Record<string, Array<Record<string, unknown>>>,
+      /** When set, the next write answers with this status (e.g. 409) and the matching code. */
+      failNext: null as null | { status: number; code: string },
+    },
     mfa: {
       enrolled: false,
       required: false,
@@ -348,6 +416,121 @@ export function createFakeBackend(
           },
         ],
       });
+    }
+    if (path.startsWith('/academics/') || /^\/students\/[^/]+\/term-enrollments/.test(path)) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      const a = state.academics;
+      const reqBody =
+        typeof reqInit?.body === 'string'
+          ? (JSON.parse(reqInit.body) as Record<string, unknown>)
+          : {};
+      if (method !== 'GET') {
+        if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+        if (a.failNext) {
+          const f = a.failNext;
+          a.failNext = null;
+          return err(f.status, f.code);
+        }
+      }
+      const list = (data: unknown) => json(200, { success: true, data });
+      const created = (arr: Array<Record<string, unknown>>, row: Record<string, unknown>) => {
+        const id = `${typeof row.kind === 'string' ? row.kind : 'x'}-${arr.length + 1}`;
+        arr.push({ ...row, id, version: 1 });
+        return json(201, { success: true, data: { id } });
+      };
+      if (path === '/academics/academic-years') {
+        if (method === 'GET') return list(a.years);
+        return created(a.years, { ...reqBody, status: 'PLANNED', kind: 'y' });
+      }
+      if (path === '/academics/terms') {
+        if (method === 'GET') return list(a.terms);
+        return created(a.terms, { ...reqBody, status: 'PLANNED', kind: 't' });
+      }
+      if (path === '/academics/courses') {
+        if (method === 'GET') return list(a.courses);
+        return created(a.courses, {
+          ...reqBody,
+          status: 'ACTIVE',
+          tracksAttendance: true,
+          owningDepartmentId: null,
+          kind: 'c',
+        });
+      }
+      if (path === '/academics/cohort-periods') return list(a.periods);
+      if (path === '/academics/sections') {
+        if (method === 'GET') return list(a.sections);
+        return created(a.sections, {
+          capacity: null,
+          ...reqBody,
+          status: 'ACTIVE',
+          memberCount: 0,
+          kind: 's',
+        });
+      }
+      const patchMatch = /^\/academics\/(academic-years|terms)\/([^/]+)$/.exec(path);
+      if (patchMatch && method === 'PATCH') {
+        if (!headers['if-match']) return err(428, 'PRECONDITION_REQUIRED');
+        const arr = patchMatch[1] === 'terms' ? a.terms : a.years;
+        const row = arr.find((r) => r.id === patchMatch[2]);
+        if (!row) return err(404, 'RESOURCE_NOT_FOUND');
+        if (headers['if-match'] !== `"${String(row.version)}"`) return err(409, 'CONFLICT');
+        row.status = reqBody.status;
+        row.version = Number(row.version) + 1;
+        return json(200, { success: true, data: row });
+      }
+      const rosterMatch = /^\/academics\/sections\/([^/]+)\/members$/.exec(path);
+      if (rosterMatch) {
+        return list(
+          Object.values(a.enrollments)
+            .flat()
+            .filter(
+              (e) =>
+                (e.currentSection as { sectionId: string } | null)?.sectionId === rosterMatch[1],
+            )
+            .map((e) => ({
+              termEnrollmentId: e.id,
+              studentId: e.studentId,
+              validFrom: (e.currentSection as { validFrom: string }).validFrom,
+              rollNumber: e.rollNumber ?? null,
+            })),
+        );
+      }
+      const enr = /^\/students\/([^/]+)\/term-enrollments(?:\/([^/]+)\/section)?$/.exec(path);
+      if (enr) {
+        const student = enr[1] as string;
+        // a student outside the caller's access is indistinguishable from a missing one
+        if (student.startsWith('ffffffff')) return err(404, 'RESOURCE_NOT_FOUND');
+        const rows = (a.enrollments[student] ??= []);
+        if (!enr[2] && method === 'GET') return list(rows);
+        if (!enr[2] && method === 'POST') {
+          if (!headers['idempotency-key']) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');
+          const id = `e-${rows.length + 1}`;
+          rows.push({
+            id,
+            studentId: student,
+            cohortPeriodId: reqBody.cohortPeriodId,
+            termId: 't1',
+            periodNo: 1,
+            status: 'REGISTERED',
+            enrollmentType: 'REGULAR',
+            rollNumber: reqBody.rollNumber ?? null,
+            currentSection: null,
+            version: 1,
+          });
+          return json(201, { success: true, data: { id } });
+        }
+        if (enr[2] && method === 'POST') {
+          const row = rows.find((r) => r.id === enr[2]);
+          if (!row) return err(404, 'RESOURCE_NOT_FOUND');
+          const sec = a.sections.find((s) => s.id === reqBody.sectionId);
+          row.currentSection = {
+            sectionId: reqBody.sectionId,
+            name: sec?.name ?? '?',
+            validFrom: reqBody.validFrom,
+          };
+          return json(200, { success: true, data: row });
+        }
+      }
     }
     if (path === '/t/missing') return err(404, 'RESOURCE_NOT_FOUND');
     if (path === '/t/forbidden') return err(403, 'FORBIDDEN');

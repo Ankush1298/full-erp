@@ -52,6 +52,11 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'academic.program.read', sensitivity: 'NORMAL' },
   { code: 'academic.program.manage', sensitivity: 'SENSITIVE' },
   { code: 'academic.cohort.manage', sensitivity: 'SENSITIVE' },
+  { code: 'academic.term.manage', sensitivity: 'SENSITIVE' },
+  { code: 'academic.course.manage', sensitivity: 'SENSITIVE' },
+  { code: 'academic.section.manage', sensitivity: 'SENSITIVE' },
+  { code: 'enrollment.term.read', sensitivity: 'SENSITIVE' },
+  { code: 'enrollment.term.manage', sensitivity: 'SENSITIVE' },
 
   { code: 'employee.profile.read', sensitivity: 'NORMAL' },
   { code: 'employee.record.create', sensitivity: 'SENSITIVE' },

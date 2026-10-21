@@ -11,7 +11,10 @@ import {
 } from '../../shared/idempotency/index.js';
 import type { ExpectedVersion } from '../../shared/settings/index.js';
 import { invalid, parseDate, parseReason } from '../people/validation.js';
-import { STATUS_ENROLMENT_NOT_CLOSABLE } from './student-status.js';
+import {
+  PROGRAM_HAS_LIVE_TERM_ENROLLMENTS,
+  STATUS_ENROLMENT_NOT_CLOSABLE,
+} from './student-status.js';
 
 export const OPEN_STUDENT_PROGRAM_OPERATION = 'POST /api/v1/students/:id/programs';
 export const PROGRAM_ASSIGN_PERMISSION = 'student.program.assign';
@@ -93,6 +96,12 @@ function ensureTrusted(ctx: TrustedContext): void {
   }
 }
 const conflict = (message: string): AppError => new AppError(409, 'CONFLICT', message);
+const liveTermEnrollments = (): AppError =>
+  new AppError(
+    409,
+    PROGRAM_HAS_LIVE_TERM_ENROLLMENTS,
+    'The enrolment has live term enrolments. Withdraw or complete them first.',
+  );
 
 /**
  * Opening and closing a student's program enrolment (`app.student_programs`, migration 0021). Service layer only: no
@@ -396,13 +405,33 @@ async function writeClose(
   reason: string,
   meta: AuditRequestMeta,
 ): Promise<EnrolmentRow> {
-  const updated = await tx.query<EnrolmentRow>(
-    `UPDATE app.student_programs
-        SET status = $3, end_date = $4::date, exit_reason = $5
-      WHERE organization_id = $1 AND id = $2 AND version = $6 AND status = 'ACTIVE'
-      RETURNING ${COLS}`,
-    [ctx.tenantId, row.id, outcome, endDate, reason, row.version],
+  // Milestone 3: live term enrolments hang off this enrolment; closing it would orphan them (migration 0033 backs this up).
+  const live = await tx.query(
+    `SELECT 1 FROM app.term_enrollments
+      WHERE organization_id = $1 AND student_program_id = $2
+        AND status IN ('REGISTERED', 'ACTIVE', 'DETAINED', 'ON_LEAVE') LIMIT 1`,
+    [ctx.tenantId, row.id],
   );
+  if (live.rows[0]) {
+    throw liveTermEnrollments();
+  }
+  let updated;
+  try {
+    updated = await tx.query<EnrolmentRow>(
+      `UPDATE app.student_programs
+          SET status = $3, end_date = $4::date, exit_reason = $5
+        WHERE organization_id = $1 AND id = $2 AND version = $6 AND status = 'ACTIVE'
+        RETURNING ${COLS}`,
+      [ctx.tenantId, row.id, outcome, endDate, reason, row.version],
+    );
+  } catch (err) {
+    // The migration 0033 trigger lost-race backstop: a term enrolment committed between the check above and this UPDATE.
+    const e = err as { code?: string; constraint?: string };
+    if (e.code === '23514' && e.constraint === 'student_programs_no_live_term_enrollments_ck') {
+      throw liveTermEnrollments();
+    }
+    throw err;
+  }
   const saved = updated.rows[0];
   if (!saved) throw conflict('Enrolment was changed concurrently. Retry.');
 

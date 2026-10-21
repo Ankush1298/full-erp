@@ -92,7 +92,7 @@ describe('migration plan: contract gate', () => {
     const plan = planMigrations(all, new Map());
     expect(versions(plan.deferred)).toEqual(all.slice(8).map((m) => m.version));
     expect(versions(plan.deferred)[0]).toBe('0009');
-    expect(versions(plan.deferred).at(-1)).toBe('0032');
+    expect(versions(plan.deferred).at(-1)).toBe('0033');
     expect(versions(plan.run)).toEqual(all.slice(0, 8).map((m) => m.version));
   });
 
@@ -213,6 +213,7 @@ describe('migration plan: phase boundary', () => {
         '0030',
         '0031',
         '0032',
+        '0033',
       ]);
       const ordinary = planMigrations(all, upTo(8));
       expect(ordinary.run).toEqual([]);
@@ -245,6 +246,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
       }
     });
@@ -268,6 +270,7 @@ describe('migration plan: phase boundary', () => {
         '0030',
         '0031',
         '0032',
+        '0033',
       ]);
       expect(planMigrations(all, at18, ['0019']).deferred).toEqual([]);
       expect(versions(planMigrations(all, at18, ['0019']).run)).toEqual([
@@ -285,6 +288,7 @@ describe('migration plan: phase boundary', () => {
         '0030',
         '0031',
         '0032',
+        '0033',
       ]);
       expect(() => planMigrations(all, upTo(9), ['0019'])).toThrow(REFUSED);
       expect(() => planMigrations(all, upTo(9), ['0019'])).toThrow(/pending 0010, /);
@@ -307,6 +311,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(plan.deferred).toEqual([]);
         const at20 = planMigrations(all, upTo(20), allow);
@@ -323,6 +328,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(at20.deferred).toEqual([]);
         const at21 = planMigrations(all, upTo(21), allow);
@@ -338,6 +344,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(at21.deferred).toEqual([]);
         const at22 = planMigrations(all, upTo(22), allow);
@@ -352,6 +359,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(at22.deferred).toEqual([]);
         const at23 = planMigrations(all, upTo(23), allow);
@@ -365,6 +373,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(at23.deferred).toEqual([]);
         const at24 = planMigrations(all, upTo(24), allow);
@@ -377,6 +386,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(at24.deferred).toEqual([]);
         const at25 = planMigrations(all, upTo(25), allow);
@@ -388,27 +398,39 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(at25.deferred).toEqual([]);
         const at26 = planMigrations(all, upTo(26), allow);
-        expect(versions(at26.run)).toEqual(['0027', '0028', '0029', '0030', '0031', '0032']);
+        expect(versions(at26.run)).toEqual([
+          '0027',
+          '0028',
+          '0029',
+          '0030',
+          '0031',
+          '0032',
+          '0033',
+        ]);
         expect(at26.deferred).toEqual([]);
         const at27 = planMigrations(all, upTo(27), allow);
-        expect(versions(at27.run)).toEqual(['0028', '0029', '0030', '0031', '0032']);
+        expect(versions(at27.run)).toEqual(['0028', '0029', '0030', '0031', '0032', '0033']);
         expect(at27.deferred).toEqual([]);
         const at28 = planMigrations(all, upTo(28), allow);
-        expect(versions(at28.run)).toEqual(['0029', '0030', '0031', '0032']);
+        expect(versions(at28.run)).toEqual(['0029', '0030', '0031', '0032', '0033']);
         expect(at28.deferred).toEqual([]);
         const at29 = planMigrations(all, upTo(29), allow);
-        expect(versions(at29.run)).toEqual(['0030', '0031', '0032']);
+        expect(versions(at29.run)).toEqual(['0030', '0031', '0032', '0033']);
         expect(at29.deferred).toEqual([]);
         const at30 = planMigrations(all, upTo(30), allow);
-        expect(versions(at30.run)).toEqual(['0031', '0032']);
+        expect(versions(at30.run)).toEqual(['0031', '0032', '0033']);
         expect(at30.deferred).toEqual([]);
         const at31 = planMigrations(all, upTo(31), allow);
-        expect(versions(at31.run)).toEqual(['0032']);
+        expect(versions(at31.run)).toEqual(['0032', '0033']);
         expect(at31.deferred).toEqual([]);
-        const done = planMigrations(all, upTo(32), allow);
+        const at32 = planMigrations(all, upTo(32), allow);
+        expect(versions(at32.run)).toEqual(['0033']);
+        expect(at32.deferred).toEqual([]);
+        const done = planMigrations(all, upTo(33), allow);
         expect(done.run).toEqual([]);
         expect(done.deferred).toEqual([]);
       }
@@ -444,6 +466,7 @@ describe('migration plan: phase boundary', () => {
           '0030',
           '0031',
           '0032',
+          '0033',
         ]);
         expect(versions(plan.run)).not.toContain('0020');
         expect(versions(plan.run)).not.toContain('0021');
@@ -472,6 +495,7 @@ describe('migration plan: phase boundary', () => {
         '0030',
         '0031',
         '0032',
+        '0033',
       ]) {
         expect(() => planMigrations(all, upTo(18), [v])).toThrow(
           /no contract migration with that exact version/,
@@ -497,6 +521,7 @@ describe('migration plan: phase boundary', () => {
         '0030',
         '0031',
         '0032',
+        '0033',
       ]);
       expect(versions(planMigrations(all, new Map(), ['0009', '0019']).run)).toEqual(
         all.map((m) => m.version),
@@ -510,7 +535,7 @@ describe('migration plan: phase boundary', () => {
       const gap = upTo(7);
       gap.delete('0004');
       expect(() => planMigrations(all, gap)).toThrow(/not a contiguous prefix/);
-      expect(() => planMigrations(all, new Map([...upTo(32), ['0033', 'x']]))).toThrow(
+      expect(() => planMigrations(all, new Map([...upTo(33), ['0034', 'x']]))).toThrow(
         /missing from source control/,
       );
     });
@@ -536,7 +561,7 @@ describe('migration plan: phase boundary', () => {
     });
 
     it('rejects unknown migration versions in through', () => {
-      for (const unknown of ['0000', '0033', '0099', '9999']) {
+      for (const unknown of ['0000', '0034', '0099', '9999']) {
         expect(() => planMigrations(all, new Map(), [], unknown)).toThrow(
           /no migration with that exact version/,
         );
@@ -631,7 +656,15 @@ describe('migration plan: phase boundary', () => {
       it('combinations: --through 0026 with --allow-contract 0019 applies 0019..0026 and defers 0027..0030', () => {
         const plan = planMigrations(all, upTo(18), ['0019'], '0026');
         expect(versions(plan.run)).toEqual(all.slice(18, 26).map((m) => m.version)); // 0019..0026
-        expect(versions(plan.deferred)).toEqual(['0027', '0028', '0029', '0030', '0031', '0032']);
+        expect(versions(plan.deferred)).toEqual([
+          '0027',
+          '0028',
+          '0029',
+          '0030',
+          '0031',
+          '0032',
+          '0033',
+        ]);
         expect(plan.deferredByThrough).toBe('0026');
       });
     });

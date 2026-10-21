@@ -20,6 +20,8 @@ const DIRECTORY = 'src/modules/students/student-directory.service.ts';
 const DIRECTORY_LIST = 'src/modules/students/student-directory-list.service.ts';
 const DEPT = 'src/modules/organization/department.service.ts';
 const ACADEMIC = 'src/modules/academics/academic.service.ts';
+// Milestone 3: reads the ACTIVE enrolment (scope + cohort) before creating a term enrolment; never writes it.
+const TERM_ENROLLMENT = 'src/modules/students/term-enrollment.service.ts';
 const text = (path: string): string => files.find((f) => f.path === path)!.text;
 
 /** The body of `static async <name>(` up to the next `static async` (or the end of the class). */
@@ -44,7 +46,9 @@ describe('only StudentProgramService writes app.student_programs and app.student
 
   it('no other source file names the tables except the two deactivation guards and the two directory readers (lookup and paginated list), which only read', () => {
     const naming = files.filter((f) => TABLE.test(f.text)).map((f) => f.path);
-    expect(naming.sort()).toEqual([ACADEMIC, DEPT, DIRECTORY, DIRECTORY_LIST, SERVICE].sort());
+    expect(naming.sort()).toEqual(
+      [ACADEMIC, DEPT, DIRECTORY, DIRECTORY_LIST, SERVICE, TERM_ENROLLMENT].sort(),
+    );
     const writers = files.filter((f) => WRITE.test(f.text)).map((f) => f.path);
     expect(writers).toEqual([SERVICE]);
     for (const guard of [DEPT, ACADEMIC, DIRECTORY, DIRECTORY_LIST]) {

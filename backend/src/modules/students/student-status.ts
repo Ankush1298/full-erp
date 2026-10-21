@@ -57,6 +57,8 @@ export const ENROLMENT_CLOSE_OUTCOME: Readonly<Partial<Record<StudentStatus, Clo
 export const STATUS_TRANSITION_INVALID = 'STUDENT_STATUS_TRANSITION_INVALID';
 export const STATUS_TRANSITION_UNAVAILABLE = 'STUDENT_STATUS_TRANSITION_UNAVAILABLE';
 export const STATUS_ENROLMENT_NOT_CLOSABLE = 'STUDENT_STATUS_ENROLMENT_NOT_CLOSABLE';
+/** 409: closing a program enrolment (directly or through a graduation / discontinuation) while term enrolments are live. */
+export const PROGRAM_HAS_LIVE_TERM_ENROLLMENTS = 'STUDENT_PROGRAM_HAS_LIVE_TERM_ENROLLMENTS';
 
 /** Throws the 409 for a pair that may not happen. The message names the two statuses; it reveals nothing else. */
 export function assertTransitionAllowed(from: StudentStatus, to: StudentStatus): void {

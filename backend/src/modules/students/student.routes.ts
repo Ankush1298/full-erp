@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { registerTermEnrollmentRoutes } from './term-enrollment.routes.js';
 import type { Database } from '../../shared/database/index.js';
 import { AppError } from '../../shared/errors/http-errors.js';
 import type { AuditRequestMeta } from '../../shared/audit/index.js';
@@ -179,4 +180,7 @@ export const registerStudentRoutes: FastifyPluginAsync<{ db: Database }> = async
       return reply.status(200).send({ success: true, data });
     },
   );
+
+  // Milestone 3 Batch 1: term enrolments and section placement.
+  registerTermEnrollmentRoutes(app, opts.db);
 };

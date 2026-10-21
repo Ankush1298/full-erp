@@ -70,6 +70,9 @@ export class ApiClient {
   post<S extends z.ZodType>(path: string, o: RequestOptions<S>): Promise<z.infer<S>> {
     return this.request('POST', path, o);
   }
+  patch<S extends z.ZodType>(path: string, o: RequestOptions<S>): Promise<z.infer<S>> {
+    return this.request('PATCH', path, o);
+  }
   delete<S extends z.ZodType>(path: string, o: RequestOptions<S>): Promise<z.infer<S>> {
     return this.request('DELETE', path, o);
   }

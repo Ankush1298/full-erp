@@ -128,7 +128,7 @@ describe('authorization tables: runtime privileges are least-privilege', () => {
   });
 
   it('the permission catalog is readable but not writable by the runtime role', async () => {
-    expect((await runAs(CTX.studentA, 'SELECT code FROM platform.permissions')).rowCount).toBe(41);
+    expect((await runAs(CTX.studentA, 'SELECT code FROM platform.permissions')).rowCount).toBe(46);
     for (const sql of [
       `INSERT INTO platform.permissions (code, sensitivity) VALUES ('x.y.z', 'NORMAL')`,
       `UPDATE platform.permissions SET sensitivity = 'NORMAL'`,
@@ -317,37 +317,51 @@ describe('no accidental probe or debug objects', () => {
       `SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname IN ('app','platform') ORDER BY 1`,
     );
-    expect(fns.map((f) => f.proname)).toEqual([
-      'admin_reset_user_mfa',
-      'complete_invitation',
-      'consents_guard',
-      'context_ok',
-      'current_actor_kind',
-      'current_tenant_id',
-      'current_user_id',
-      'enforce_immutable_keys',
-      'enforce_person_record_exclusive',
-      'enforce_student_staff_role_exclusive_on_assignment',
-      'enforce_student_staff_role_exclusive_on_student',
-      'files_guard',
-      'get_identity_memberships',
-      'lock_invitation',
-      'mfa_enrollment_tickets_guard',
-      'reject_audit_mutation',
-      'reject_student_program_event_mutation',
-      'role_assignments_guard',
-      'student_guardians_guard',
-      'student_program_events_guard',
-      'student_programs_guard',
-      'student_programs_open_guard',
-      'students_guard',
-      'students_status_transition_guard',
-      'touch_row',
-      'user_mfa_factors_guard',
-      'user_mfa_factors_insert_guard',
-      'user_recovery_codes_guard',
-      'users_invited_status_guard',
-    ]);
+    // Compared as sorted sets: the database ORDER BY follows the server collation, which differs between machines.
+    expect(fns.map((f) => f.proname).sort()).toEqual(
+      [
+        'admin_reset_user_mfa',
+        'complete_invitation',
+        'consents_guard',
+        'context_ok',
+        'current_actor_kind',
+        'current_tenant_id',
+        'current_user_id',
+        'enforce_immutable_keys',
+        'enforce_person_record_exclusive',
+        'enforce_student_staff_role_exclusive_on_assignment',
+        'enforce_student_staff_role_exclusive_on_student',
+        'files_guard',
+        'get_identity_memberships',
+        'lock_invitation',
+        'mfa_enrollment_tickets_guard',
+        'reject_audit_mutation',
+        'reject_student_program_event_mutation',
+        'role_assignments_guard',
+        'student_guardians_guard',
+        'student_program_events_guard',
+        'student_programs_guard',
+        'student_programs_open_guard',
+        'students_guard',
+        'students_status_transition_guard',
+        'touch_row',
+        'user_mfa_factors_guard',
+        'user_mfa_factors_insert_guard',
+        'user_recovery_codes_guard',
+        'users_invited_status_guard',
+        'academic_years_guard',
+        'programs_duration_guard',
+        'term_enrollments_close_membership',
+        'cohort_periods_guard',
+        'courses_guard',
+        'curriculum_courses_guard',
+        'section_memberships_guard',
+        'sections_guard',
+        'student_programs_live_term_enrollments_guard',
+        'term_enrollments_guard',
+        'terms_guard',
+      ].sort(),
+    );
     const rels = await adminQuery<{ relname: string }>(
       `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'platform' AND c.relkind IN ('r','v','m') ORDER BY 1`,

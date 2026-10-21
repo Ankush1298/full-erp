@@ -3,6 +3,7 @@ import type { Database } from '../../shared/database/index.js';
 import { AppError } from '../../shared/errors/http-errors.js';
 import type { AuditRequestMeta } from '../../shared/audit/index.js';
 import { PeriodTypeService, ProgramService, CohortService } from './academic.service.js';
+import { registerCalendarRoutes } from './calendar.routes.js';
 import {
   CreatePeriodTypeBodySchema,
   type CreatePeriodTypeBody,
@@ -187,4 +188,7 @@ export const registerAcademicsRoutes: FastifyPluginAsync<{ db: Database }> = asy
       return reply.status(200).send({ success: true });
     },
   );
+
+  // Milestone 3 Batch 1: academic years, terms, cohort periods, sections, courses, curriculum.
+  registerCalendarRoutes(app, opts.db);
 };

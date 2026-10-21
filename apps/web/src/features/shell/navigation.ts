@@ -49,6 +49,19 @@ export const NAV_ITEMS: readonly NavItem[] = [
     audience: 'staff',
   },
   {
+    id: 'academics',
+    label: 'Academics',
+    to: '/academics',
+    anyOf: [
+      'academic.term.manage',
+      'academic.course.manage',
+      'academic.section.manage',
+      'enrollment.term.manage',
+      'enrollment.term.read',
+    ],
+    audience: 'staff',
+  },
+  {
     id: 'organisation',
     label: 'Organisation',
     to: '/organisation',

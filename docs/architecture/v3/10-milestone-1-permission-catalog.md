@@ -42,7 +42,7 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | 18 | `org.settings.read` | N | – | – | – | – | – | G | G | G |
 | 19 | `org.settings.manage` | C | – | – | – | – | – | – | G | – |
 | **Programs (minimal)** |
-| 20 | `academic.program.read` (programs, cohorts, period types) | N | G | G | G | G | G | G | G | G |
+| 20 | `academic.program.read` (programs, cohorts, period types; M3 adds academic years, terms, cohort periods, sections, courses, curriculum) | N | G | G | G | G | G | G | G | G |
 | 21 | `academic.program.manage` | S | – | – | – | – | G | G | G | G |
 | 22 | `academic.cohort.manage` | S | – | – | – | – | G | G | G | G |
 | **Students** |
@@ -80,6 +80,12 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | **AI foundation** |
 | 48 | `assistant.use` | N | S | S | – | – | – | – | – | – |
 | 49 | `assistant.conversation.read` (own) | N | S | S | – | – | – | – | – | – |
+| **Academic calendar & enrollment (Milestone 3, Batch 1)** |
+| 50 | `academic.term.manage` (academic years - organization scope - and campus terms, cohort periods are under `academic.cohort.manage`) | S | – | – | – | – | – | G | G | G |
+| 51 | `academic.course.manage` (courses and curriculum entries) | S | – | – | – | – | G | G | G | G |
+| 52 | `academic.section.manage` (sections) | S | – | – | – | – | G | G | G | G |
+| 53 | `enrollment.term.read` (term enrolments and section memberships) | S | S | – | – | G | G | G | G | G |
+| 54 | `enrollment.term.manage` (create / change term enrolments, place students in sections) | S | – | – | – | – | G | G | G | G |
 
 ¹ FACULTY `student.profile.read` is `A` (assigned) but the resolver needs course registrations (M3); in M1 the permission is **not seeded for FACULTY**, only the resolver contract is tested with a stub.
 

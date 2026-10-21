@@ -7,6 +7,8 @@ const STUDENT_BEARING = [
   'student_guardians',
   'student_programs',
   'student_program_events',
+  'term_enrollments',
+  'section_memberships',
 ];
 
 describe('schema linter (S-2)', () => {
@@ -205,10 +207,14 @@ describe('schema linter (S-2)', () => {
           AND NOT c.relispartition`, // partition children inherit the parent's trigger; checked in audit-events.test.ts
     );
     expect(rows.map((r) => r.relname).sort()).toEqual([
+      'academic_years',
       'audit_events',
       'campuses',
+      'cohort_periods',
       'cohorts',
       'consents',
+      'courses',
+      'curriculum_courses',
       'departments',
       'designations',
       'employees',
@@ -231,10 +237,14 @@ describe('schema linter (S-2)', () => {
       'role_assignments',
       'role_permissions',
       'roles',
+      'section_memberships',
+      'sections',
       'student_guardians',
       'student_program_events',
       'student_programs',
       'students',
+      'term_enrollments',
+      'terms',
       'user_mfa_factors',
       'user_recovery_codes',
       'users',

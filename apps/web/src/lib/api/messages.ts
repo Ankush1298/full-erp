@@ -64,3 +64,30 @@ export function mfaErrorMessage(err: unknown): string {
   }
   return 'Authentication failed. Please verify your code and try again.';
 }
+
+/** Fixed wording for the academics pages; the server's own text is never shown. */
+export function academicsErrorMessage(err: unknown): string {
+  if (!isApiError(err)) return 'Something went wrong. Please try again.';
+  switch (err.kind) {
+    case 'forbidden':
+      return 'You do not have permission to do that.';
+    case 'not_found':
+      return 'That record could not be found, or it is outside your access.';
+    case 'network':
+      return 'Cannot reach the server. Check your connection and try again.';
+    case 'validation':
+      return err.code === 'CONFLICT'
+        ? 'That conflicts with an existing record or its current state. Reload and try again.'
+        : err.code === 'IDEMPOTENCY_KEY_REUSED' || err.status === 422
+          ? 'That request was already submitted with different details. Reload and try again.'
+          : 'Check the details you entered and try again.';
+    case 'csrf':
+    case 'mfa_required':
+    case 'unauthenticated':
+      return 'The request was rejected. Reload the page and try again.';
+    case 'rate_limited':
+    case 'server':
+    case 'protocol':
+      return 'Something went wrong on our side. Please try again.';
+  }
+}

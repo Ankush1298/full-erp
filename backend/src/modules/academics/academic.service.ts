@@ -57,7 +57,7 @@ async function activeDepartmentScope(
  * grants. ORGANIZATION grant ⇒ every department; CAMPUS grant ⇒ its departments; DEPARTMENT grant ⇒
  * itself. Returns { orgWide } so the caller can skip the id filter entirely.
  */
-async function departmentScopeFilter(
+export async function departmentScopeFilter(
   tx: TenantTx,
   ctx: TrustedContext,
   permissions: readonly string[],
@@ -387,6 +387,37 @@ export class ProgramService {
     return res.rows.map(toProgramDto);
   }
 
+  private static async writeUpdate(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    programId: string,
+    v: {
+      finalName: string;
+      finalDegree: string;
+      finalDuration: number;
+      finalPpy: number | null;
+      finalReg: string | null;
+      finalStatus: ProgramStatus;
+    },
+  ): Promise<void> {
+    await tx.query(
+      `UPDATE app.programs
+          SET name = $3, degree_level = $4, duration_periods = $5, periods_per_year = $6,
+              default_regulation = $7, status = $8
+        WHERE organization_id = $1 AND id = $2`,
+      [
+        ctx.tenantId,
+        programId,
+        v.finalName,
+        v.finalDegree,
+        v.finalDuration,
+        v.finalPpy,
+        v.finalReg,
+        v.finalStatus,
+      ],
+    );
+  }
+
   static async update(
     tx: TenantTx,
     ctx: TrustedContext,
@@ -488,22 +519,44 @@ export class ProgramService {
 
     if (Object.keys(changes).length === 0) return;
 
-    await tx.query(
-      `UPDATE app.programs
-          SET name = $3, degree_level = $4, duration_periods = $5, periods_per_year = $6,
-              default_regulation = $7, status = $8
-        WHERE organization_id = $1 AND id = $2`,
-      [
-        ctx.tenantId,
-        programId,
+    // Milestone 3: the duration cannot drop below a period that curriculum entries or cohort periods already use
+    // (migration 0033 enforces the same for every writer; this gives the caller a precise 409).
+    if (finalDuration < row.duration_periods) {
+      const used = await tx.query(
+        `SELECT 1 FROM app.curriculum_courses
+          WHERE organization_id = $1 AND program_id = $2 AND period_no > $3
+         UNION ALL
+         SELECT 1 FROM app.cohort_periods cp
+           JOIN app.cohorts c ON c.organization_id = cp.organization_id AND c.id = cp.cohort_id
+          WHERE c.organization_id = $1 AND c.program_id = $2 AND NOT cp.is_extension AND cp.period_no > $3
+         LIMIT 1`,
+        [ctx.tenantId, programId, finalDuration],
+      );
+      if (used.rows[0]) {
+        throw new AppError(
+          409,
+          'CONFLICT',
+          'The duration is below a period already used by curriculum entries or cohort periods.',
+        );
+      }
+    }
+
+    try {
+      await ProgramService.writeUpdate(tx, ctx, programId, {
         finalName,
         finalDegree,
         finalDuration,
         finalPpy,
         finalReg,
         finalStatus,
-      ],
-    );
+      });
+    } catch (err) {
+      // a racing curriculum / cohort-period insert that the pre-check could not see (migration 0033 guard)
+      if ((err as { code?: string }).code === '23514') {
+        throw new AppError(409, 'CONFLICT', 'The duration is below a period already in use.');
+      }
+      throw err;
+    }
 
     await recordAudit(
       tx,

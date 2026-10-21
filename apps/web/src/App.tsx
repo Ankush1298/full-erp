@@ -6,6 +6,7 @@ import { AppShell } from './features/shell/AppShell';
 import { InformationalShell } from './features/shell/InformationalShell';
 import { ROUTE_REQUIREMENTS } from './features/shell/navigation';
 import { AccountPage } from './pages/AccountPage';
+import { AcademicsPage } from './pages/AcademicsPage';
 import { ComingSoonPage } from './pages/ComingSoon';
 import { ConsentsPage } from './pages/ConsentsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
@@ -107,6 +108,14 @@ export function AppRoutes() {
             element={
               <RequireCapability anyOf={ROUTE_REQUIREMENTS['/organisation'] ?? []}>
                 <OrganisationPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="academics"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/academics'] ?? []}>
+                <AcademicsPage />
               </RequireCapability>
             }
           />
