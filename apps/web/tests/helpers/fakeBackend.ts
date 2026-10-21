@@ -257,6 +257,98 @@ export function createFakeBackend(
       state.mfa.unusedRecoveryCodes = 0;
       return json(200, { success: true });
     }
+    if (path.startsWith('/notifications') && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      return json(200, {
+        data: [
+          {
+            id: 'notif-1',
+            category: 'ANNOUNCEMENT',
+            title: 'Campus Orientation',
+            body: 'Orientation will be held in Hall A.',
+            read_at: null,
+            created_at: '2026-10-15T10:00:00Z',
+          },
+        ],
+        pagination: { limit: 20, has_more: false },
+      });
+    }
+    if (path === '/notifications/read-all' && method === 'POST') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      return json(200, { count: 1 });
+    }
+    if (path.startsWith('/notifications/') && path.endsWith('/read') && method === 'POST') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      return json(200, {
+        id: 'notif-1',
+        category: 'ANNOUNCEMENT',
+        title: 'Campus Orientation',
+        body: 'Orientation will be held in Hall A.',
+        read_at: '2026-10-15T12:00:00Z',
+      });
+    }
+    if (path === '/me/consents' && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      return json(200, {
+        data: [
+          {
+            id: 'consent-1',
+            consent_type: 'DATA_PROCESSING',
+            policy_version: 'v1.0',
+            status: 'GRANTED',
+            granted_at: '2026-10-10T08:00:00Z',
+          },
+        ],
+        pagination: { limit: 20, has_more: false },
+      });
+    }
+    if (path.startsWith('/me/consents/') && path.endsWith('/withdraw') && method === 'POST') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      return json(200, {
+        success: true,
+        data: {
+          id: 'consent-1',
+          consent_type: 'DATA_PROCESSING',
+          policy_version: 'v1.0',
+          status: 'WITHDRAWN',
+          granted_at: '2026-10-10T08:00:00Z',
+          withdrawn_at: '2026-10-15T10:00:00Z',
+        },
+      });
+    }
+    if (path === '/organization/campuses' && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      return json(200, {
+        success: true,
+        data: [
+          {
+            id: 'camp-1',
+            name: 'Main Campus',
+            code: 'MAIN',
+            timezone: 'Asia/Kolkata',
+            status: 'ACTIVE',
+          },
+        ],
+      });
+    }
+    if (path === '/organization/departments' && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      return json(200, {
+        success: true,
+        data: [
+          {
+            id: 'dept-1',
+            campus_id: 'camp-1',
+            name: 'Computer Science',
+            code: 'CS',
+            status: 'ACTIVE',
+          },
+        ],
+      });
+    }
     if (path === '/t/missing') return err(404, 'RESOURCE_NOT_FOUND');
     if (path === '/t/forbidden') return err(403, 'FORBIDDEN');
     return err(404, 'RESOURCE_NOT_FOUND');

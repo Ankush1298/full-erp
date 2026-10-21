@@ -15,6 +15,23 @@ const MFA_KEYS = {
   MFA_ENCRYPTION_ACTIVE_KEY_ID: 'm1',
 };
 
+// Production also needs object storage for the documents kernel (ADR-010). Not real credentials.
+const STORAGE_KEYS = {
+  STORAGE_ENDPOINT: 'https://s3.example.com',
+  STORAGE_REGION: 'us-east-1',
+  STORAGE_ACCESS_KEY_ID: 'AKIATEST',
+  STORAGE_SECRET_ACCESS_KEY: 'storage-secret-value', // secret-scan:allow (deliberate test fixture)
+  STORAGE_BUCKET_GENERAL: 'campus-general',
+  STORAGE_BUCKET_SENSITIVE: 'campus-sensitive',
+  STORAGE_BUCKET_GENERATED: 'campus-generated',
+};
+
+// Production also needs ClamAV configuration for malware scanning (ADR-010).
+const CLAMAV_KEYS = {
+  CLAMAV_HOST: '127.0.0.1',
+  CLAMAV_PORT: '3310',
+};
+
 describe('loadConfig', () => {
   it('applies safe defaults', () => {
     const c = loadConfig(base);
@@ -50,6 +67,8 @@ describe('loadConfig', () => {
         DATABASE_SSL: 'require',
         APP_ORIGINS: 'https://app.example.edu',
         ...MFA_KEYS,
+        ...STORAGE_KEYS,
+        ...CLAMAV_KEYS,
       }),
     ).not.toThrow();
   });
@@ -62,6 +81,8 @@ describe('loadConfig', () => {
       HOST: '0.0.0.0',
       APP_ORIGINS: 'https://app.example.edu',
       ...MFA_KEYS,
+      ...STORAGE_KEYS,
+      ...CLAMAV_KEYS,
     };
     expect(() => loadConfig(prod)).toThrow(/TRUST_PROXY/);
     expect(() => loadConfig({ ...prod, TRUST_PROXY: 'true' })).not.toThrow();
@@ -119,6 +140,8 @@ describe('cursor key configuration (optional)', () => {
     DATABASE_SSL: 'require',
     APP_ORIGINS: 'https://a.edu',
     ...MFA_KEYS,
+    ...STORAGE_KEYS,
+    ...CLAMAV_KEYS,
   };
 
   function messageOf(env: Record<string, string>): string {
@@ -339,6 +362,8 @@ describe('MFA encryption keyring (MFA_ENCRYPTION_KEYS / MFA_ENCRYPTION_ACTIVE_KE
     NODE_ENV: 'production',
     DATABASE_SSL: 'require',
     APP_ORIGINS: 'https://a.edu',
+    ...STORAGE_KEYS,
+    ...CLAMAV_KEYS,
   };
   const fail = (env: Record<string, string>): string => {
     try {
@@ -413,5 +438,109 @@ describe('MFA encryption keyring (MFA_ENCRYPTION_KEYS / MFA_ENCRYPTION_ACTIVE_KE
     const printed = `${inspect(c, { depth: 10 })}${JSON.stringify(c)}`;
     expect(printed).not.toContain(k1);
     expect(printed).not.toContain(k2);
+  });
+});
+
+describe('object storage (STORAGE_*) for the documents kernel', () => {
+  const prodNoStorage = {
+    ...base,
+    NODE_ENV: 'production',
+    DATABASE_SSL: 'require',
+    APP_ORIGINS: 'https://a.edu',
+    ...MFA_KEYS,
+    ...CLAMAV_KEYS,
+  };
+
+  it('is absent (and the documents feature unavailable) outside production when unset', () => {
+    expect('storage' in loadConfig(base)).toBe(false);
+    expect(loadConfig(base).storage).toBeUndefined();
+  });
+
+  it('is REQUIRED in production: a missing config fails closed and names the variable', () => {
+    let message = '';
+    try {
+      loadConfig(prodNoStorage);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toMatch(/STORAGE_ENDPOINT: required in production/);
+  });
+
+  it('is all-or-nothing: a partial config is refused and the secret is never echoed', () => {
+    let message = '';
+    try {
+      loadConfig({
+        ...base,
+        STORAGE_ENDPOINT: 'https://s3.example.com',
+        STORAGE_SECRET_ACCESS_KEY: 'partial-secret',
+      }); // secret-scan:allow
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toMatch(/STORAGE_REGION: required when any STORAGE_\* is set/);
+    expect(message).not.toContain('partial-secret');
+  });
+
+  it('refuses a non-https endpoint and refuses three buckets that are not distinct', () => {
+    expect(() =>
+      loadConfig({ ...base, ...STORAGE_KEYS, STORAGE_ENDPOINT: 'http://s3.example.com' }),
+    ).toThrow(/STORAGE_ENDPOINT: must be an https/);
+    expect(() =>
+      loadConfig({ ...base, ...STORAGE_KEYS, STORAGE_BUCKET_SENSITIVE: 'campus-general' }),
+    ).toThrow(/distinct/);
+  });
+
+  it('parses a full config and keeps the credentials inside Secret (never printed)', () => {
+    const c = loadConfig({ ...base, ...STORAGE_KEYS });
+    expect(c.storage?.endpoint).toBe('https://s3.example.com');
+    expect(c.storage?.buckets.SENSITIVE).toBe('campus-sensitive');
+    const printed = `${inspect(c, { depth: 10 })}${JSON.stringify(c)}`;
+    expect(printed).not.toContain('storage-secret-value');
+  });
+});
+
+describe('ClamAV daemon config (CLAMAV_*) for the scan worker', () => {
+  const prodNoClamAv = {
+    ...base,
+    NODE_ENV: 'production',
+    DATABASE_SSL: 'require',
+    APP_ORIGINS: 'https://a.edu',
+    ...MFA_KEYS,
+    ...STORAGE_KEYS,
+  };
+
+  it('is absent outside production when unset', () => {
+    expect('clamav' in loadConfig(base)).toBe(false);
+    expect(loadConfig(base).clamav).toBeUndefined();
+  });
+
+  it('is REQUIRED in production: missing CLAMAV_HOST fails closed and names the variable', () => {
+    let message = '';
+    try {
+      loadConfig(prodNoClamAv);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toMatch(/CLAMAV_HOST: required in production/);
+  });
+
+  it('parses valid ClamAV configuration with custom port and timeout', () => {
+    const c = loadConfig({
+      ...base,
+      CLAMAV_HOST: 'clamav.internal',
+      CLAMAV_PORT: '3310',
+      CLAMAV_TIMEOUT_MS: '15000',
+    });
+    expect(c.clamav).toEqual({
+      host: 'clamav.internal',
+      port: 3310,
+      timeoutMs: 15000,
+    });
+  });
+
+  it('rejects an empty CLAMAV_HOST', () => {
+    expect(() => loadConfig({ ...base, CLAMAV_HOST: '   ' })).toThrow(
+      /CLAMAV_HOST: must not be empty/,
+    );
   });
 });

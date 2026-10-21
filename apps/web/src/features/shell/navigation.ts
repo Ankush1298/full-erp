@@ -13,10 +13,27 @@ export interface NavItem {
 /**
  * The menu is computed from capabilities returned by the backend, never from role names typed in the
  * client. Hiding an item is a convenience; the backend still authorises every request.
- * Targets are placeholder pages that say "not yet available": no future module is implied to exist.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'home', label: 'Home', to: '/' },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    to: '/notifications',
+    anyOf: ['notification.read'],
+  },
+  {
+    id: 'documents',
+    label: 'Documents',
+    to: '/documents',
+    anyOf: ['document.read', 'document.upload'],
+  },
+  {
+    id: 'consents',
+    label: 'Privacy & consents',
+    to: '/consents',
+    anyOf: ['consent.read'],
+  },
   {
     id: 'my-profile',
     label: 'My profile',
@@ -35,7 +52,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'organisation',
     label: 'Organisation',
     to: '/organisation',
-    anyOf: ['org.settings.read', 'org.campus.manage', 'org.department.manage'],
+    anyOf: ['org.structure.read', 'org.campus.manage', 'org.department.manage'],
   },
   {
     id: 'access',

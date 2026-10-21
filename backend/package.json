@@ -20,6 +20,7 @@
     "check:secrets": "tsx scripts/check-secrets.ts",
     "db:bootstrap": "tsx --env-file-if-exists=../.env tools/db/cli.ts bootstrap",
     "db:migrate": "tsx --env-file-if-exists=../.env tools/db/cli.ts migrate",
+    "platform:cli": "tsx --env-file-if-exists=../.env tools/platform/cli.ts",
     "test:security:db": "vitest run --project security-db"
   },
   "dependencies": {

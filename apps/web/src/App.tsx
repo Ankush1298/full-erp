@@ -7,6 +7,10 @@ import { InformationalShell } from './features/shell/InformationalShell';
 import { ROUTE_REQUIREMENTS } from './features/shell/navigation';
 import { AccountPage } from './pages/AccountPage';
 import { ComingSoonPage } from './pages/ComingSoon';
+import { ConsentsPage } from './pages/ConsentsPage';
+import { DocumentsPage } from './pages/DocumentsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { OrganisationPage } from './pages/OrganisationPage';
 import { NotFoundPage } from './pages/StatePages';
 import {
   AboutPage,
@@ -55,6 +59,30 @@ export function AppRoutes() {
           <Route index element={<HomePage />} />
           <Route path="account" element={<AccountPage />} />
           <Route
+            path="notifications"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/notifications'] ?? []}>
+                <NotificationsPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="documents"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/documents'] ?? []}>
+                <DocumentsPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="consents"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/consents'] ?? []}>
+                <ConsentsPage />
+              </RequireCapability>
+            }
+          />
+          <Route
             path="profile"
             element={
               <Guarded
@@ -77,11 +105,9 @@ export function AppRoutes() {
           <Route
             path="organisation"
             element={
-              <Guarded
-                path="/organisation"
-                title="Organisation"
-                description="Campuses, departments and settings will be managed here."
-              />
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/organisation'] ?? []}>
+                <OrganisationPage />
+              </RequireCapability>
             }
           />
           <Route

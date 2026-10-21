@@ -9,6 +9,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 export interface RequestOptions<S extends z.ZodType> {
   schema: S;
   body?: unknown;
+  headers?: Record<string, string> | undefined;
   signal?: AbortSignal;
   /** Public endpoints (login) must not trigger the "session expired" handler on 401. */
   public?: boolean;
@@ -80,7 +81,10 @@ export class ApiClient {
     retried = false,
   ): Promise<z.infer<S>> {
     const unsafe = !SAFE_METHODS.has(method);
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      ...(o.headers ?? {}),
+    };
     if (o.body !== undefined) headers['Content-Type'] = 'application/json';
     if (unsafe && this.csrfToken !== null) headers[CSRF_HEADER] = this.csrfToken;
 

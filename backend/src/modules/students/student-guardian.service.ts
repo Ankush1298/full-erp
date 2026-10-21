@@ -640,6 +640,35 @@ export class StudentGuardianService {
       options.meta ?? {},
     );
   }
+
+  /**
+   * Verifies that a guardian is actively linked to the student with can_give_consent = true.
+   * Internal verification helper for consent recording (doc 02 §4.3).
+   */
+  public static async verifyConsentAuthority(
+    tx: TenantTx,
+    tenantId: string,
+    studentUserId: string,
+    guardianId: string,
+  ): Promise<boolean> {
+    const res = await tx.query<{
+      can_give_consent: boolean;
+      valid_from: string;
+      valid_to: string | null;
+    }>(
+      `SELECT sg.can_give_consent, sg.valid_from::text, sg.valid_to::text
+         FROM app.student_guardians sg
+         JOIN app.guardians g ON g.organization_id = sg.organization_id AND g.id = sg.guardian_id
+         JOIN app.students s ON s.organization_id = sg.organization_id AND s.id = sg.student_id
+        WHERE sg.organization_id = $1 AND g.id = $2 AND s.user_id = $3 AND g.deleted_at IS NULL`,
+      [tenantId, guardianId, studentUserId],
+    );
+    const activeLink = res.rows.find((link) => {
+      const today = new Date().toISOString().slice(0, 10);
+      return link.valid_from <= today && (!link.valid_to || link.valid_to >= today);
+    });
+    return activeLink?.can_give_consent === true;
+  }
 }
 
 // ---- shared steps ----------------------------------------------------------------------------------------------------

@@ -57,6 +57,21 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'employee.record.create', sensitivity: 'SENSITIVE' },
   { code: 'employee.record.update', sensitivity: 'SENSITIVE' },
 
+  { code: 'document.upload', sensitivity: 'NORMAL' },
+  { code: 'document.read', sensitivity: 'NORMAL' },
+  { code: 'document.read_restricted', sensitivity: 'CRITICAL' },
+
+  { code: 'consent.read', sensitivity: 'SENSITIVE' },
+  { code: 'consent.record', sensitivity: 'NORMAL' },
+  { code: 'consent.withdraw', sensitivity: 'NORMAL' },
+
+  { code: 'notification.read', sensitivity: 'NORMAL' },
+  { code: 'notification.preference.manage', sensitivity: 'NORMAL' },
+  { code: 'notification.template.manage', sensitivity: 'SENSITIVE' },
+
+  { code: 'assistant.use', sensitivity: 'NORMAL' },
+  { code: 'assistant.conversation.read', sensitivity: 'NORMAL' },
+
   { code: 'role.assignment.grant', sensitivity: 'CRITICAL' },
   { code: 'role.assignment.revoke', sensitivity: 'CRITICAL' },
 ];

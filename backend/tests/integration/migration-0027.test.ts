@@ -17,13 +17,7 @@ describe('0027 applied on top of a database with legacy guardian rows', () => {
     const db = await freshDatabase();
     // A database exactly as it is at 0026: every migration but 0027 (one pass on an empty ledger, contract steps allowed)
     const dir = mkdtempSync(join(tmpdir(), 'campusos-mig-'));
-    for (const f of readdirSync(DEFAULT_MIGRATIONS_DIR).filter(
-      (x) =>
-        !x.startsWith('0027') &&
-        !x.startsWith('0028') &&
-        !x.startsWith('0029') &&
-        !x.startsWith('0030'),
-    )) {
+    for (const f of readdirSync(DEFAULT_MIGRATIONS_DIR).filter((x) => Number(x.slice(0, 4)) < 27)) {
       cpSync(join(DEFAULT_MIGRATIONS_DIR, f), join(dir, f));
     }
     await migrate({ connectionString: db.migrator, dir, allowContract: contractVersions(dir) });
@@ -80,9 +74,7 @@ describe('0027 applied on top of a database with legacy guardian rows', () => {
     // apply 0027 (the real directory: the ledger holds 0001-0026, so exactly one migration is pending)
     // the directory WITH 0027 and WITHOUT the later migrations: exactly one migration is pending
     const upTo27 = mkdtempSync(join(tmpdir(), 'campusos-mig-'));
-    for (const f of readdirSync(DEFAULT_MIGRATIONS_DIR).filter(
-      (x) => !x.startsWith('0028') && !x.startsWith('0029') && !x.startsWith('0030'),
-    )) {
+    for (const f of readdirSync(DEFAULT_MIGRATIONS_DIR).filter((x) => Number(x.slice(0, 4)) < 28)) {
       cpSync(join(DEFAULT_MIGRATIONS_DIR, f), join(upTo27, f));
     }
     const r = await migrate({ connectionString: db.migrator, dir: upTo27 });

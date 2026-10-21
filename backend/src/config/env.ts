@@ -65,6 +65,20 @@ const EnvSchema = z.object({
   // mandatory for the HOD-and-above and REGISTRAR roles and no MFA can be enrolled or verified without it.
   MFA_ENCRYPTION_KEYS: z.string().optional(),
   MFA_ENCRYPTION_ACTIVE_KEY_ID: z.string().optional(),
+  // Object storage for the documents kernel (ADR-010). All-or-nothing, like the keyrings; REQUIRED in production, where
+  // its absence fails closed (no documents feature rather than an insecure fallback). Credentials are wrapped in Secret.
+  STORAGE_ENDPOINT: z.string().optional(),
+  STORAGE_REGION: z.string().optional(),
+  STORAGE_ACCESS_KEY_ID: z.string().optional(),
+  STORAGE_SECRET_ACCESS_KEY: z.string().optional(),
+  STORAGE_FORCE_PATH_STYLE: booleanString,
+  STORAGE_BUCKET_GENERAL: z.string().optional(),
+  STORAGE_BUCKET_SENSITIVE: z.string().optional(),
+  STORAGE_BUCKET_GENERATED: z.string().optional(),
+  // ClamAV daemon configuration for malware scanning (Milestone 1 / Phase 1E).
+  CLAMAV_HOST: z.string().optional(),
+  CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+  CLAMAV_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(30000),
 });
 
 /** Parses APP_ORIGINS: exact origins only (scheme://host[:port]), no paths, no wildcards. */
@@ -100,6 +114,119 @@ export interface KeyRingConfig {
 }
 export type CursorConfig = KeyRingConfig;
 export type MfaConfig = KeyRingConfig;
+
+/** Object-storage configuration (one private bucket per storage class). Present only when fully configured. */
+export interface StorageConfig {
+  readonly endpoint: string;
+  readonly region: string;
+  readonly accessKeyId: Secret;
+  readonly secretAccessKey: Secret;
+  readonly forcePathStyle: boolean;
+  readonly buckets: Readonly<Record<'GENERAL' | 'SENSITIVE' | 'GENERATED', string>>;
+}
+
+const BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+
+/**
+ * STORAGE_* is all-or-nothing: absent means the documents feature is unavailable (fail closed). Any one set requires
+ * every one set, with a valid https endpoint, a region, credentials and three DISTINCT private bucket names. Errors
+ * name the variable and the rule, never a value (credentials are secret).
+ */
+function parseStorage(
+  e: {
+    STORAGE_ENDPOINT?: string | undefined;
+    STORAGE_REGION?: string | undefined;
+    STORAGE_ACCESS_KEY_ID?: string | undefined;
+    STORAGE_SECRET_ACCESS_KEY?: string | undefined;
+    STORAGE_FORCE_PATH_STYLE: boolean;
+    STORAGE_BUCKET_GENERAL?: string | undefined;
+    STORAGE_BUCKET_SENSITIVE?: string | undefined;
+    STORAGE_BUCKET_GENERATED?: string | undefined;
+  },
+  problems: string[],
+): StorageConfig | undefined {
+  const fields = {
+    STORAGE_ENDPOINT: e.STORAGE_ENDPOINT,
+    STORAGE_REGION: e.STORAGE_REGION,
+    STORAGE_ACCESS_KEY_ID: e.STORAGE_ACCESS_KEY_ID,
+    STORAGE_SECRET_ACCESS_KEY: e.STORAGE_SECRET_ACCESS_KEY,
+    STORAGE_BUCKET_GENERAL: e.STORAGE_BUCKET_GENERAL,
+    STORAGE_BUCKET_SENSITIVE: e.STORAGE_BUCKET_SENSITIVE,
+    STORAGE_BUCKET_GENERATED: e.STORAGE_BUCKET_GENERATED,
+  };
+  if (Object.values(fields).every((v) => v === undefined)) return undefined;
+
+  const before = problems.length;
+  for (const [name, value] of Object.entries(fields)) {
+    if (value === undefined || value === '')
+      problems.push(`${name}: required when any STORAGE_* is set`);
+  }
+  if (fields.STORAGE_ENDPOINT !== undefined && fields.STORAGE_ENDPOINT !== '') {
+    try {
+      const u = new URL(fields.STORAGE_ENDPOINT);
+      if (u.protocol !== 'https:') problems.push('STORAGE_ENDPOINT: must be an https:// URL');
+    } catch {
+      problems.push('STORAGE_ENDPOINT: must be a valid https:// URL');
+    }
+  }
+  const buckets = {
+    GENERAL: fields.STORAGE_BUCKET_GENERAL,
+    SENSITIVE: fields.STORAGE_BUCKET_SENSITIVE,
+    GENERATED: fields.STORAGE_BUCKET_GENERATED,
+  };
+  for (const [cls, name] of Object.entries(buckets)) {
+    if (name !== undefined && name !== '' && !BUCKET_NAME_RE.test(name)) {
+      problems.push(`STORAGE_BUCKET_${cls}: must be a valid bucket name (3-63 chars, lowercase)`);
+    }
+  }
+  const names = Object.values(buckets).filter((v): v is string => !!v);
+  if (names.length === 3 && new Set(names).size !== 3) {
+    problems.push(
+      'STORAGE_BUCKET_*: the three bucket names must be distinct (separate buckets per class)',
+    );
+  }
+  if (problems.length !== before) return undefined;
+  return {
+    endpoint: fields.STORAGE_ENDPOINT as string,
+    region: fields.STORAGE_REGION as string,
+    accessKeyId: new Secret(fields.STORAGE_ACCESS_KEY_ID as string),
+    secretAccessKey: new Secret(fields.STORAGE_SECRET_ACCESS_KEY as string),
+    forcePathStyle: e.STORAGE_FORCE_PATH_STYLE,
+    buckets: {
+      GENERAL: buckets.GENERAL as string,
+      SENSITIVE: buckets.SENSITIVE as string,
+      GENERATED: buckets.GENERATED as string,
+    },
+  };
+}
+
+/** ClamAV daemon configuration for the background malware scan worker. */
+export interface ClamAvConfig {
+  readonly host: string;
+  readonly port: number;
+  readonly timeoutMs: number;
+}
+
+function parseClamAv(
+  e: {
+    CLAMAV_HOST?: string | undefined;
+    CLAMAV_PORT: number;
+    CLAMAV_TIMEOUT_MS: number;
+  },
+  problems: string[],
+): ClamAvConfig | undefined {
+  if (e.CLAMAV_HOST === undefined) return undefined;
+  const host = e.CLAMAV_HOST.trim();
+  if (host.length === 0) {
+    problems.push('CLAMAV_HOST: must not be empty');
+    return undefined;
+  }
+  return {
+    host,
+    port: e.CLAMAV_PORT,
+    timeoutMs: e.CLAMAV_TIMEOUT_MS,
+  };
+}
 
 /**
  * `<KEYS>` is `<keyId>:<key>` entries separated by commas (no whitespace is trimmed); `<ACTIVE>` names the key used for
@@ -185,6 +312,10 @@ export interface AppConfig {
   readonly studentDirectoryListEnabled: boolean;
   /** MFA_ENCRYPTION_KEYS + MFA_ENCRYPTION_ACTIVE_KEY_ID. Always present in production; absent elsewhere = MFA unavailable. */
   readonly mfa?: MfaConfig;
+  /** Object storage (STORAGE_*). Always present in production; absent elsewhere = the documents feature is unavailable. */
+  readonly storage?: StorageConfig;
+  /** ClamAV daemon configuration. Always present in production; absent elsewhere = scanner fails closed. */
+  readonly clamav?: ClamAvConfig;
 }
 
 export class ConfigError extends Error {
@@ -227,6 +358,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       problems.push('MFA_ENCRYPTION_KEYS: must not reuse key material from CURSOR_KEYS');
     }
   }
+  const storage = parseStorage(e, problems);
+  const clamav = parseClamAv(e, problems);
   if (e.STUDENT_DIRECTORY_LIST_ENABLED && !cursor) {
     problems.push(
       'STUDENT_DIRECTORY_LIST_ENABLED: requires valid CURSOR_KEYS and CURSOR_ACTIVE_KEY_ID',
@@ -253,6 +386,16 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     if (e.HOST === '0.0.0.0' && !e.TRUST_PROXY) {
       problems.push('HOST: binding 0.0.0.0 in production requires TRUST_PROXY=true (behind proxy)');
     }
+    if (!storage && e.STORAGE_ENDPOINT === undefined && e.STORAGE_BUCKET_SENSITIVE === undefined) {
+      problems.push(
+        'STORAGE_ENDPOINT: required in production (the documents kernel has no insecure fallback)',
+      );
+    }
+    if (!clamav && e.CLAMAV_HOST === undefined) {
+      problems.push(
+        'CLAMAV_HOST: required in production (malware scanning is mandatory for document uploads)',
+      );
+    }
   }
   if (problems.length > 0) throw new ConfigError(problems);
 
@@ -271,5 +414,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     ...(cursor ? { cursor } : {}),
     studentDirectoryListEnabled: e.STUDENT_DIRECTORY_LIST_ENABLED,
     ...(mfa ? { mfa } : {}),
+    ...(storage ? { storage } : {}),
+    ...(clamav ? { clamav } : {}),
   };
 }
