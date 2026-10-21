@@ -62,6 +62,8 @@ describe('GET /auth/me profile', () => {
     expect(b.roles).toEqual(['STUDENT']);
     expect(b.capabilities).toEqual([
       'academic.program.read',
+      'assistant.conversation.read',
+      'assistant.use',
       'auth.mfa.manage',
       'consent.read',
       'consent.record',
