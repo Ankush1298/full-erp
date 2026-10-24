@@ -56,6 +56,8 @@ describe('the rollout boundary', () => {
       '0032',
       '0033',
       '0034',
+      '0035',
+      '0036',
     ]);
     expect(step.blockedBy).toBe('0019');
     const again = await migrate({ connectionString: db.migrator, allowContract: ['0009'] });
@@ -77,6 +79,8 @@ describe('the rollout boundary', () => {
       '0032',
       '0033',
       '0034',
+      '0035',
+      '0036',
     ]);
     expect(await triggersOf(db.admin)).toEqual([]);
     expect(await ledgerOf(db.admin)).not.toContain('0020');
@@ -104,9 +108,11 @@ describe('the rollout boundary', () => {
       '0032',
       '0033',
       '0034',
+      '0035',
+      '0036',
     ]);
     expect(last.deferred).toEqual([]);
-    expect((await ledgerOf(db.admin)).slice(-17)).toEqual([
+    expect((await ledgerOf(db.admin)).slice(-19)).toEqual([
       '0018',
       '0019',
       '0020',
@@ -124,6 +130,8 @@ describe('the rollout boundary', () => {
       '0032',
       '0033',
       '0034',
+      '0035',
+      '0036',
     ]);
     expect(await triggersOf(db.admin)).toEqual(TRIGGERS);
     const noop = await migrate({ connectionString: db.migrator, allowContract: ['0019'] });
@@ -155,6 +163,8 @@ describe('the rollout boundary', () => {
       '0032',
       '0033',
       '0034',
+      '0035',
+      '0036',
     ]);
     expect(plain.deferred).toEqual([]);
     expect(await triggersOf(db.admin)).toEqual(TRIGGERS);

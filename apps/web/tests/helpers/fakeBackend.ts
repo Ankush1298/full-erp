@@ -84,6 +84,24 @@ export const ADMIN: MeData = {
   ],
 };
 
+/** Registrar-like: may import students only. */
+export const IMPORT_REGISTRAR: MeData = {
+  tenant_id: 't1',
+  user_id: 'u5',
+  actor_kind: 'STAFF',
+  display_name: 'Rita Registrar',
+  roles: ['REGISTRAR'],
+  capabilities: ['session.read', 'session.revoke', 'import.job.manage', 'student.record.create'],
+};
+/** Organisation administrator: may import students and employees. */
+export const IMPORT_ADMIN: MeData = {
+  ...IMPORT_REGISTRAR,
+  user_id: 'u6',
+  display_name: 'Ada Admin',
+  roles: ['COLLEGE_ADMIN'],
+  capabilities: [...IMPORT_REGISTRAR.capabilities, 'employee.record.create'],
+};
+
 type Mode = 'ok' | 'invalid' | 'rate' | 'network' | 'server' | 'badjson' | 'badshape';
 
 /** A stand-in for the real backend, implementing the documented contracts including CSRF enforcement. */
@@ -98,6 +116,12 @@ export function createFakeBackend(
     meMode: 'ok' as Mode | 'noaccess',
     logoutMode: 'ok' as Mode,
     calls: [] as Call[],
+    imports: {
+      jobs: new Map<string, Record<string, unknown>>(),
+      byKey: new Map<string, string>(),
+      /** What the next commit does: succeed, report a changed preview, or report a conflict. */
+      commitMode: 'ok' as 'ok' | 'changed' | 'conflict',
+    },
     academics: {
       years: [
         {
@@ -448,6 +472,164 @@ export function createFakeBackend(
           success: true,
           data: { id: 'room-new-1' },
         });
+      }
+    }
+    const imp =
+      /^\/(students|faculty)\/imports(?:\/([^/?]+)(?:\/(validate|rows|commit))?)?(?:\?.*)?$/.exec(
+        path,
+      );
+    if (imp) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      const kindName = imp[1] as 'students' | 'faculty';
+      const jobs = state.imports.jobs;
+      const bodyIn =
+        typeof reqInit?.body === 'string'
+          ? (JSON.parse(reqInit.body) as Record<string, unknown>)
+          : {};
+      if (method !== 'GET' && headers['x-csrf-token'] !== state.csrf)
+        return err(403, 'CSRF_REJECTED');
+      const dto = (j: Record<string, unknown>) => ({
+        id: j.id,
+        type: j.type,
+        status: j.status,
+        rowCount: (j.rows as unknown[]).length,
+        summary: j.summary,
+        version: j.version,
+        createdAt: '2026-10-22T00:00:00.000Z',
+        updatedAt: '2026-10-22T00:00:00.000Z',
+        committedAt: j.status === 'COMMITTED' ? '2026-10-22T01:00:00.000Z' : null,
+      });
+      const evaluate = (j: Record<string, unknown>) => {
+        const rows = j.rows as Array<Record<string, unknown>>;
+        let errorCount = 0;
+        let warningCount = 0;
+        for (const r of rows) {
+          const raw = r.raw as Record<string, string>;
+          const errors: Array<{ code: string; field?: string }> = [];
+          const warnings: Array<{ code: string; field?: string }> = [];
+          if (!raw.email?.includes('@')) errors.push({ code: 'INVALID_EMAIL', field: 'email' });
+          else if (raw.email.startsWith('taken'))
+            errors.push({ code: 'ACCOUNT_HAS_STUDENT_RECORD', field: 'email' });
+          const date = raw.admissionDate ?? raw.joiningDate ?? '';
+          if (date.startsWith('2199'))
+            warnings.push({
+              code: 'FUTURE_DATE',
+              field: raw.admissionDate ? 'admissionDate' : 'joiningDate',
+            });
+          if (raw.name === 'Possible Duplicate')
+            warnings.push({ code: 'POSSIBLE_DUPLICATE_STUDENT' });
+          r.errors = errors;
+          r.warnings = warnings;
+          r.status = errors.length ? 'INVALID' : 'VALID';
+          r.normalized = errors.length
+            ? null
+            : j.type === 'STUDENT_RECORDS'
+              ? {
+                  action: 'CREATE_STUDENT_RECORD',
+                  email: raw.email,
+                  admissionNumber: raw.admissionNumber,
+                  admissionDate: raw.admissionDate,
+                  initialStatus: 'ADMITTED',
+                }
+              : {
+                  action: 'CREATE_EMPLOYEE_RECORD',
+                  email: raw.email,
+                  employeeCode: raw.employeeCode,
+                  employeeType: raw.employeeType,
+                  joiningDate: raw.joiningDate,
+                  initialStatus: 'ACTIVE',
+                };
+          errorCount += errors.length;
+          warningCount += warnings.length;
+        }
+        j.summary = {
+          validRows: rows.filter((r) => r.status === 'VALID').length,
+          invalidRows: rows.filter((r) => r.status === 'INVALID').length,
+          rowsWithWarnings: rows.filter((r) => (r.warnings as unknown[]).length > 0).length,
+          errorCount,
+          warningCount,
+        };
+        j.status = errorCount === 0 ? 'VALIDATED' : 'DRAFT';
+        j.version = (j.version as number) + 1;
+      };
+      if (!imp[2]) {
+        if (method === 'POST') {
+          const key = headers['idempotency-key'];
+          if (!key) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');
+          const existing = state.imports.byKey.get(key);
+          if (existing) return json(201, { success: true, data: { id: existing, version: 1 } });
+          const id = `job-${jobs.size + 1}`;
+          const rows = (bodyIn.rows as Array<Record<string, string>>).map((raw, i) => ({
+            rowNo: i + 1,
+            status: 'PENDING',
+            raw,
+            normalized: null,
+            errors: [],
+            warnings: [],
+            recordId: null,
+          }));
+          jobs.set(id, {
+            id,
+            type: kindName === 'students' ? 'STUDENT_RECORDS' : 'EMPLOYEE_RECORDS',
+            status: 'DRAFT',
+            version: 1,
+            summary: {},
+            rows,
+          });
+          state.imports.byKey.set(key, id);
+          return json(201, { success: true, data: { id, version: 1 } });
+        }
+      } else {
+        const job = jobs.get(imp[2]);
+        if (!job) return err(404, 'RESOURCE_NOT_FOUND');
+        if (!imp[3] && method === 'GET') return json(200, { success: true, data: dto(job) });
+        if (imp[3] === 'validate' && method === 'POST') {
+          evaluate(job);
+          return json(200, { success: true, data: dto(job) });
+        }
+        if (imp[3] === 'rows' && method === 'GET') {
+          const q = new URL(path, 'http://x').searchParams;
+          const after = Number(q.get('afterRowNo') ?? 0);
+          const limit = Number(q.get('limit') ?? 100);
+          const rows = (job.rows as Array<Record<string, unknown>>).filter(
+            (r) => (r.rowNo as number) > after,
+          );
+          const page = rows.slice(0, limit);
+          return json(200, {
+            success: true,
+            data: page,
+            page: {
+              nextAfterRowNo: rows.length > limit ? (page[page.length - 1]?.rowNo ?? null) : null,
+            },
+          });
+        }
+        if (imp[3] === 'commit' && method === 'POST') {
+          if (!headers['idempotency-key']) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');
+          if (headers['if-match'] !== `"${job.version as number}"`) return err(409, 'CONFLICT');
+          if (job.status !== 'VALIDATED') return err(409, 'IMPORT_JOB_STATE');
+          const summary = job.summary as Record<string, number>;
+          if ((summary.rowsWithWarnings ?? 0) > 0 && bodyIn.acknowledgeWarnings !== true)
+            return err(409, 'IMPORT_WARNINGS_UNACKNOWLEDGED');
+          if (state.imports.commitMode === 'changed') {
+            state.imports.commitMode = 'ok';
+            job.version = (job.version as number) + 1;
+            return err(409, 'IMPORT_PREVIEW_CHANGED');
+          }
+          if (state.imports.commitMode === 'conflict') {
+            state.imports.commitMode = 'ok';
+            job.status = 'FAILED';
+            job.version = (job.version as number) + 1;
+            return err(409, 'IMPORT_COMMIT_CONFLICT');
+          }
+          job.status = 'COMMITTED';
+          job.version = (job.version as number) + 1;
+          const created = (job.rows as unknown[]).length;
+          job.summary = { ...summary, createdRows: created };
+          return json(200, {
+            success: true,
+            data: { id: job.id, status: 'COMMITTED', createdRows: created, version: job.version },
+          });
+        }
       }
     }
     if (path.startsWith('/academics/') || /^\/students\/[^/]+\/term-enrollments/.test(path)) {

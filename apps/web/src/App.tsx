@@ -10,6 +10,7 @@ import { AcademicsPage } from './pages/AcademicsPage';
 import { ComingSoonPage } from './pages/ComingSoon';
 import { ConsentsPage } from './pages/ConsentsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { ImportsPage } from './pages/ImportsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { OrganisationPage } from './pages/OrganisationPage';
 import { NotFoundPage } from './pages/StatePages';
@@ -116,6 +117,14 @@ export function AppRoutes() {
             element={
               <RequireCapability anyOf={ROUTE_REQUIREMENTS['/academics'] ?? []}>
                 <AcademicsPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="imports"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/imports'] ?? []}>
+                <ImportsPage />
               </RequireCapability>
             }
           />

@@ -112,6 +112,39 @@ export class EmployeeService {
       throw err;
     }
 
+    return EmployeeService.insertRecord(
+      tx,
+      ctx,
+      {
+        userId: input.userId,
+        code,
+        employeeType: input.employeeType,
+        joiningDate,
+        reason,
+      },
+      meta,
+    );
+  }
+
+  /**
+   * The write half of `create`, shared with the import commit (modules/imports): account and relationship checks,
+   * insert, audit. PRECONDITIONS, owned by the caller: the request is validated and normalised, the actor holds
+   * `employee.record.create` at ORGANIZATION scope, and `lockPersonIdentity` was taken for `input.userId` in this
+   * transaction before any other statement of the person-writing path. This is the only INSERT into app.employees.
+   */
+  static async insertRecord(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    input: {
+      userId: string;
+      code: string;
+      employeeType: EmployeeType;
+      joiningDate: string;
+      reason: string;
+    },
+    meta: AuditRequestMeta,
+  ): Promise<string> {
+    const { code, joiningDate, reason } = input;
     // Relationship: the account must exist in THIS tenant (RLS + the explicit filter make another tenant's user
     // indistinguishable from a missing one). Share-locked so it cannot be deactivated mid-transaction.
     const user = await tx.query<{ status: string }>(

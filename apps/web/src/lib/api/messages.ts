@@ -91,3 +91,48 @@ export function academicsErrorMessage(err: unknown): string {
       return 'Something went wrong on our side. Please try again.';
   }
 }
+
+/** Fixed wording for the import wizard; the server's own text is never shown. */
+export function importErrorMessage(err: unknown): string {
+  if (!isApiError(err)) return 'Something went wrong. Please try again.';
+  switch (err.code) {
+    case 'IMPORT_PREVIEW_CHANGED':
+      return 'The proposed changes differ from the preview you reviewed. Nothing was imported. Review the refreshed preview and commit again.';
+    case 'IMPORT_COMMIT_CONFLICT':
+      return 'Some rows no longer pass validation, or conflict with a recent change. Nothing was imported. Download the error report and import again.';
+    case 'IMPORT_MATCHING_MISMATCH':
+      return 'The date of birth and guardian phone values do not match this import. Upload the same file again, then validate before committing.';
+    case 'IMPORT_WARNINGS_UNACKNOWLEDGED':
+      return 'The preview has warnings. Review them and tick the confirmation box.';
+    case 'IMPORT_MATCHING_UNAVAILABLE':
+      return 'Imports with date of birth or guardian phone data cannot be committed right now. Nothing was imported. Contact your administrator.';
+    case 'IMPORT_JOB_COMMITTED':
+      return 'This import was already committed.';
+    case 'IMPORT_JOB_STATE':
+      return 'That step is not available for this import in its current state.';
+    default:
+      break;
+  }
+  switch (err.kind) {
+    case 'forbidden':
+      return 'You do not have permission to import these records.';
+    case 'not_found':
+      return 'That import could not be found, or it belongs to someone else.';
+    case 'network':
+      return 'Cannot reach the server. Check your connection and try again.';
+    case 'validation':
+      return err.code === 'IDEMPOTENCY_KEY_REUSED' || err.status === 422
+        ? 'That request was already submitted with different details. Start the import again.'
+        : err.status === 409
+          ? 'That conflicts with the current state of the import. Reload and try again.'
+          : 'The file was not accepted. Check it and try again.';
+    case 'csrf':
+    case 'mfa_required':
+    case 'unauthenticated':
+      return 'The request was rejected. Reload the page and try again.';
+    case 'rate_limited':
+    case 'server':
+    case 'protocol':
+      return 'Something went wrong on our side. Please try again.';
+  }
+}

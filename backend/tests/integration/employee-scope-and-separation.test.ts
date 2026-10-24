@@ -1068,6 +1068,25 @@ describe('owner Decision 6: secondary postings and unscoped onboarding never esc
   });
 });
 
+/**
+ * DDL on app.audit_events needs ACCESS EXCLUSIVE, and every other integration file writes audit events concurrently. A DDL
+ * statement that WAITS queues every later reader and writer behind it, which can end in `40P01 deadlock detected` for an
+ * unrelated test (observed: three victims in full-suite runs). So the statement is never allowed to wait for long: a short
+ * lock_timeout (well below the 1 s deadlock timeout) makes it give up and retry instead of queueing.
+ */
+async function ddlWithoutQueueing(sql: string): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    try {
+      await adminQuery(`SET lock_timeout = '150ms'; ${sql}`);
+      return;
+    } catch (err) {
+      if ((err as { code?: string }).code !== '55P03') throw err;
+      await new Promise((r) => setTimeout(r, 25 + Math.floor(Math.random() * 50)));
+    }
+  }
+  throw new Error('DDL on app.audit_events could not obtain its lock');
+}
+
 describe('audit failures roll back the whole separation (final acceptance)', () => {
   it('a failing posting-close audit insert leaves status, postings and every audit row untouched', async () => {
     const e = await newEmployee();
@@ -1079,7 +1098,7 @@ describe('audit failures roll back the whole separation (final acceptance)', () 
       `CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected audit failure'; END $$`,
     );
     // fails the SECOND posting-close audit event, i.e. after the first closure and its audit were already written
-    await adminQuery(
+    await ddlWithoutQueueing(
       `CREATE TRIGGER ${trg} BEFORE INSERT ON app.audit_events FOR EACH ROW
          WHEN (NEW.resource_id = '${p2}'::uuid AND NEW.action = 'employee.posting.close') EXECUTE FUNCTION ${fn}()`,
     );
@@ -1088,7 +1107,7 @@ describe('audit failures roll back the whole separation (final acceptance)', () 
         /audit record could not be written/,
       );
     } finally {
-      await adminQuery(`DROP TRIGGER ${trg} ON app.audit_events`);
+      await ddlWithoutQueueing(`DROP TRIGGER ${trg} ON app.audit_events`);
       await adminQuery(`DROP FUNCTION ${fn}()`);
     }
     expect((await postingRows(e.id)).map((r) => r.valid_to)).toEqual([null, null]);

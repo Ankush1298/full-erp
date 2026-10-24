@@ -10,3 +10,7 @@ export * from './student-status.service.js';
 export * from './student-guardian.schemas.js';
 export * from './student-guardian.service.js';
 export * from './student-guardian.routes.js';
+export * from './student-identifier.schemas.js';
+export * from './student-identifier.service.js';
+export * from './student-identifier.routes.js';
+export * from './student-duplicate.service.js';

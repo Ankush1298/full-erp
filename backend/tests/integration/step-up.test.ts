@@ -6,6 +6,7 @@ import { Database } from '../../src/shared/database/index.js';
 import { createPool } from '../../src/shared/database/pool.js';
 import { FixedWindowLimiter } from '../../src/shared/http/fixed-window-limiter.js';
 import { adminQuery, elevateSession, mfaVerified } from '../support/db-harness.js';
+import { createIsolatedTenant, type IsolatedTenant } from '../support/isolated-tenant.js';
 
 const PASSWORD = /* secret-scan:allow */ 'CorrectPassword123!';
 const WRONG_PASSWORD = /* secret-scan:allow */ 'WrongPassword999!';
@@ -41,7 +42,12 @@ const testApp = buildApp({
   stepUpLimiter: new FixedWindowLimiter({ limit: 1000, windowMs: 60_000, maxKeys: 10_000 }),
 });
 
-const EMAIL = 'staff.a@college-a.test';
+// A PRIVATE identity (the COLLEGE_ADMIN of an isolated tenant), never the shared fixture staff.a@college-a.test: other
+// integration files log in as that fixture in parallel, and every successful login resets failed_login_count to 0
+// (auth.repository recordSuccessfulLogin), which made the exact-counter assertions below intermittent. The audit
+// assertions are scoped to this tenant for the same reason (mfa.test.ts also writes auth.step_up events).
+let T!: IsolatedTenant;
+let EMAIL = '';
 
 beforeEach(async () => {
   fakeNow = Date.now();
@@ -52,22 +58,30 @@ beforeEach(async () => {
 });
 
 beforeAll(async () => {
+  T = await createIsolatedTenant(await argon2.hash(PASSWORD, { type: argon2.argon2id }));
+  EMAIL = T.emails.admin;
   await defaultApp.ready();
   await testApp.ready();
-  await adminQuery('UPDATE platform.identities SET password_hash = $1 WHERE email = $2', [
-    await argon2.hash(PASSWORD, { type: argon2.argon2id }),
-    EMAIL,
-  ]);
-});
+}, 120_000);
 
 afterAll(async () => {
-  await adminQuery(
-    'UPDATE platform.identities SET failed_login_count = 0, locked_until = NULL WHERE email = $1',
-    [EMAIL],
-  );
-  await defaultApp.close();
-  await testApp.close();
-  await pool.end().catch(() => undefined);
+  // Every step runs even if an earlier one fails (a failed tenant cleanup must not leak the apps or the pool), and the
+  // FIRST failure is re-thrown afterwards. Vitest reports a hook failure separately from test results, so it never
+  // replaces a test's own failure.
+  const errors: unknown[] = [];
+  for (const step of [
+    () => T?.cleanup(),
+    () => defaultApp.close(),
+    () => testApp.close(),
+    () => pool.end().catch(() => undefined),
+  ]) {
+    try {
+      await step();
+    } catch (err) {
+      errors.push(err);
+    }
+  }
+  if (errors.length > 0) throw errors[0];
 });
 
 async function login(app = defaultApp): Promise<{ cookie: string; csrf: string }> {
@@ -168,7 +182,7 @@ describe('D10 Step-Up Authentication Foundation', () => {
     it('route with mixed sensitivity permissions cannot bypass step-up even when authorized on non-critical permission', async () => {
       const { cookie } = await login(defaultApp);
 
-      // staff.a holds COLLEGE_ADMIN, which possesses both org.structure.read (NORMAL) and org.settings.manage (CRITICAL).
+      // The isolated admin holds COLLEGE_ADMIN, which possesses both org.structure.read (NORMAL) and org.settings.manage (CRITICAL).
       // Authorization on org.structure.read must NOT bypass the CRITICAL requirement of org.settings.manage on the route.
       const res = await defaultApp.inject({
         method: 'GET',
@@ -222,7 +236,8 @@ describe('D10 Step-Up Authentication Foundation', () => {
       const { cookie, csrf } = await login(testApp);
 
       const beforeAudit = await adminQuery<{ count: string }>(
-        "SELECT count(*)::text as count FROM app.audit_events WHERE action = 'auth.step_up'",
+        "SELECT count(*)::text as count FROM app.audit_events WHERE action = 'auth.step_up' AND organization_id = $1",
+        [T.orgId],
       );
       const countBefore = Number(beforeAudit[0]?.count ?? '0');
 
@@ -263,9 +278,10 @@ describe('D10 Step-Up Authentication Foundation', () => {
       }>(
         `SELECT action, resource_type, resource_id, session_id, risk_tier, metadata
            FROM app.audit_events
-          WHERE action = 'auth.step_up'
+          WHERE action = 'auth.step_up' AND organization_id = $1
           ORDER BY occurred_at DESC
           LIMIT 1`,
+        [T.orgId],
       );
       expect(audit?.action).toBe('auth.step_up');
       expect(audit?.resource_type).toBe('session');
@@ -275,7 +291,8 @@ describe('D10 Step-Up Authentication Foundation', () => {
       expect(audit?.metadata?.authStrength).toBe('PASSWORD_REAUTH');
 
       const afterAudit = await adminQuery<{ count: string }>(
-        "SELECT count(*)::text as count FROM app.audit_events WHERE action = 'auth.step_up'",
+        "SELECT count(*)::text as count FROM app.audit_events WHERE action = 'auth.step_up' AND organization_id = $1",
+        [T.orgId],
       );
       expect(Number(afterAudit[0]?.count)).toBe(countBefore + 1);
     });

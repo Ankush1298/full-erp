@@ -34,7 +34,7 @@ export function registerHardening(app: FastifyInstance, opts: { production: bool
 
   app.setErrorHandler((err: FastifyError | AppError | ZodError, req, reply) => {
     if (err instanceof AppError) {
-      void reply.status(err.statusCode).send(envelope(req.id, err.code, err.message));
+      void reply.status(err.statusCode).send(envelope(req.id, err.code, err.message, err.details));
       return;
     }
     if (err instanceof ZodError) {

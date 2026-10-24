@@ -31,6 +31,7 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'student.profile.read', sensitivity: 'SENSITIVE' },
   { code: 'student.profile.read_sensitive', sensitivity: 'SENSITIVE' },
   { code: 'student.record.create', sensitivity: 'SENSITIVE' },
+  { code: 'student.record.update', sensitivity: 'SENSITIVE' },
   { code: 'student.program.assign', sensitivity: 'SENSITIVE' },
   { code: 'student.directory.search', sensitivity: 'SENSITIVE' },
   { code: 'student.directory.list', sensitivity: 'SENSITIVE' },
@@ -79,6 +80,8 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
 
   { code: 'role.assignment.grant', sensitivity: 'CRITICAL' },
   { code: 'role.assignment.revoke', sensitivity: 'CRITICAL' },
+
+  { code: 'import.job.manage', sensitivity: 'SENSITIVE' },
 ];
 
 export const PERMISSION_CODES: ReadonlySet<string> = new Set(PERMISSION_CATALOG.map((p) => p.code));

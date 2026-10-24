@@ -144,6 +144,10 @@ export async function createIsolatedTenant(passwordHash: string): Promise<Isolat
       try {
         for (const table of [
           'app.idempotency_keys',
+          // import rows reference jobs, students and employees (RESTRICT); identifiers reference students (RESTRICT)
+          'app.import_job_rows',
+          'app.import_jobs',
+          'app.student_identifiers',
           // links before guardians before students: both foreign keys are RESTRICT
           'app.student_guardians',
           'app.guardians',

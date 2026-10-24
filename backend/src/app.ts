@@ -15,6 +15,12 @@ import { registerAcademicsRoutes } from './modules/academics/academic.routes.js'
 import { registerPeopleRoutes } from './modules/people/employee.routes.js';
 import { registerStudentRoutes } from './modules/students/student.routes.js';
 import { registerStudentGuardianRoutes } from './modules/students/student-guardian.routes.js';
+import { registerStudentIdentifierRoutes } from './modules/students/student-identifier.routes.js';
+import {
+  registerEmployeeImportRoutes,
+  registerStudentImportRoutes,
+} from './modules/imports/import.routes.js';
+import { MatchingBinder } from './modules/imports/import.binding.js';
 import {
   registerDocumentRoutes,
   registerStudentDocumentRoutes,
@@ -200,6 +206,16 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.register(registerPeopleRoutes, { prefix: '/api/v1/faculty', db: deps.db });
   app.register(registerStudentRoutes, { prefix: '/api/v1/students', db: deps.db });
   app.register(registerStudentGuardianRoutes, { prefix: '/api/v1/students', db: deps.db });
+  app.register(registerStudentIdentifierRoutes, { prefix: '/api/v1/students', db: deps.db });
+  // Import framework (Milestone 2 Batch 2): validate -> preview -> commit, one mount per record kind.
+  // Import matching-data bindings use ONLY the dedicated IMPORT_MATCHING_KEYS ring (never the cursor or MFA keys). Without
+  // it, a student import commit that carries matching data is refused (503); production refuses to boot without it.
+  app.register(registerStudentImportRoutes, {
+    prefix: '/api/v1/students/imports',
+    db: deps.db,
+    binder: config.importMatching ? new MatchingBinder(config.importMatching) : undefined,
+  });
+  app.register(registerEmployeeImportRoutes, { prefix: '/api/v1/faculty/imports', db: deps.db });
   app.register(registerConsentRoutes, { prefix: '/api/v1', db: deps.db });
   app.register(registerNotificationRoutes, {
     prefix: '/api/v1/notifications',

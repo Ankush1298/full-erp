@@ -15,6 +15,12 @@ const MFA_KEYS = {
   MFA_ENCRYPTION_ACTIVE_KEY_ID: 'm1',
 };
 
+// Production also needs the dedicated import matching-data HMAC ring (doc 26 §3.5.4); generated at run time.
+const IMPORT_KEYS = {
+  IMPORT_MATCHING_KEYS: `i1:${randomBytes(32).toString('base64url')}`,
+  IMPORT_MATCHING_ACTIVE_KEY_ID: 'i1',
+};
+
 // Production also needs object storage for the documents kernel (ADR-010). Not real credentials.
 const STORAGE_KEYS = {
   STORAGE_ENDPOINT: 'https://s3.example.com',
@@ -67,6 +73,7 @@ describe('loadConfig', () => {
         DATABASE_SSL: 'require',
         APP_ORIGINS: 'https://app.example.edu',
         ...MFA_KEYS,
+        ...IMPORT_KEYS,
         ...STORAGE_KEYS,
         ...CLAMAV_KEYS,
       }),
@@ -81,6 +88,7 @@ describe('loadConfig', () => {
       HOST: '0.0.0.0',
       APP_ORIGINS: 'https://app.example.edu',
       ...MFA_KEYS,
+      ...IMPORT_KEYS,
       ...STORAGE_KEYS,
       ...CLAMAV_KEYS,
     };
@@ -140,6 +148,7 @@ describe('cursor key configuration (optional)', () => {
     DATABASE_SSL: 'require',
     APP_ORIGINS: 'https://a.edu',
     ...MFA_KEYS,
+    ...IMPORT_KEYS,
     ...STORAGE_KEYS,
     ...CLAMAV_KEYS,
   };
@@ -364,6 +373,7 @@ describe('MFA encryption keyring (MFA_ENCRYPTION_KEYS / MFA_ENCRYPTION_ACTIVE_KE
     APP_ORIGINS: 'https://a.edu',
     ...STORAGE_KEYS,
     ...CLAMAV_KEYS,
+    ...IMPORT_KEYS,
   };
   const fail = (env: Record<string, string>): string => {
     try {
@@ -448,6 +458,7 @@ describe('object storage (STORAGE_*) for the documents kernel', () => {
     DATABASE_SSL: 'require',
     APP_ORIGINS: 'https://a.edu',
     ...MFA_KEYS,
+    ...IMPORT_KEYS,
     ...CLAMAV_KEYS,
   };
 
@@ -506,6 +517,7 @@ describe('ClamAV daemon config (CLAMAV_*) for the scan worker', () => {
     DATABASE_SSL: 'require',
     APP_ORIGINS: 'https://a.edu',
     ...MFA_KEYS,
+    ...IMPORT_KEYS,
     ...STORAGE_KEYS,
   };
 
@@ -542,5 +554,100 @@ describe('ClamAV daemon config (CLAMAV_*) for the scan worker', () => {
     expect(() => loadConfig({ ...base, CLAMAV_HOST: '   ' })).toThrow(
       /CLAMAV_HOST: must not be empty/,
     );
+  });
+});
+
+describe('import matching-data HMAC keyring (IMPORT_MATCHING_KEYS / IMPORT_MATCHING_ACTIVE_KEY_ID)', () => {
+  const k1 = randomBytes(32).toString('base64url');
+  const k2 = randomBytes(32).toString('base64url');
+  const prod = {
+    ...base,
+    NODE_ENV: 'production',
+    DATABASE_SSL: 'require',
+    APP_ORIGINS: 'https://a.edu',
+    ...MFA_KEYS,
+    ...STORAGE_KEYS,
+    ...CLAMAV_KEYS,
+  };
+  const fail = (env: Record<string, string>): string => {
+    try {
+      loadConfig(env);
+    } catch (e) {
+      expect(e).toBeInstanceOf(ConfigError);
+      return (e as Error).message;
+    }
+    throw new Error('expected loadConfig to throw');
+  };
+
+  it('is required in production: a missing ring refuses to start, and the message names the variable', () => {
+    expect(fail(prod)).toMatch(/IMPORT_MATCHING_KEYS: required in production/);
+    const c = loadConfig({
+      ...prod,
+      IMPORT_MATCHING_KEYS: `a:${k1}`,
+      IMPORT_MATCHING_ACTIVE_KEY_ID: 'a',
+    });
+    expect(c.importMatching?.activeKeyId).toBe('a');
+  });
+
+  it('is optional outside production (commits with matching data are then refused, never unbound)', () => {
+    expect('importMatching' in loadConfig(base)).toBe(false);
+  });
+
+  it('rejects half-configured, malformed, wrongly sized or duplicated keys and an unknown active id', () => {
+    const cases: Record<string, string>[] = [
+      { IMPORT_MATCHING_KEYS: `a:${k1}` },
+      { IMPORT_MATCHING_ACTIVE_KEY_ID: 'a' },
+      { IMPORT_MATCHING_KEYS: '', IMPORT_MATCHING_ACTIVE_KEY_ID: 'a' },
+      { IMPORT_MATCHING_KEYS: 'a:short', IMPORT_MATCHING_ACTIVE_KEY_ID: 'a' },
+      {
+        IMPORT_MATCHING_KEYS: `a:${randomBytes(16).toString('base64url')}`,
+        IMPORT_MATCHING_ACTIVE_KEY_ID: 'a',
+      },
+      { IMPORT_MATCHING_KEYS: `a:${k1}=`, IMPORT_MATCHING_ACTIVE_KEY_ID: 'a' },
+      { IMPORT_MATCHING_KEYS: `a:${k1},a:${k2}`, IMPORT_MATCHING_ACTIVE_KEY_ID: 'a' },
+      { IMPORT_MATCHING_KEYS: `a:${k1},b:${k1}`, IMPORT_MATCHING_ACTIVE_KEY_ID: 'a' },
+      { IMPORT_MATCHING_KEYS: `a:${k1}`, IMPORT_MATCHING_ACTIVE_KEY_ID: 'b' },
+      { IMPORT_MATCHING_KEYS: `bad id:${k1}`, IMPORT_MATCHING_ACTIVE_KEY_ID: 'bad id' },
+    ];
+    for (const env of cases) {
+      for (const target of [base, prod]) {
+        const message = fail({ ...target, ...env });
+        expect(message).toMatch(/IMPORT_MATCHING_(KEYS|ACTIVE_KEY_ID)/);
+        expect(message).not.toContain(k1);
+        expect(message).not.toContain(k2);
+      }
+    }
+  });
+
+  it('must not reuse cursor or MFA key material (one key, one purpose)', () => {
+    for (const [name, other] of [
+      ['CURSOR_KEYS', { CURSOR_KEYS: `c:${k1}`, CURSOR_ACTIVE_KEY_ID: 'c' }],
+      [
+        'MFA_ENCRYPTION_KEYS',
+        { MFA_ENCRYPTION_KEYS: `m:${k1}`, MFA_ENCRYPTION_ACTIVE_KEY_ID: 'm' },
+      ],
+    ] as const) {
+      const message = fail({
+        ...base,
+        ...other,
+        IMPORT_MATCHING_KEYS: `a:${k2},b:${k1}`,
+        IMPORT_MATCHING_ACTIVE_KEY_ID: 'a',
+      });
+      expect(message).toContain(`IMPORT_MATCHING_KEYS: must not reuse key material from ${name}`);
+      expect(message).not.toContain(k1);
+    }
+  });
+
+  it('keeps retiring keys for verification and never prints a key', () => {
+    const c = loadConfig({
+      ...base,
+      IMPORT_MATCHING_KEYS: `old:${k1},new:${k2}`,
+      IMPORT_MATCHING_ACTIVE_KEY_ID: 'new',
+    });
+    expect([...(c.importMatching?.keys.keys() ?? [])]).toEqual(['old', 'new']);
+    expect(c.importMatching?.activeKeyId).toBe('new');
+    const printed = `${inspect(c, { depth: 10 })}${JSON.stringify(c)}`;
+    expect(printed).not.toContain(k1);
+    expect(printed).not.toContain(k2);
   });
 });

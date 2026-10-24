@@ -272,9 +272,9 @@ Not in this phase, deliberately:
 
 - `registration_number` (set-once, partial unique), `merged_into_student_id` and the merge workflow, and the `(organization_id, status)` index: nothing in this slice writes or queries them.
 - Automatic admission-number allocation and the `identity.admission_number` setting.
-- `student.record.update`, an audited admission-number correction, account re-pointing. (Status transitions and `student.status.change` shipped as §6b; transitions into `TRANSFERRED_OUT` and any correction/reinstatement workflow remain deferred.)
+- An audited admission-number correction, account re-pointing, and any student edit other than identifiers. (`student.record.update` was registered in Milestone 2 Batch 2 and is used only by the identifier endpoints: doc 26.) (Status transitions and `student.status.change` shipped as §6b; transitions into `TRANSFERRED_OUT` and any correction/reinstatement workflow remain deferred.)
 - Student name search and totals/facets. (The cursor-paginated staff directory shipped as §0c, on the shared authenticated cursor codec `shared/pagination`, so no `limit`/`offset` deviation was added.)
-- `student_identifiers`. (`student_programs` shipped as §6a and guardians as §6c; the unresolved guardian decisions are listed there.)
+- ~~`student_identifiers`~~ shipped in Milestone 2 Batch 2 (doc 26), together with the import framework that creates student records through `StudentService.insertRecord`. (`student_programs` shipped as §6a and guardians as §6c; the unresolved guardian decisions are listed there.)
 - Implicit `STUDENT` role assignment (doc 06, "implicit assignments"). Nothing creates it, so a student will not be able to read their own record through the API until one exists; recorded as a follow-up, like FU-EMP-4.
 - Student name search remains deferred (see above); `PATCH` and deletes do not exist.
 - Idempotency is wired to the create route only; no other route was retrofitted.

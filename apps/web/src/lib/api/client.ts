@@ -41,6 +41,10 @@ export class ApiClient {
     this.fetchImpl = options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   }
 
+  /** Same-origin URL of an API path, for a plain browser download (a GET that the session cookie authorises). */
+  url(path: string): string {
+    return `${this.basePath}${path}`;
+  }
   setCsrfToken(value: string): void {
     this.csrfToken = value;
   }

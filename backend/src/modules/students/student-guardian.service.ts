@@ -253,6 +253,51 @@ function primaryTaken(): AppError {
  * audited: both are separate, unresolved gates.
  */
 export class StudentGuardianService {
+  /**
+   * INTERNAL, for the possible-duplicate check only (StudentDuplicateService; doc 26 §3.5). Returns, per student id, the raw
+   * phones of its ACTIVE guardian links (`valid_to IS NULL`, guardian not soft-deleted) and of legacy contact rows, and
+   * NOTHING else. It lives here because this class is the only code that names the guardian tables. It is not reachable
+   * from any route and the phones never leave the matcher. It does not use `student.guardian.read` (the matcher's caller
+   * only learns that a match exists); it re-asserts the permission of the writes the check guards: a staff actor holding
+   * `student.record.create` at ORGANIZATION scope. Read-only, tenant-scoped.
+   */
+  static async phonesForMatching(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    studentIds: readonly string[],
+  ): Promise<Map<string, string[]>> {
+    ensureTrusted(ctx);
+    AuthorizationEngine.assertStaffActor(ctx);
+    await AuthorizationEngine.assert(tx, ctx, 'student.record.create');
+    try {
+      await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+        organization_id: ctx.tenantId,
+      });
+    } catch (err) {
+      if (err instanceof AppError && err.statusCode === 404) {
+        throw new AppError(403, 'FORBIDDEN', 'Access denied.');
+      }
+      throw err;
+    }
+    const out = new Map<string, string[]>();
+    if (studentIds.length === 0) return out;
+    const res = await tx.query<{ student_id: string; phone: string }>(
+      `SELECT sg.student_id, g.phone
+         FROM app.student_guardians AS sg
+         JOIN app.guardians AS g ON g.organization_id = sg.organization_id AND g.id = sg.guardian_id
+        WHERE sg.organization_id = $1 AND sg.student_id = ANY($2::uuid[])
+          AND sg.valid_to IS NULL AND g.deleted_at IS NULL
+       UNION ALL
+       SELECT sg.student_id, sg.phone
+         FROM app.student_guardians AS sg
+        WHERE sg.organization_id = $1 AND sg.student_id = ANY($2::uuid[])
+          AND sg.guardian_id IS NULL AND sg.valid_to IS NULL AND sg.phone IS NOT NULL`,
+      [ctx.tenantId, studentIds],
+    );
+    for (const r of res.rows) out.set(r.student_id, [...(out.get(r.student_id) ?? []), r.phone]);
+    return out;
+  }
+
   /** Active guardians of one student. Not held: 403. Missing OR out of scope: the same 404. No audit on read. */
   static async list(
     tx: TenantTx,

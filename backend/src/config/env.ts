@@ -65,6 +65,12 @@ const EnvSchema = z.object({
   // mandatory for the HOD-and-above and REGISTRAR roles and no MFA can be enrolled or verified without it.
   MFA_ENCRYPTION_KEYS: z.string().optional(),
   MFA_ENCRYPTION_ACTIVE_KEY_ID: z.string().optional(),
+  // Dedicated HMAC keyring for import matching-data bindings (docs/architecture/v3/26 §3.5.4): the key that makes the stored
+  // binding of a committed import's date-of-birth/guardian-phone data unguessable from the database alone. Same format as
+  // the other rings, separate material (never shared with CURSOR_KEYS or MFA_ENCRYPTION_KEYS). Both or neither; REQUIRED
+  // in production. Absent elsewhere = a commit that carries matching data is refused (503), never committed unbound.
+  IMPORT_MATCHING_KEYS: z.string().optional(),
+  IMPORT_MATCHING_ACTIVE_KEY_ID: z.string().optional(),
   // Object storage for the documents kernel (ADR-010). All-or-nothing, like the keyrings; REQUIRED in production, where
   // its absence fails closed (no documents feature rather than an insecure fallback). Credentials are wrapped in Secret.
   STORAGE_ENDPOINT: z.string().optional(),
@@ -114,6 +120,7 @@ export interface KeyRingConfig {
 }
 export type CursorConfig = KeyRingConfig;
 export type MfaConfig = KeyRingConfig;
+export type ImportMatchingConfig = KeyRingConfig;
 
 /** Object-storage configuration (one private bucket per storage class). Present only when fully configured. */
 export interface StorageConfig {
@@ -231,7 +238,8 @@ function parseClamAv(
 /**
  * `<KEYS>` is `<keyId>:<key>` entries separated by commas (no whitespace is trimmed); `<ACTIVE>` names the key used for
  * new data, every other key only reads. Both variables or neither: absent means the ring is absent and nothing else
- * changes. Errors name the variable and the rule, never a value. Used for CURSOR_KEYS and MFA_ENCRYPTION_KEYS.
+ * changes. Errors name the variable and the rule, never a value. Used for CURSOR_KEYS, MFA_ENCRYPTION_KEYS and
+ * IMPORT_MATCHING_KEYS.
  */
 function parseKeyRing(
   rawKeys: string | undefined,
@@ -312,6 +320,9 @@ export interface AppConfig {
   readonly studentDirectoryListEnabled: boolean;
   /** MFA_ENCRYPTION_KEYS + MFA_ENCRYPTION_ACTIVE_KEY_ID. Always present in production; absent elsewhere = MFA unavailable. */
   readonly mfa?: MfaConfig;
+  /** IMPORT_MATCHING_KEYS + IMPORT_MATCHING_ACTIVE_KEY_ID. Always present in production; absent elsewhere = an import commit
+   * carrying matching data is refused (fail closed). */
+  readonly importMatching?: ImportMatchingConfig;
   /** Object storage (STORAGE_*). Always present in production; absent elsewhere = the documents feature is unavailable. */
   readonly storage?: StorageConfig;
   /** ClamAV daemon configuration. Always present in production; absent elsewhere = scanner fails closed. */
@@ -358,6 +369,23 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       problems.push('MFA_ENCRYPTION_KEYS: must not reuse key material from CURSOR_KEYS');
     }
   }
+  const importMatching = parseKeyRing(
+    e.IMPORT_MATCHING_KEYS,
+    e.IMPORT_MATCHING_ACTIVE_KEY_ID,
+    { keys: 'IMPORT_MATCHING_KEYS', active: 'IMPORT_MATCHING_ACTIVE_KEY_ID' },
+    problems,
+  );
+  if (importMatching) {
+    for (const [name, ring] of [
+      ['CURSOR_KEYS', cursor],
+      ['MFA_ENCRYPTION_KEYS', mfa],
+    ] as const) {
+      const other = new Set([...(ring?.keys.values() ?? [])].map((k) => k.reveal()));
+      if ([...importMatching.keys.values()].some((k) => other.has(k.reveal()))) {
+        problems.push(`IMPORT_MATCHING_KEYS: must not reuse key material from ${name}`);
+      }
+    }
+  }
   const storage = parseStorage(e, problems);
   const clamav = parseClamAv(e, problems);
   if (e.STUDENT_DIRECTORY_LIST_ENABLED && !cursor) {
@@ -381,6 +409,15 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     ) {
       problems.push(
         'MFA_ENCRYPTION_KEYS: required in production (MFA is mandatory for administrative roles)',
+      );
+    }
+    if (
+      !importMatching &&
+      e.IMPORT_MATCHING_KEYS === undefined &&
+      e.IMPORT_MATCHING_ACTIVE_KEY_ID === undefined
+    ) {
+      problems.push(
+        'IMPORT_MATCHING_KEYS: required in production (import commits with matching data are bound by it)',
       );
     }
     if (e.HOST === '0.0.0.0' && !e.TRUST_PROXY) {
@@ -414,6 +451,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     ...(cursor ? { cursor } : {}),
     studentDirectoryListEnabled: e.STUDENT_DIRECTORY_LIST_ENABLED,
     ...(mfa ? { mfa } : {}),
+    ...(importMatching ? { importMatching } : {}),
     ...(storage ? { storage } : {}),
     ...(clamav ? { clamav } : {}),
   };

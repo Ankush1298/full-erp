@@ -11,6 +11,7 @@ import {
   type IdempotentResult,
 } from '../../shared/idempotency/index.js';
 import { invalid, parseDate, parseReason } from '../people/validation.js';
+import { StudentDuplicateService, duplicateWarningError } from './student-duplicate.service.js';
 import {
   ADMISSION_NUMBER_PATTERN,
   type CreateStudentBody,
@@ -25,6 +26,12 @@ function ensureTrusted(ctx: TrustedContext): void {
   if (!isTrustedContext(ctx)) {
     throw new AppError(500, 'UNTRUSTED_CONTEXT', 'Database access requires a trusted context.');
   }
+}
+
+function optionalText(value: unknown, field: string, max: number): string {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (text === '' || text.length > max) throw invalid(`${field} must be 1 to ${max} characters.`);
+  return text;
 }
 
 export interface StudentRow {
@@ -98,6 +105,21 @@ export class StudentService {
     }
     const admissionDate = parseDate(input.admissionDate, 'admissionDate');
     const reason = parseReason(input.reason);
+    // Matching-only inputs of the possible-duplicate check: validated strictly, never stored (doc 26 §3.5).
+    const dateOfBirth =
+      input.dateOfBirth === undefined ? null : parseDate(input.dateOfBirth, 'dateOfBirth');
+    if (dateOfBirth !== null && dateOfBirth > new Date().toISOString().slice(0, 10)) {
+      throw invalid('dateOfBirth must not be in the future.');
+    }
+    const name = input.name === undefined ? null : optionalText(input.name, 'name', 200);
+    const guardianPhone =
+      input.guardianPhone === undefined
+        ? null
+        : optionalText(input.guardianPhone, 'guardianPhone', 30);
+    const acknowledgement = input.duplicateAcknowledgement;
+    if (acknowledgement !== undefined && !/^[0-9a-f]{64}$/.test(String(acknowledgement))) {
+      throw invalid('duplicateAcknowledgement is not a valid acknowledgement.');
+    }
 
     // FIRST database statement: the per-person lock shared with employee creation and role grants (and re-taken, as a
     // no-op, by the migration 0016/0020 triggers). See shared/authorization/person-identity.ts for the lock order.
@@ -127,100 +149,148 @@ export class StudentService {
       {
         key,
         operation: CREATE_STUDENT_OPERATION,
-        // The NORMALISED request: reason is trimmed and the id lower-cased, so equal requests hash equally.
-        request: { userId, admissionNumber, admissionDate, reason },
+        // The NORMALISED request: reason is trimmed and the id lower-cased, so equal requests hash equally. The matching-only
+        // inputs enter the fingerprint as PRESENCE only (owner decision 2026-10-22): a SHA-256 of a date of birth or a phone
+        // number is brute-forceable, and the stored digest must hold none. Consequence: a retry with the same key and a
+        // DIFFERENT value of a field that was present replays the original answer; the acknowledgement token (a fingerprint of
+        // the current candidate set, the actor and the account) is what binds a creation to the reviewed warning.
+        request: {
+          userId,
+          admissionNumber,
+          admissionDate,
+          reason,
+          matching: {
+            name: name !== null,
+            dateOfBirth: dateOfBirth !== null,
+            guardianPhone: guardianPhone !== null,
+          },
+          acknowledgement: acknowledgement ?? null,
+        },
       },
       async () => {
-        // The person lock above already serialises this create against employee creation and role grants for this
-        // account; FOR UPDATE additionally keeps other writers of the account row (and FK share-lockers) out until
-        // commit. Both directions are covered: docs/architecture/v3/21-students.md §6.
-        const user = await tx.query<{ status: string }>(
-          `SELECT status FROM app.users WHERE organization_id = $1 AND id = $2 FOR UPDATE`,
-          [ctx.tenantId, userId],
-        );
-        const account = user.rows[0];
-        if (!account) throw resourceNotFound(); // missing and other-tenant are indistinguishable (RLS + filter)
-        if (account.status !== 'ACTIVE') {
-          throw new AppError(
-            409,
-            'CONFLICT',
-            'Only an ACTIVE account can be given a student record.',
-          );
-        }
-
-        // actor_kind is derived from the students mapping: a student record turns the account into a STUDENT actor
-        // whose staff permissions stop working. Refuse any account with a STAFF-CAPABLE role assignment (any role but
-        // STUDENT, pending future-dated ones included), the creator's own account too. A STUDENT-role assignment is
-        // allowed: it is the student's own role. The race-free guarantee is the migration 0020 trigger.
-        if (await AuthorizationEngine.hasStaffCapableAssignment(tx, ctx.tenantId, userId)) {
-          throw new AppError(
-            409,
-            'CONFLICT',
-            'This account holds a staff role assignment (active or not yet effective) and cannot be given a student record.',
-          );
-        }
-
-        // Friendly early answer; the race-free guarantee is the database guard of migration 0016 (mapped below).
-        const employee = await tx.query(
-          'SELECT 1 FROM app.employees WHERE organization_id = $1 AND user_id = $2',
-          [ctx.tenantId, userId],
-        );
-        if ((employee.rowCount ?? 0) > 0) {
-          throw new AppError(409, 'CONFLICT', 'This account already has an employee record.');
-        }
-
-        const id = uuidv7();
-        try {
-          await tx.query(
-            `INSERT INTO app.students
-               (id, organization_id, user_id, admission_number, admission_date, status)
-             VALUES ($1, $2, $3, $4, $5::date, 'ADMITTED')`,
-            [id, ctx.tenantId, userId, admissionNumber, admissionDate],
-          );
-        } catch (err) {
-          const e = err as { code?: string; constraint?: string };
-          // Race loser of the exclusivity guard (migration 0016). Only this exact code AND constraint is mapped.
-          if (e.code === '23P01' && e.constraint === 'person_record_exclusive') {
-            throw new AppError(
-              409,
-              'CONFLICT',
-              'This account already has an employee record or a staff role assignment.',
-            );
-          }
-          if (e.code === '23505') {
-            throw new AppError(
-              409,
-              'CONFLICT',
-              e.constraint === 'students_org_user_uq'
-                ? 'This account already has a student record.'
-                : 'A student with this admission number already exists.',
-            );
-          }
-          throw err;
-        }
-
-        await recordAudit(
+        const id = await StudentService.insertRecord(
           tx,
           ctx,
-          {
-            action: 'student.record.create',
-            resourceType: 'student',
-            resourceId: id,
-            subjectStudentId: id,
-            riskTier: 2,
-            reasonText: reason,
-            changes: {
-              userId: { old: null, new: userId },
-              admissionNumber: { old: null, new: admissionNumber },
-              admissionDate: { old: null, new: admissionDate },
-              status: { old: null, new: 'ADMITTED' },
-            },
-          },
+          { userId, admissionNumber, admissionDate, reason },
           meta,
+          { duplicateAcknowledgementSupplied: acknowledgement !== undefined },
         );
+        // The authoritative duplicate check, AFTER the insert so every hard error (exact admission number, account state,
+        // exclusivity) wins over the warning. A warning that is not acknowledged - or whose candidate set differs from the
+        // acknowledged one - throws, and the whole transaction (insert, audit, idempotency claim) rolls back.
+        const [fingerprint] = await StudentDuplicateService.find(tx, ctx, [
+          { name, dateOfBirth, guardianPhone, excludeUserId: userId },
+        ]);
+        if (fingerprint !== null && fingerprint !== acknowledgement) {
+          throw duplicateWarningError(fingerprint!);
+        }
         return { status: 201, body: { success: true, data: { id } } };
       },
     );
+  }
+
+  /**
+   * The write half of `create`, shared with the import commit (modules/imports): account and relationship checks, insert,
+   * audit. PRECONDITIONS, owned by the caller: the request is already validated and normalised, the actor holds
+   * `student.record.create` at ORGANIZATION scope, and `lockPersonIdentity` was taken for `input.userId` in this
+   * transaction before any other statement of the person-writing path. This is the only INSERT into app.students.
+   */
+  static async insertRecord(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    input: { userId: string; admissionNumber: string; admissionDate: string; reason: string },
+    meta: AuditRequestMeta,
+    options: { duplicateAcknowledgementSupplied?: boolean } = {},
+  ): Promise<string> {
+    const { userId, admissionNumber, admissionDate, reason } = input;
+    // The person lock above already serialises this create against employee creation and role grants for this
+    // account; FOR UPDATE additionally keeps other writers of the account row (and FK share-lockers) out until
+    // commit. Both directions are covered: docs/architecture/v3/21-students.md §6.
+    const user = await tx.query<{ status: string }>(
+      `SELECT status FROM app.users WHERE organization_id = $1 AND id = $2 FOR UPDATE`,
+      [ctx.tenantId, userId],
+    );
+    const account = user.rows[0];
+    if (!account) throw resourceNotFound(); // missing and other-tenant are indistinguishable (RLS + filter)
+    if (account.status !== 'ACTIVE') {
+      throw new AppError(409, 'CONFLICT', 'Only an ACTIVE account can be given a student record.');
+    }
+
+    // actor_kind is derived from the students mapping: a student record turns the account into a STUDENT actor
+    // whose staff permissions stop working. Refuse any account with a STAFF-CAPABLE role assignment (any role but
+    // STUDENT, pending future-dated ones included), the creator's own account too. A STUDENT-role assignment is
+    // allowed: it is the student's own role. The race-free guarantee is the migration 0020 trigger.
+    if (await AuthorizationEngine.hasStaffCapableAssignment(tx, ctx.tenantId, userId)) {
+      throw new AppError(
+        409,
+        'CONFLICT',
+        'This account holds a staff role assignment (active or not yet effective) and cannot be given a student record.',
+      );
+    }
+
+    // Friendly early answer; the race-free guarantee is the database guard of migration 0016 (mapped below).
+    const employee = await tx.query(
+      'SELECT 1 FROM app.employees WHERE organization_id = $1 AND user_id = $2',
+      [ctx.tenantId, userId],
+    );
+    if ((employee.rowCount ?? 0) > 0) {
+      throw new AppError(409, 'CONFLICT', 'This account already has an employee record.');
+    }
+
+    const id = uuidv7();
+    try {
+      await tx.query(
+        `INSERT INTO app.students
+           (id, organization_id, user_id, admission_number, admission_date, status)
+         VALUES ($1, $2, $3, $4, $5::date, 'ADMITTED')`,
+        [id, ctx.tenantId, userId, admissionNumber, admissionDate],
+      );
+    } catch (err) {
+      const e = err as { code?: string; constraint?: string };
+      // Race loser of the exclusivity guard (migration 0016). Only this exact code AND constraint is mapped.
+      if (e.code === '23P01' && e.constraint === 'person_record_exclusive') {
+        throw new AppError(
+          409,
+          'CONFLICT',
+          'This account already has an employee record or a staff role assignment.',
+        );
+      }
+      if (e.code === '23505') {
+        throw new AppError(
+          409,
+          'CONFLICT',
+          e.constraint === 'students_org_user_uq'
+            ? 'This account already has a student record.'
+            : 'A student with this admission number already exists.',
+        );
+      }
+      throw err;
+    }
+
+    await recordAudit(
+      tx,
+      ctx,
+      {
+        action: 'student.record.create',
+        resourceType: 'student',
+        resourceId: id,
+        subjectStudentId: id,
+        riskTier: 2,
+        reasonText: reason,
+        changes: {
+          userId: { old: null, new: userId },
+          admissionNumber: { old: null, new: admissionNumber },
+          admissionDate: { old: null, new: admissionDate },
+          status: { old: null, new: 'ADMITTED' },
+        },
+        // Only the FACT of the acknowledgement; never the matching inputs or the candidate (doc 26 §3.5).
+        ...(options.duplicateAcknowledgementSupplied
+          ? { metadata: { duplicateAcknowledgementSupplied: true } }
+          : {}),
+      },
+      meta,
+    );
+    return id;
   }
 
   /** One record. Not held ⇒ 403; missing OR out of scope ⇒ the same 404. No audit on read. */

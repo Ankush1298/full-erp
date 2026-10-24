@@ -50,6 +50,19 @@ export const CreateStudentBodySchema = Type.Object(
     }),
     admissionDate: DateSchema,
     reason: ReasonSchema,
+    /**
+     * MATCHING-ONLY inputs of the possible-duplicate check (doc 26 §3.5). All optional; when any is missing or unusable the
+     * check cannot match. None is stored by the create (not the date of birth, not the guardian phone) and none appears in
+     * the response, the audit event or any log.
+     */
+    // name and guardianPhone are UNTYPED here on purpose: the HTTP layer's type coercion would accept `12345` as "12345".
+    // `StudentService.create` (optionalText) accepts a JSON string only, 1-200 / 1-30 characters after trimming, else 400 -
+    // the same contract as the import's matching cells, which also refuse non-text values.
+    name: Type.Optional(Type.Unknown()),
+    dateOfBirth: Type.Optional(DateSchema),
+    guardianPhone: Type.Optional(Type.Unknown()),
+    /** The fingerprint returned by a previous 409 POSSIBLE_DUPLICATE_STUDENT: acknowledges exactly that warning. */
+    duplicateAcknowledgement: Type.Optional(Type.String({ pattern: '^[0-9a-f]{64}$' })),
   },
   { additionalProperties: false },
 );

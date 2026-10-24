@@ -35,6 +35,15 @@ function method(source: string, name: string): string {
   return source.slice(start, next === -1 ? undefined : next);
 }
 
+// Files that know a guardian only as the MATCHING-ONLY input `guardianPhone` of the possible-duplicate check (doc 26 §3.5).
+// They never read a guardian field (tests/security/imports-static.test.ts pins that no SQL of theirs names a guardian table).
+const MATCHING_ONLY = [
+  'src/modules/students/student-duplicate.service.ts',
+  'src/modules/students/student-import.adapter.ts',
+  'src/modules/students/student.schemas.ts',
+  'src/modules/students/student.service.ts',
+];
+
 describe('only StudentGuardianService touches the guardian tables', () => {
   it('no other source file names app.guardians or app.student_guardians, so no other endpoint can expose guardian data', () => {
     const naming = files
@@ -49,7 +58,8 @@ describe('only StudentGuardianService touches the guardian tables', () => {
       if (
         !f.path.startsWith('src/modules/students/') ||
         f.path.includes('student-guardian.') ||
-        f.path.endsWith('/index.ts')
+        f.path.endsWith('/index.ts') ||
+        MATCHING_ONLY.includes(f.path)
       ) {
         continue;
       }

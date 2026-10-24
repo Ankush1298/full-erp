@@ -86,6 +86,8 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | 52 | `academic.section.manage` (sections) | S | – | – | – | – | G | G | G | G |
 | 53 | `enrollment.term.read` (term enrolments and section memberships) | S | S | – | – | G | G | G | G | G |
 | 54 | `enrollment.term.manage` (create / change term enrolments, place students in sections) | S | – | – | – | – | G | G | G | G |
+| **Imports (Milestone 2, Batch 2)** |
+| 55 | `import.job.manage` (create, validate, preview, commit and download the error report of the caller's own student and faculty import jobs; a commit additionally requires `student.record.create` / `employee.record.create` at organization scope) | S | – | – | – | – | – | – | G | G |
 
 ¹ FACULTY `student.profile.read` is `A` (assigned) but the resolver needs course registrations (M3); in M1 the permission is **not seeded for FACULTY**, only the resolver contract is tested with a stub.
 
@@ -113,7 +115,7 @@ Support access to tenant data additionally requires a tenant-approved `platform_
 
 ## 3. Reserved namespaces (not seeded in M1)
 
-`attendance.*`, `enrollment.*`, `academic.term.*`, `academic.course.*`, `service.*`, `request.*`, `ticket.*`, `exam.*`, `result.*`, `finance.*`, `report.*`, `import.*` (M2), `push.*` (M2). Each milestone adds its permissions to the catalog and the matrix **in the same change** as its routes (the route-coverage test fails otherwise).
+`attendance.*`, `enrollment.*`, `academic.term.*`, `academic.course.*`, `service.*`, `request.*`, `ticket.*`, `exam.*`, `result.*`, `finance.*`, `report.*`, `push.*` (M2). Each milestone adds its permissions to the catalog and the matrix **in the same change** as its routes (the route-coverage test fails otherwise).
 
 ---
 

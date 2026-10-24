@@ -12,6 +12,8 @@ export class AppError extends Error {
     readonly statusCode: number,
     readonly code: string,
     message: string,
+    /** Optional structured details, rendered in the envelope exactly like validation details. Never put sensitive data here. */
+    readonly details?: { field: string; message: string }[],
   ) {
     super(message);
     this.name = 'AppError';

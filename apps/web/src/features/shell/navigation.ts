@@ -62,6 +62,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     audience: 'staff',
   },
   {
+    id: 'imports',
+    label: 'Imports',
+    to: '/imports',
+    anyOf: ['import.job.manage'],
+    audience: 'staff',
+  },
+  {
     id: 'organisation',
     label: 'Organisation',
     to: '/organisation',
