@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
+import { useStepUp } from '../features/auth/StepUp';
 import { roleLabel } from '../features/auth/identity';
 import { MfaEnrollment } from '../features/auth/MfaEnrollment';
 import {
@@ -19,6 +20,7 @@ import { mfaErrorMessage } from '../lib/api/messages';
 export function AccountPage() {
   usePageTitle('Account');
   const { identity, client } = useAuth();
+  const { runWithStepUp } = useStepUp();
   const [mfaStatus, setMfaStatus] = useState<MfaStatus | null>(null);
   const [loadingMfa, setLoadingMfa] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
@@ -50,7 +52,7 @@ export function AccountPage() {
     setActionSuccess(null);
     setBusy(true);
     try {
-      const codes = await regenerateRecoveryCodes(client);
+      const codes = await runWithStepUp(() => regenerateRecoveryCodes(client), 'PASSWORD_MFA');
       setNewRecoveryCodes(codes);
       loadStatus();
     } catch (err) {
@@ -65,7 +67,7 @@ export function AccountPage() {
     setActionSuccess(null);
     setBusy(true);
     try {
-      await disableMfa(client);
+      await runWithStepUp(() => disableMfa(client), 'PASSWORD_MFA');
       setActionSuccess('Two-factor authentication has been disabled.');
       loadStatus();
     } catch (err) {

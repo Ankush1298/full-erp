@@ -611,3 +611,20 @@
   font-size: 0.8125rem;
   color: var(--color-muted);
 }
+
+/* Step-up (re-verification) modal: fixed layer above the app, content width capped for small screens. */
+.stepup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgb(0 0 0 / 0.45);
+}
+.stepup-dialog {
+  width: 100%;
+  max-width: 28rem;
+  box-shadow: var(--shadow-md);
+}

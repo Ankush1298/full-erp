@@ -11,6 +11,7 @@ import {
 } from '../../lib/api/mfa-api';
 import { mfaErrorMessage } from '../../lib/api/messages';
 import { useAuth } from './AuthProvider';
+import { useStepUp } from './StepUp';
 
 interface MfaEnrollmentProps {
   isMfaRequired?: boolean;
@@ -22,6 +23,7 @@ type Step = 'init' | 'scan' | 'codes';
 
 export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: MfaEnrollmentProps) {
   const { client } = useAuth();
+  const { runWithStepUp } = useStepUp();
   const [step, setStep] = useState<Step>('init');
   const [ticket, setTicket] = useState('');
   const [enrollData, setEnrollData] = useState<MfaEnrollStartData | null>(null);
@@ -36,7 +38,10 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
     setBusy(true);
 
     try {
-      const data = await startMfaEnrollment(client, ticket || undefined);
+      const data = await runWithStepUp(
+        () => startMfaEnrollment(client, ticket || undefined),
+        'PASSWORD_REAUTH',
+      );
       setEnrollData(data);
       setStep('scan');
     } catch (err) {

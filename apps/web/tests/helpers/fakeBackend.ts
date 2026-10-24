@@ -174,7 +174,29 @@ export function createFakeBackend(
       failChallenge: false,
       failVerify: false,
     },
+    /**
+     * Models the backend's step-up policy (auth.hook / mfa.service): the session has a strength, and when `enforce` is on
+     * the guarded MFA routes refuse with 403 STEP_UP_REQUIRED unless it is high enough (regenerate/disable need
+     * PASSWORD_MFA, the first enrollment PASSWORD_REAUTH). POST /auth/step-up grants PASSWORD_REAUTH and never downgrades;
+     * POST /auth/mfa/challenge grants PASSWORD_MFA. Off by default, so existing tests are unaffected.
+     */
+    stepUp: {
+      enforce: false,
+      strength: 'PASSWORD' as 'PASSWORD' | 'PASSWORD_REAUTH' | 'PASSWORD_MFA',
+      passwordFails: false,
+      /** how /auth/step-up answers: normal, 500, 429 with Retry-After, or a dead session (401 UNAUTHORIZED). */
+      passwordMode: 'ok' as 'ok' | 'server' | 'rate' | 'expired',
+      challengeMode: 'ok' as 'ok' | 'server' | 'expired',
+      /** the challenge answers 200 but reports only PASSWORD_REAUTH (a weak grant that must not be accepted). */
+      weakChallenge: false,
+    },
   };
+
+  const STRENGTH_RANK = { PASSWORD: 1, PASSWORD_REAUTH: 2, PASSWORD_MFA: 3 } as const;
+  const stepUpRefusal = (needed: 'PASSWORD_REAUTH' | 'PASSWORD_MFA'): Response | null =>
+    state.stepUp.enforce && STRENGTH_RANK[state.stepUp.strength] < STRENGTH_RANK[needed]
+      ? err(403, 'STEP_UP_REQUIRED')
+      : null;
 
   const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
     new Response(JSON.stringify(body), {
@@ -257,9 +279,27 @@ export function createFakeBackend(
       if (!state.session) return err(401, 'UNAUTHORIZED');
       return json(200, { success: true, data: { ...state.mfa } });
     }
+    if (path === '/auth/step-up' && method === 'POST') {
+      if (!state.session || state.stepUp.passwordMode === 'expired')
+        return err(401, 'UNAUTHORIZED');
+      if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      if (state.stepUp.passwordMode === 'server') return err(500, 'INTERNAL_ERROR');
+      if (state.stepUp.passwordMode === 'rate')
+        return err(429, 'TOO_MANY_REQUESTS', { 'retry-after': '30' });
+      if (state.stepUp.passwordFails) return err(401, 'INVALID_CREDENTIALS');
+      if (STRENGTH_RANK[state.stepUp.strength] < STRENGTH_RANK.PASSWORD_REAUTH) {
+        state.stepUp.strength = 'PASSWORD_REAUTH';
+      }
+      return json(200, {
+        success: true,
+        data: { steppedUp: true, authStrength: state.stepUp.strength, maxAgeSeconds: 600 },
+      });
+    }
     if (path === '/me/mfa/totp/enroll' && method === 'POST') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      const refused = stepUpRefusal('PASSWORD_REAUTH');
+      if (refused) return refused;
       state.mfa.pendingEnrollment = true;
       return json(201, {
         success: true,
@@ -311,8 +351,17 @@ export function createFakeBackend(
     if (path === '/auth/mfa/challenge' && method === 'POST') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      if (state.stepUp.challengeMode === 'expired') return err(401, 'UNAUTHORIZED');
+      if (state.stepUp.challengeMode === 'server') return err(500, 'INTERNAL_ERROR');
       if (state.mfa.failChallenge) return err(401, 'INVALID_CREDENTIALS');
+      if (state.stepUp.weakChallenge) {
+        return json(200, {
+          success: true,
+          data: { authStrength: 'PASSWORD_REAUTH', method: 'TOTP' },
+        });
+      }
       state.mfa.sessionVerified = true;
+      state.stepUp.strength = 'PASSWORD_MFA';
       return json(200, {
         success: true,
         data: { authStrength: 'PASSWORD_MFA', method: 'TOTP' },
@@ -321,6 +370,8 @@ export function createFakeBackend(
     if (path === '/me/mfa/recovery-codes/regenerate' && method === 'POST') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      const refused = stepUpRefusal('PASSWORD_MFA');
+      if (refused) return refused;
       state.mfa.unusedRecoveryCodes = 10;
       return json(200, {
         success: true,
@@ -343,6 +394,8 @@ export function createFakeBackend(
     if (path === '/me/mfa/totp' && method === 'DELETE') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      const refused = stepUpRefusal('PASSWORD_MFA');
+      if (refused) return refused;
       state.mfa.enrolled = false;
       state.mfa.sessionVerified = false;
       state.mfa.confirmedAt = null;

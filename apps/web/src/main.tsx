@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router';
 import { AppRoutes } from './App';
 import { loadPublicConfig } from './config/env';
 import { AuthProvider } from './features/auth/AuthProvider';
+import { StepUpProvider } from './features/auth/StepUp';
 import { ApiClient } from './lib/api/client';
 import './styles/tokens.css';
 import './styles/base.css';
@@ -19,7 +20,9 @@ createRoot(rootElement).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider client={client}>
-        <AppRoutes />
+        <StepUpProvider>
+          <AppRoutes />
+        </StepUpProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

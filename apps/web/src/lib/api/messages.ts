@@ -54,7 +54,7 @@ export function mfaErrorMessage(err: unknown): string {
     return 'Invalid or expired enrollment ticket.';
   }
   if (err.code === 'STEP_UP_REQUIRED') {
-    return 'Password verification is required before continuing.';
+    return 'Re-verification is required before continuing. Nothing was changed.';
   }
   if (err.code === 'MFA_UNAVAILABLE') {
     return 'MFA service is temporarily unavailable. Please try again later.';
@@ -135,4 +135,37 @@ export function importErrorMessage(err: unknown): string {
     case 'protocol':
       return 'Something went wrong on our side. Please try again.';
   }
+}
+
+/** True for the backend's "re-verify this session first" refusal (403 STEP_UP_REQUIRED). Nothing else qualifies. */
+export function isStepUpRequired(err: unknown): boolean {
+  return isApiError(err) && err.kind === 'forbidden' && err.code === 'STEP_UP_REQUIRED';
+}
+
+/** Fixed wording for the step-up dialog; the server's text and the entered secret are never shown. */
+export function stepUpErrorMessage(
+  err: unknown,
+  level: 'PASSWORD_REAUTH' | 'PASSWORD_MFA',
+): string {
+  if (!isApiError(err)) return 'Re-verification failed. Nothing was changed. Please try again.';
+  if (err.kind === 'rate_limited') {
+    return `Too many attempts. Please wait ${wait(err.retryAfterSeconds)} and try again.`;
+  }
+  if (err.code === 'INVALID_CREDENTIALS') {
+    return level === 'PASSWORD_MFA'
+      ? 'Invalid authentication code or recovery code.'
+      : 'The password is incorrect.';
+  }
+  if (err.kind === 'validation') {
+    return level === 'PASSWORD_MFA'
+      ? 'Check the code you entered and try again.'
+      : 'Enter your current password.';
+  }
+  if (err.kind === 'network') {
+    return 'Cannot reach the server. Check your connection and try again. Nothing was changed.';
+  }
+  if (err.code === 'MFA_UNAVAILABLE') {
+    return 'Two-factor authentication is temporarily unavailable. Please try again later.';
+  }
+  return 'Re-verification is unavailable right now. Nothing was changed. Please try again shortly.';
 }
