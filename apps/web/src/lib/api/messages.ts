@@ -213,3 +213,47 @@ export function accessLoadMessage(err: unknown): string {
   }
   return 'Users and roles could not be loaded. Please try again.';
 }
+
+/** Fixed wording for user management (directory, invitation, suspension, reactivation). */
+export function userErrorMessage(err: unknown): string {
+  if (!isApiError(err)) return 'Something went wrong. Please try again.';
+  if (isStepUpRequired(err))
+    return 'Re-verification is required before continuing. Nothing was changed.';
+  switch (err.code) {
+    case 'LAST_ADMINISTRATOR':
+      return 'The organization must keep at least one active administrator. This user cannot be suspended.';
+    case 'USER_STATUS_TRANSITION_INVALID':
+      return 'The user status has changed or does not permit this action. Please reload.';
+    case 'CONFLICT':
+      return 'This conflicts with the current state: the user may already exist, or another administrator modified this record. Reload and try again.';
+  }
+  switch (err.kind) {
+    case 'forbidden':
+      return 'You do not have permission to perform this action, or you cannot perform it on your own account.';
+    case 'not_found':
+      return 'That user could not be found. Please reload the list.';
+    case 'validation':
+      return 'Check the details you entered (such as email format and a reason of at least 5 characters) and try again.';
+    case 'rate_limited':
+      return `Too many requests. Please wait ${wait(err.retryAfterSeconds)} and try again.`;
+    case 'network':
+      return 'Cannot reach the server. Check your connection and try again. Nothing was changed.';
+    case 'unauthenticated':
+    case 'csrf':
+    case 'mfa_required':
+    case 'server':
+    case 'protocol':
+      return 'Something went wrong on our side. Nothing was changed. Please try again.';
+  }
+}
+
+/** Why the user directory could not be loaded. */
+export function userLoadMessage(err: unknown): string {
+  if (isApiError(err) && err.kind === 'forbidden') {
+    return 'You do not have permission to view the user directory. Contact your organization administrator.';
+  }
+  if (isApiError(err) && err.kind === 'network') {
+    return 'Cannot reach the server. Check your connection and try again.';
+  }
+  return 'Users could not be loaded. Please try again.';
+}

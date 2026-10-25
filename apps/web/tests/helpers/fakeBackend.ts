@@ -84,6 +84,17 @@ export const ADMIN: MeData = {
   ],
 };
 
+export const USER_ADMIN: MeData = {
+  ...ADMIN,
+  user_id: 'u3',
+  capabilities: [
+    ...ADMIN.capabilities,
+    'user.account.read',
+    'user.account.invite',
+    'user.account.suspend',
+  ],
+};
+
 /** Registrar-like: may import students only. */
 export const IMPORT_REGISTRAR: MeData = {
   tenant_id: 't1',
@@ -292,6 +303,13 @@ export function createFakeBackend(
       failNext: null as null | { status: number; code: string },
       seq: 100,
     },
+    users: {
+      inviteDelivery: 'FAILED' as 'SENT' | 'FAILED' | 'NOT_ATTEMPTED',
+      failInvite: null as null | { status: number; code: string },
+      failSuspend: null as null | { status: number; code: string },
+      failReactivate: null as null | { status: number; code: string },
+      lastAdminId: 'u3' as string | null,
+    },
     /**
      * Models the backend's step-up policy (auth.hook / mfa.service): the session has a strength, and when `enforce` is on
      * the guarded MFA routes refuse with 403 STEP_UP_REQUIRED unless it is high enough (regenerate/disable need
@@ -399,14 +417,60 @@ export function createFakeBackend(
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (state.access.listMode === 'forbidden') return err(403, 'FORBIDDEN');
       if (state.access.listMode === 'server') return err(500, 'INTERNAL_ERROR');
+      const statusParam = accessUrl.searchParams.get('status');
+      let filtered = state.access.users;
+      if (statusParam && statusParam !== 'ALL') {
+        filtered = filtered.filter((u) => u['status'] === statusParam);
+      }
       const after = accessUrl.searchParams.get('afterId');
-      const start = after ? state.access.users.findIndex((u) => u['id'] === after) + 1 : 0;
-      const page = state.access.users.slice(start, start + state.access.pageSize);
-      const more = start + state.access.pageSize < state.access.users.length;
+      const start = after ? filtered.findIndex((u) => u['id'] === after) + 1 : 0;
+      const requestedLimit = Number(accessUrl.searchParams.get('limit')) || state.access.pageSize;
+      const limitParam = Math.min(requestedLimit, state.access.pageSize);
+      const page = filtered.slice(start, start + limitParam);
+      const more = start + limitParam < filtered.length;
       return json(200, {
         success: true,
         data: page,
         page: { nextAfterId: more ? (page[page.length - 1]?.['id'] ?? null) : null },
+      });
+    }
+    if (accessUrl.pathname === '/users/invite' && method === 'POST') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      if (state.users?.failInvite) {
+        const fail = state.users.failInvite;
+        state.users.failInvite = null;
+        return err(fail.status, fail.code);
+      }
+      const body = (
+        typeof reqInit?.body === 'string' ? (JSON.parse(reqInit.body) as unknown) : {}
+      ) as Record<string, unknown>;
+      const reason = typeof body['reason'] === 'string' ? body['reason'].trim() : '';
+      if (reason.length < 5) return err(400, 'VALIDATION_ERROR');
+      const email = typeof body['email'] === 'string' ? body['email'].trim() : '';
+      const existing = state.access.users.find((u) => u['email'] === email);
+      if (existing && existing['status'] !== 'INVITED') {
+        return err(409, 'CONFLICT');
+      }
+      const userId = existing ? (existing['id'] as string) : `user-inv-${state.access.seq++}`;
+      if (!existing) {
+        state.access.users.push({
+          id: userId,
+          email,
+          displayName: body['displayName'] ?? email,
+          status: 'INVITED',
+          version: 1,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      return json(201, {
+        success: true,
+        data: {
+          userId,
+          invitationId: `inv-${state.access.seq++}`,
+          expiresAt: '2026-11-01T09:00:00.000Z',
+          delivery: state.users.inviteDelivery,
+        },
       });
     }
     if (accessUrl.pathname === '/roles' && method === 'GET') {
@@ -498,6 +562,59 @@ export function createFakeBackend(
           success: true,
           data: { id: target['id'], validUntil: target['validUntil'], version: target['version'] },
         });
+      }
+    }
+    const userAction = /^\/users\/([^/]+)\/(suspend|reactivate)$/.exec(accessUrl.pathname);
+    if (userAction && method === 'POST') {
+      const early = accessMutation();
+      if (early) return early;
+      const id = decodeURIComponent(userAction[1]!);
+      const action = userAction[2]!;
+      if (action === 'suspend' && state.session && state.me?.user_id === id) {
+        return err(403, 'FORBIDDEN');
+      }
+      const target = state.access.users.find((u) => u['id'] === id);
+      if (!target) return err(404, 'NOT_FOUND');
+      if (action === 'suspend' && (state.users?.lastAdminId === id || target['isLastAdmin'])) {
+        return err(409, 'LAST_ADMINISTRATOR');
+      }
+      const ifMatch = headers['if-match'];
+      if (ifMatch !== `"${String(target['version'])}"`) {
+        return err(409, 'CONFLICT');
+      }
+      if (action === 'suspend' && target['status'] !== 'ACTIVE') {
+        return err(409, 'USER_STATUS_TRANSITION_INVALID');
+      }
+      if (action === 'reactivate' && target['status'] !== 'SUSPENDED') {
+        return err(409, 'USER_STATUS_TRANSITION_INVALID');
+      }
+      if (action === 'suspend' && state.users?.failSuspend) {
+        const fail = state.users.failSuspend;
+        state.users.failSuspend = null;
+        return err(fail.status, fail.code);
+      }
+      if (action === 'reactivate' && state.users?.failReactivate) {
+        const fail = state.users.failReactivate;
+        state.users.failReactivate = null;
+        return err(fail.status, fail.code);
+      }
+      target['status'] = action === 'suspend' ? 'SUSPENDED' : 'ACTIVE';
+      target['version'] = (target['version'] as number) + 1;
+      return json(200, { success: true, data: target }, { ETag: `"${String(target['version'])}"` });
+    }
+    const userDetail = /^\/users\/([^/]+)$/.exec(accessUrl.pathname);
+    if (userDetail && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (state.access.listMode === 'forbidden') return err(403, 'FORBIDDEN');
+      const id = decodeURIComponent(userDetail[1]!);
+      if (id !== 'invite') {
+        const target = state.access.users.find((u) => u['id'] === id);
+        if (!target) return err(404, 'NOT_FOUND');
+        return json(
+          200,
+          { success: true, data: target },
+          { ETag: `"${String(target['version'])}"` },
+        );
       }
     }
     if (path === '/me/mfa' && method === 'GET') {

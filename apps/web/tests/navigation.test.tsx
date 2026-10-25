@@ -2,7 +2,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { describe, expect, it } from 'vitest';
-import { ADMIN, createFakeBackend, STAFF, STUDENT, type MeData } from './helpers/fakeBackend';
+import {
+  ADMIN,
+  USER_ADMIN,
+  createFakeBackend,
+  STAFF,
+  STUDENT,
+  type MeData,
+} from './helpers/fakeBackend';
 import { renderApp } from './helpers/render';
 
 const navLinks = (): string[] =>
@@ -34,6 +41,11 @@ describe('role-based navigation comes from backend-derived identity', () => {
     await open(ADMIN);
     expect(screen.getByRole('heading', { name: 'Administration home' })).toBeInTheDocument();
     expect(navLinks()).toEqual(['Home', 'Students', 'Organisation', 'Roles & access']);
+  });
+
+  it('user administrator: includes Users item when user has user.account capabilities', async () => {
+    await open(USER_ADMIN);
+    expect(navLinks()).toEqual(['Home', 'Students', 'Organisation', 'Users', 'Roles & access']);
   });
 
   it('is driven by capabilities, not role names: an unknown role with admin capabilities gets the admin menu', async () => {

@@ -2,6 +2,7 @@ import type { MeResponse } from '../../lib/api/schemas';
 
 /** The verified identity as returned by the backend. Nothing here is ever derived on the client. */
 export interface Identity {
+  readonly userId: string;
   readonly displayName: string;
   readonly actorKind: 'STUDENT' | 'STAFF';
   readonly roles: readonly string[];
@@ -10,6 +11,7 @@ export interface Identity {
 
 export function toIdentity(me: MeResponse): Identity {
   return {
+    userId: me.user_id,
     displayName: me.display_name,
     actorKind: me.actor_kind,
     roles: me.roles,

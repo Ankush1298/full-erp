@@ -75,6 +75,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     anyOf: ['org.structure.read', 'org.campus.manage', 'org.department.manage'],
   },
   {
+    id: 'users',
+    label: 'Users',
+    to: '/users',
+    anyOf: ['user.account.read', 'user.account.invite', 'user.account.suspend'],
+    audience: 'staff',
+  },
+  {
     id: 'access',
     label: 'Roles & access',
     to: '/access',
