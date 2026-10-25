@@ -257,3 +257,24 @@ export function userLoadMessage(err: unknown): string {
   }
   return 'Users could not be loaded. Please try again.';
 }
+
+/** Fixed wording for invitation acceptance failures; the server's own text is never shown. */
+export function acceptInviteErrorMessage(err: unknown): string {
+  if (!isApiError(err)) return 'Something went wrong. Please try again.';
+  if (err.kind === 'rate_limited') {
+    return `Too many attempts. Please wait ${wait(err.retryAfterSeconds)} and try again.`;
+  }
+  if (err.kind === 'network') {
+    return 'Cannot reach the server. Check your connection and try again.';
+  }
+  if (err.code === 'INVALID_INVITATION') {
+    return 'This invitation link is invalid, expired, or has already been used. Please ask your administrator to send a new invitation.';
+  }
+  if (err.kind === 'validation') {
+    return 'Check the details you entered and try again.';
+  }
+  if (err.kind === 'csrf') {
+    return 'The request was rejected. Reload the page and try again.';
+  }
+  return 'Invitation acceptance is temporarily unavailable. Please try again shortly.';
+}

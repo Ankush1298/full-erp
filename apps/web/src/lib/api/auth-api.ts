@@ -33,3 +33,20 @@ export async function fetchMe(client: ApiClient, signal?: AbortSignal): Promise<
 export async function logout(client: ApiClient): Promise<void> {
   await client.post('/auth/logout', { body: {}, schema: SuccessSchema, public: true });
 }
+
+export interface AcceptInviteInput {
+  token: string;
+  password: string;
+}
+
+/** POST /auth/accept-invite. Public: accepts one-time token and sets password. */
+export async function acceptInvite(client: ApiClient, input: AcceptInviteInput): Promise<void> {
+  await client.post('/auth/accept-invite', {
+    body: {
+      token: input.token,
+      password: input.password,
+    },
+    schema: SuccessSchema,
+    public: true,
+  });
+}

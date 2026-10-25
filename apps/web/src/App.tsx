@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router';
 import { LoginPage } from './features/auth/LoginPage';
+import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { RequireAuth, RequireCapability } from './features/auth/guards';
 import { HomePage } from './features/home/Homes';
 import { AppShell } from './features/shell/AppShell';
@@ -48,6 +49,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route element={<InformationalShell />}>
         <Route path="about" element={<AboutPage />} />
         <Route path="help" element={<HelpPage />} />

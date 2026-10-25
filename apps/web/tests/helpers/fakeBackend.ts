@@ -126,6 +126,7 @@ export function createFakeBackend(
     loginMode: 'ok' as Mode,
     meMode: 'ok' as Mode | 'noaccess',
     logoutMode: 'ok' as Mode,
+    acceptInviteMode: 'ok' as Mode,
     calls: [] as Call[],
     imports: {
       jobs: new Map<string, Record<string, unknown>>(),
@@ -406,6 +407,37 @@ export function createFakeBackend(
       state.session = false;
       return json(200, { success: true });
     }
+    if (path === '/auth/accept-invite' && method === 'POST') {
+      const body = state.calls[state.calls.length - 1]?.body as Record<string, unknown> | undefined;
+      const token = body?.['token'];
+      const password = body?.['password'];
+      switch (state.acceptInviteMode) {
+        case 'network':
+          throw new TypeError('Failed to fetch');
+        case 'invalid':
+          return err(400, 'INVALID_INVITATION');
+        case 'rate':
+          return err(429, 'TOO_MANY_REQUESTS', { 'retry-after': '120' });
+        case 'server':
+          return err(500, 'INTERNAL_ERROR');
+        case 'badjson':
+          return new Response('<html>oops</html>', { status: 200 });
+        case 'badshape':
+          return json(200, { unexpected: true });
+        case 'ok':
+          if (
+            typeof token !== 'string' ||
+            !token ||
+            typeof password !== 'string' ||
+            password.length < 12 ||
+            password.length > 128
+          ) {
+            return err(400, 'INVALID_INVITATION');
+          }
+          return json(200, { success: true });
+      }
+    }
+
     if (path === '/t/mutate' && method !== 'GET') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
