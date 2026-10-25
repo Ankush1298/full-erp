@@ -100,6 +100,11 @@ export const GrantRoleBodySchema = Type.Object(
     scopeType: Type.Union(SCOPE_TYPES.map((s) => Type.Literal(s))),
     scopeId: Type.Optional(UuidV7Schema),
     reason: ReasonSchema,
+    /**
+     * Optional end of the assignment (ISO 8601 with offset). Deliberately UNTYPED here: the HTTP layer's type coercion would
+     * turn a number into text; `parseValidUntil` in the service is the single, strict validator.
+     */
+    validUntil: Type.Optional(Type.Unknown()),
   },
   { additionalProperties: false },
 );
@@ -141,3 +146,70 @@ export const IssueMfaTicketResponseSchema = Type.Object(
   { additionalProperties: false },
 );
 export type IssueMfaTicketResponse = Static<typeof IssueMfaTicketResponseSchema>;
+
+// ---- role administration reads and expiry change (Milestone 2, B2) -------------------------------------------------------
+
+const ScopeTypeSchema = Type.Union(SCOPE_TYPES.map((t) => Type.Literal(t)));
+
+/** A role of THIS tenant. `grantable` is the CALLER's role-level grant rule only; scope containment is decided at grant time. */
+export const RoleDtoSchema = Type.Object(
+  {
+    id: UuidV7Schema,
+    code: Type.String(),
+    name: Type.String(),
+    allowedScopeTypes: Type.Array(ScopeTypeSchema),
+    permissionCount: Type.Integer({ minimum: 0 }),
+    criticalPermissionCount: Type.Integer({ minimum: 0 }),
+    grantable: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+export type RoleDto = Static<typeof RoleDtoSchema>;
+export const ListRolesResponseSchema = Type.Object(
+  { success: Type.Literal(true), data: Type.Array(RoleDtoSchema) },
+  { additionalProperties: false },
+);
+
+export const ASSIGNMENT_STATES = ['EFFECTIVE', 'EXPIRED', 'PENDING', 'REVOKED'] as const;
+export const RoleAssignmentDtoSchema = Type.Object(
+  {
+    id: UuidV7Schema,
+    roleId: UuidV7Schema,
+    roleCode: Type.String(),
+    scopeType: ScopeTypeSchema,
+    scopeId: Type.Union([UuidV7Schema, Type.Null()]),
+    scopeName: Type.Union([Type.String(), Type.Null()]),
+    state: Type.Union(ASSIGNMENT_STATES.map((s) => Type.Literal(s))),
+    validFrom: Type.String(),
+    validUntil: Type.Union([Type.String(), Type.Null()]),
+    version: Type.Integer({ minimum: 1 }),
+    createdAt: Type.String(),
+  },
+  { additionalProperties: false },
+);
+export type RoleAssignmentDto = Static<typeof RoleAssignmentDtoSchema>;
+export const ListRoleAssignmentsResponseSchema = Type.Object(
+  { success: Type.Literal(true), data: Type.Array(RoleAssignmentDtoSchema) },
+  { additionalProperties: false },
+);
+
+/** `validUntil` is required (null clears the expiry) and untyped for the same coercion reason as in the grant body. */
+export const UpdateAssignmentExpiryBodySchema = Type.Object(
+  { validUntil: Type.Unknown(), reason: ReasonSchema },
+  { additionalProperties: false },
+);
+export type UpdateAssignmentExpiryBody = Static<typeof UpdateAssignmentExpiryBodySchema>;
+export const UpdateAssignmentExpiryResponseSchema = Type.Object(
+  {
+    success: Type.Literal(true),
+    data: Type.Object(
+      {
+        id: UuidV7Schema,
+        validUntil: Type.Union([Type.String(), Type.Null()]),
+        version: Type.Integer({ minimum: 1 }),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);

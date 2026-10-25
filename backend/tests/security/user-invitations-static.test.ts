@@ -160,10 +160,17 @@ describe('the services keep their order and their limits', () => {
   it('the user routes are gated by catalogued permissions and take the tenant only from the session', () => {
     const routes = get(USER_ROUTES);
     const used = [...routes.matchAll(/permission:\s*'([^']+)'/g)].map((m) => m[1]!).sort();
+    // Milestone 2 B2 added GET /roles, GET /users/:id, GET /users/:id/role-assignments (all user.account.read, SENSITIVE:
+    // reading must not need a step-up) and PATCH /role-assignments/:id (role.assignment.grant, CRITICAL). The expiry
+    // change is deliberately the GRANT permission: a longer or unlimited assignment is a grant.
     expect(used).toEqual([
+      'role.assignment.grant',
       'role.assignment.grant',
       'role.assignment.revoke',
       'user.account.invite',
+      'user.account.read',
+      'user.account.read',
+      'user.account.read',
       'user.account.read',
       'user.account.suspend',
     ]);

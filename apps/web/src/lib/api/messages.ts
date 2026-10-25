@@ -169,3 +169,47 @@ export function stepUpErrorMessage(
   }
   return 'Re-verification is unavailable right now. Nothing was changed. Please try again shortly.';
 }
+
+/** Fixed wording for the role-administration page; the server's text is never shown. */
+export function accessErrorMessage(err: unknown): string {
+  if (!isApiError(err)) return 'Something went wrong. Please try again.';
+  if (isStepUpRequired(err))
+    return 'Re-verification is required before continuing. Nothing was changed.';
+  switch (err.code) {
+    case 'LAST_ADMINISTRATOR':
+      return 'The last effective administrator of the organization cannot be removed.';
+    case 'ASSIGNMENT_NOT_EFFECTIVE':
+      return 'This assignment has already expired. Grant the role again instead.';
+    case 'CONFLICT':
+      return 'This conflicts with the current state: the user may already have this role, the account may not accept it, or someone else changed the assignment. Reload and try again.';
+  }
+  switch (err.kind) {
+    case 'forbidden':
+      return 'You are not allowed to make this change. You cannot change your own access, and you can only manage roles and scopes your own role allows.';
+    case 'not_found':
+      return 'That user, role or assignment is no longer available. Reload and try again.';
+    case 'validation':
+      return 'Check the details you entered (the reason needs at least 5 characters, and an expiry must be a future date and time) and try again.';
+    case 'rate_limited':
+      return `Too many requests. Please wait ${wait(err.retryAfterSeconds)} and try again.`;
+    case 'network':
+      return 'Cannot reach the server. Check your connection and try again. Nothing was changed.';
+    case 'unauthenticated':
+    case 'csrf':
+    case 'mfa_required':
+    case 'server':
+    case 'protocol':
+      return 'Something went wrong on our side. Nothing was changed. Please try again.';
+  }
+}
+
+/** Why the user list could not be shown (read-only call; the server decides who may see it). */
+export function accessLoadMessage(err: unknown): string {
+  if (isApiError(err) && err.kind === 'forbidden') {
+    return 'Your role cannot manage access for the whole organization. Organization-level administrators can use this page.';
+  }
+  if (isApiError(err) && err.kind === 'network') {
+    return 'Cannot reach the server. Check your connection and try again.';
+  }
+  return 'Users and roles could not be loaded. Please try again.';
+}

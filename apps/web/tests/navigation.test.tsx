@@ -59,9 +59,10 @@ describe('role-based navigation comes from backend-derived identity', () => {
     await waitFor(() => expect(document.title).toBe('Access restricted · Anesa'));
   });
 
-  it('an administrator can open the admin placeholder, clearly labelled as not yet available', async () => {
-    await open(ADMIN, '/access');
-    expect(screen.getByRole('heading', { name: 'Roles & access' })).toBeInTheDocument();
+  it('an administrator can open a not-yet-built page, clearly labelled as not yet available', async () => {
+    // /access used to be this placeholder; Milestone 2 B2 built it (tests/access-page.test.tsx). /students still is one.
+    await open(ADMIN, '/students');
+    expect(screen.getByRole('heading', { name: 'Students' })).toBeInTheDocument();
     expect(screen.getByText('Not yet available')).toBeInTheDocument();
   });
 });

@@ -174,6 +174,124 @@ export function createFakeBackend(
       failChallenge: false,
       failVerify: false,
     },
+    /** Role administration (/access): users, roles and assignments of one tenant, with the real routes' error behaviour. */
+    access: {
+      users: [
+        {
+          id: 'user-fiona',
+          email: 'fiona.faculty@college.test',
+          displayName: 'Fiona Faculty',
+          status: 'ACTIVE',
+          version: 1,
+          createdAt: '2026-10-01T09:00:00.000Z',
+        },
+        {
+          id: 'user-sam',
+          email: 'sam.staff@college.test',
+          displayName: 'Sam Staff',
+          status: 'ACTIVE',
+          version: 1,
+          createdAt: '2026-10-02T09:00:00.000Z',
+        },
+        {
+          id: 'user-nobody',
+          email: 'nobody@college.test',
+          displayName: 'Nobody Yet',
+          status: 'ACTIVE',
+          version: 1,
+          createdAt: '2026-10-03T09:00:00.000Z',
+        },
+      ] as Array<Record<string, unknown>>,
+      pageSize: 50,
+      roles: [
+        {
+          id: 'role-faculty',
+          code: 'FACULTY',
+          name: 'FACULTY',
+          allowedScopeTypes: ['ORGANIZATION', 'CAMPUS', 'DEPARTMENT'],
+          permissionCount: 12,
+          criticalPermissionCount: 0,
+          grantable: true,
+        },
+        {
+          id: 'role-hod',
+          code: 'HOD',
+          name: 'HOD',
+          allowedScopeTypes: ['DEPARTMENT'],
+          permissionCount: 20,
+          criticalPermissionCount: 0,
+          grantable: true,
+        },
+        {
+          id: 'role-admin',
+          code: 'COLLEGE_ADMIN',
+          name: 'COLLEGE_ADMIN',
+          allowedScopeTypes: ['ORGANIZATION'],
+          permissionCount: 60,
+          criticalPermissionCount: 6,
+          grantable: true,
+        },
+        {
+          id: 'role-student',
+          code: 'STUDENT',
+          name: 'STUDENT',
+          allowedScopeTypes: ['ORGANIZATION'],
+          permissionCount: 8,
+          criticalPermissionCount: 0,
+          grantable: false,
+        },
+      ] as Array<Record<string, unknown>>,
+      assignments: {
+        'user-fiona': [
+          {
+            id: 'asg-1',
+            roleId: 'role-faculty',
+            roleCode: 'FACULTY',
+            scopeType: 'ORGANIZATION',
+            scopeId: null,
+            scopeName: null,
+            state: 'EFFECTIVE',
+            validFrom: '2026-10-01T09:00:00.000Z',
+            validUntil: '2030-01-01T00:00:00.000Z',
+            version: 1,
+            createdAt: '2026-10-01T09:00:00.000Z',
+          },
+          {
+            id: 'asg-2',
+            roleId: 'role-hod',
+            roleCode: 'HOD',
+            scopeType: 'DEPARTMENT',
+            scopeId: 'dept-1',
+            scopeName: 'Computer Science',
+            state: 'REVOKED',
+            validFrom: '2026-09-01T09:00:00.000Z',
+            validUntil: null,
+            version: 2,
+            createdAt: '2026-09-01T09:00:00.000Z',
+          },
+        ],
+        'user-sam': [
+          {
+            id: 'asg-3',
+            roleId: 'role-admin',
+            roleCode: 'COLLEGE_ADMIN',
+            scopeType: 'ORGANIZATION',
+            scopeId: null,
+            scopeName: null,
+            state: 'EFFECTIVE',
+            validFrom: '2026-09-01T09:00:00.000Z',
+            validUntil: null,
+            version: 1,
+            createdAt: '2026-09-01T09:00:00.000Z',
+          },
+        ],
+      } as Record<string, Array<Record<string, unknown>>>,
+      /** how the user list answers: normal, 403 (not an organization-level administrator), 500 */
+      listMode: 'ok' as 'ok' | 'forbidden' | 'server',
+      /** the next mutation answers with this status and code (then clears) */
+      failNext: null as null | { status: number; code: string },
+      seq: 100,
+    },
     /**
      * Models the backend's step-up policy (auth.hook / mfa.service): the session has a strength, and when `enforce` is on
      * the guarded MFA routes refuse with 403 STEP_UP_REQUIRED unless it is high enough (regenerate/disable need
@@ -274,6 +392,113 @@ export function createFakeBackend(
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
       return json(200, { success: true });
+    }
+    // ---- role administration (mirrors backend/src/modules/users routes) ----
+    const accessUrl = new URL(path, 'http://x');
+    if (accessUrl.pathname === '/users' && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (state.access.listMode === 'forbidden') return err(403, 'FORBIDDEN');
+      if (state.access.listMode === 'server') return err(500, 'INTERNAL_ERROR');
+      const after = accessUrl.searchParams.get('afterId');
+      const start = after ? state.access.users.findIndex((u) => u['id'] === after) + 1 : 0;
+      const page = state.access.users.slice(start, start + state.access.pageSize);
+      const more = start + state.access.pageSize < state.access.users.length;
+      return json(200, {
+        success: true,
+        data: page,
+        page: { nextAfterId: more ? (page[page.length - 1]?.['id'] ?? null) : null },
+      });
+    }
+    if (accessUrl.pathname === '/roles' && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (state.access.listMode === 'forbidden') return err(403, 'FORBIDDEN');
+      return json(200, { success: true, data: state.access.roles });
+    }
+    const assignList = /^\/users\/([^/]+)\/role-assignments$/.exec(accessUrl.pathname);
+    if (assignList && method === 'GET') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      const id = decodeURIComponent(assignList[1]!);
+      if (!state.access.users.some((u) => u['id'] === id)) return err(404, 'NOT_FOUND');
+      return json(200, { success: true, data: state.access.assignments[id] ?? [] });
+    }
+    const accessMutation = (): Response | null => {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      const refused = stepUpRefusal('PASSWORD_MFA');
+      if (refused) return refused;
+      const fail = state.access.failNext;
+      if (fail) {
+        state.access.failNext = null;
+        return err(fail.status, fail.code);
+      }
+      return null;
+    };
+    if (assignList && method === 'POST') {
+      const early = accessMutation();
+      if (early) return early;
+      const userId = decodeURIComponent(assignList[1]!);
+      const body = (
+        typeof reqInit?.body === 'string' ? (JSON.parse(reqInit.body) as unknown) : {}
+      ) as Record<string, unknown>;
+      const role = state.access.roles.find((r) => r['id'] === body['roleId']);
+      const list = (state.access.assignments[userId] ??= []);
+      if (!role) return err(404, 'NOT_FOUND');
+      if (
+        list.some(
+          (a) =>
+            a['roleId'] === role['id'] &&
+            a['state'] === 'EFFECTIVE' &&
+            a['scopeId'] === (body['scopeId'] ?? null),
+        )
+      ) {
+        return err(409, 'CONFLICT');
+      }
+      const id = `asg-${state.access.seq++}`;
+      list.unshift({
+        id,
+        roleId: role['id'],
+        roleCode: role['code'],
+        scopeType: body['scopeType'],
+        scopeId: body['scopeId'] ?? null,
+        scopeName:
+          body['scopeId'] === 'dept-1'
+            ? 'Computer Science'
+            : body['scopeId'] === 'camp-1'
+              ? 'Main Campus'
+              : null,
+        state: 'EFFECTIVE',
+        validFrom: '2026-10-25T09:00:00.000Z',
+        validUntil: body['validUntil'] ?? null,
+        version: 1,
+        createdAt: '2026-10-25T09:00:00.000Z',
+      });
+      return json(201, { success: true, data: { id } });
+    }
+    const assignOne = /^\/role-assignments\/([^/]+)(\/revoke)?$/.exec(accessUrl.pathname);
+    if (assignOne && (method === 'POST' || method === 'PATCH')) {
+      const early = accessMutation();
+      if (early) return early;
+      const target = Object.values(state.access.assignments)
+        .flat()
+        .find((a) => a['id'] === decodeURIComponent(assignOne[1]!));
+      if (!target) return err(404, 'NOT_FOUND');
+      const body = (
+        typeof reqInit?.body === 'string' ? (JSON.parse(reqInit.body) as unknown) : {}
+      ) as Record<string, unknown>;
+      if (method === 'POST' && assignOne[2]) {
+        target['state'] = 'REVOKED';
+        target['version'] = (target['version'] as number) + 1;
+        return json(200, { success: true });
+      }
+      if (method === 'PATCH' && !assignOne[2]) {
+        if (headers['if-match'] !== `"${String(target['version'])}"`) return err(409, 'CONFLICT');
+        target['validUntil'] = body['validUntil'] ?? null;
+        target['version'] = (target['version'] as number) + 1;
+        return json(200, {
+          success: true,
+          data: { id: target['id'], validUntil: target['validUntil'], version: target['version'] },
+        });
+      }
     }
     if (path === '/me/mfa' && method === 'GET') {
       if (!state.session) return err(401, 'UNAUTHORIZED');

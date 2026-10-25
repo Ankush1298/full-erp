@@ -5,7 +5,10 @@ import { isUuidV7, uuidv7 } from '../../shared/ids/uuidv7.js';
 import { isTrustedContext, type TrustedContext } from '../../shared/tenancy/trusted-context.js';
 import { recordAudit, type AuditRequestMeta } from '../../shared/audit/index.js';
 import { AuthorizationEngine } from '../../shared/authorization/engine.js';
-import { RoleAssignmentService } from '../../shared/authorization/assignments.js';
+import {
+  RoleAssignmentService,
+  administratorLockKey,
+} from '../../shared/authorization/assignments.js';
 import type { ScopeType } from '../../shared/authorization/catalog.js';
 import {
   parseIdempotencyKey,
@@ -20,6 +23,8 @@ import {
   USERS_DEFAULT_LIMIT,
   USERS_MAX_LIMIT,
   USER_STATUSES,
+  type RoleAssignmentDto,
+  type RoleDto,
   type UserDto,
 } from './user.schemas.js';
 
@@ -111,6 +116,7 @@ export interface GrantRoleInput {
   scopeType: ScopeType;
   scopeId?: string | undefined;
   reason: string;
+  validUntil?: unknown;
 }
 
 export interface InviteInput {
@@ -317,7 +323,7 @@ export class UserService {
 
     // Serialises every "might remove the last administrator" decision of this tenant (two admins suspending each other).
     await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-      `app.user_admin_exclusive:${ctx.tenantId}`,
+      administratorLockKey(ctx.tenantId),
     ]);
     const current = await lockUser(tx, ctx.tenantId, id);
     if (current.version !== expected) throw new AppError(409, 'CONFLICT', 'User version mismatch.');
@@ -438,9 +444,51 @@ export class UserService {
         scopeType: input.scopeType,
         reason: input.reason,
         ...(input.scopeId ? { scopeId: input.scopeId } : {}),
+        ...(input.validUntil !== undefined ? { validUntil: input.validUntil } : {}),
       },
       meta,
     );
+  }
+
+  // ---- role administration reads (Milestone 2, B2) ---------------------------------------------------------------------
+  // All three are `user.account.read` (SENSITIVE) at ORGANIZATION scope, exactly like `list`: reading is not a CRITICAL act
+  // (the page must load without a step-up); changing assignments stays CRITICAL on its own routes. Every query is filtered by
+  // the session's tenant; a user, role or assignment of another tenant is the same 404 as an absent one.
+
+  /** One account of the caller's tenant. */
+  static async get(tx: TenantTx, ctx: TrustedContext, userId: string): Promise<UserDto> {
+    ensureTrusted(ctx);
+    AuthorizationEngine.assertStaffActor(ctx);
+    if (!isUuidV7(userId)) throw invalid('Invalid user ID.');
+    await assertOrganizationScope(tx, ctx, USER_READ_PERMISSION);
+    const res = await tx.query<UserRow>(
+      `SELECT ${COLS} FROM app.users WHERE organization_id = $1 AND id = $2`,
+      [ctx.tenantId, userId.toLowerCase()],
+    );
+    const row = res.rows[0];
+    if (!row) throw resourceNotFound();
+    return toDto(row);
+  }
+
+  /**
+   * Roles of THIS tenant that the platform defines, with the caller's grant rule. The query lives in the authorization layer
+   * (the only code allowed to read the role tables); this method proves `user.account.read` at organization scope first.
+   */
+  static async listRoles(tx: TenantTx, ctx: TrustedContext): Promise<RoleDto[]> {
+    ensureTrusted(ctx);
+    AuthorizationEngine.assertStaffActor(ctx);
+    await assertOrganizationScope(tx, ctx, USER_READ_PERMISSION);
+    return RoleAssignmentService.describeRoles(tx, ctx);
+  }
+
+  /** Every assignment of one account (history included, newest first, at most 200) with its computed state. */
+  static async listAssignments(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    userId: string,
+  ): Promise<RoleAssignmentDto[]> {
+    await UserService.get(tx, ctx, userId); // authorization, tenant scope and the 404 for an unknown or foreign user
+    return RoleAssignmentService.listForUser(tx, ctx, userId.toLowerCase());
   }
 }
 

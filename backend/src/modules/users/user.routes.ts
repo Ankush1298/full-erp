@@ -17,6 +17,11 @@ import {
   GrantRoleBodySchema,
   type GrantRoleBody,
   GrantRoleResponseSchema,
+  ListRoleAssignmentsResponseSchema,
+  ListRolesResponseSchema,
+  UpdateAssignmentExpiryBodySchema,
+  type UpdateAssignmentExpiryBody,
+  UpdateAssignmentExpiryResponseSchema,
   InviteUserBodySchema,
   type InviteUserBody,
   InviteUserResponseSchema,
@@ -74,6 +79,51 @@ export const registerUserRoutes: FastifyPluginAsync<UserRoutesOptions> = async (
         data: out.data,
         page: { nextAfterId: out.nextAfterId },
       });
+    },
+  );
+
+  app.get<{ Params: UserIdParam }>(
+    '/users/:id',
+    {
+      config: { permission: 'user.account.read' },
+      schema: { params: UserIdParamSchema, response: { 200: GetUserResponseSchema } },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) => UserService.get(tx, ctx, req.params.id));
+      reply.header('ETag', `"${data.version}"`);
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  app.get<{ Params: UserIdParam }>(
+    '/users/:id/role-assignments',
+    {
+      config: { permission: 'user.account.read' },
+      schema: { params: UserIdParamSchema, response: { 200: ListRoleAssignmentsResponseSchema } },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        UserService.listAssignments(tx, ctx, req.params.id),
+      );
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  app.get(
+    '/roles',
+    {
+      config: { permission: 'user.account.read' },
+      schema: { response: { 200: ListRolesResponseSchema } },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) => UserService.listRoles(tx, ctx));
+      return reply.status(200).send({ success: true, data });
     },
   );
 
@@ -203,6 +253,47 @@ export const registerUserRoutes: FastifyPluginAsync<UserRoutesOptions> = async (
         UserService.grantRole(tx, ctx, req.params.id, req.body, auditMeta(req)),
       );
       return reply.status(201).send({ success: true, data: { id } });
+    },
+  );
+
+  // Expiry change. CRITICAL like a grant (a longer or unlimited assignment is a grant); If-Match = the assignment version.
+  app.patch<{ Params: RoleAssignmentIdParam; Body: UpdateAssignmentExpiryBody }>(
+    '/role-assignments/:id',
+    {
+      config: { permission: 'role.assignment.grant' },
+      schema: {
+        params: RoleAssignmentIdParamSchema,
+        body: UpdateAssignmentExpiryBodySchema,
+        response: { 200: UpdateAssignmentExpiryResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const header = req.headers['if-match'];
+      const expected = parseIfMatch(typeof header === 'string' ? header : undefined);
+      if (expected.type !== 'version') {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'If-Match must carry the exact version of the assignment.',
+        );
+      }
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        RoleAssignmentService.updateExpiry(
+          tx,
+          ctx,
+          req.params.id,
+          {
+            validUntil: req.body.validUntil,
+            reason: req.body.reason,
+            expectedVersion: expected.version,
+          },
+          auditMeta(req),
+        ),
+      );
+      reply.header('ETag', `"${data.version}"`);
+      return reply.status(200).send({ success: true, data });
     },
   );
 

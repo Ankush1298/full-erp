@@ -10,6 +10,7 @@ import { AcademicsPage } from './pages/AcademicsPage';
 import { ComingSoonPage } from './pages/ComingSoon';
 import { ConsentsPage } from './pages/ConsentsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { AccessPage } from './pages/AccessPage';
 import { ImportsPage } from './pages/ImportsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { OrganisationPage } from './pages/OrganisationPage';
@@ -131,11 +132,9 @@ export function AppRoutes() {
           <Route
             path="access"
             element={
-              <Guarded
-                path="/access"
-                title="Roles & access"
-                description="Role assignments will be managed here."
-              />
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/access'] ?? []}>
+                <AccessPage />
+              </RequireCapability>
             }
           />
           <Route path="*" element={<NotFoundPage />} />
