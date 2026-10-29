@@ -278,3 +278,40 @@ export function acceptInviteErrorMessage(err: unknown): string {
   }
   return 'Invitation acceptance is temporarily unavailable. Please try again shortly.';
 }
+
+/**
+ * Fixed wording for student record reads (directory, lookup, profile sections). A 404 never says whether a record exists:
+ * a missing record, another organisation's record and one outside the caller's scope are the same answer.
+ */
+export function studentReadMessage(err: unknown, subject: string): string {
+  if (!isApiError(err)) return `${subject} could not be loaded. Please try again.`;
+  switch (err.kind) {
+    case 'forbidden':
+      return `You do not have permission to view ${subject.toLowerCase()}.`;
+    case 'not_found':
+      return 'No student was found, or the record is outside your access.';
+    case 'rate_limited':
+      return `Too many requests. Please wait ${wait(err.retryAfterSeconds)} and try again.`;
+    case 'network':
+      return 'Cannot reach the server. Check your connection and try again.';
+    default:
+      return `${subject} could not be loaded. Please try again.`;
+  }
+}
+
+/**
+ * Directory failures the UI can tell apart. The backend (docs 21 §0c, tests/unit/student-directory-activation.test.ts)
+ * gives NO stable signal for "directory not enabled": an unregistered route is read as GET /students/:id with a malformed
+ * id and answers 400 BAD_REQUEST, the same status and code as a malformed directory query (bad status or limit) on an
+ * enabled server. Only INVALID_CURSOR is distinct. So any other 400 is reported as "request not accepted" (which may mean
+ * the directory is not enabled), never asserted to be the feature flag. Every case fails closed; no fallback listing.
+ */
+export type DirectoryFailure = 'cursor' | 'rejected' | 'other';
+export function directoryFailure(err: unknown): DirectoryFailure {
+  if (!isApiError(err) || err.kind !== 'validation') return 'other';
+  return err.code === 'INVALID_CURSOR' ? 'cursor' : 'rejected';
+}
+
+/** Fixed wording for a rejected (non-cursor 400) directory request. */
+export const DIRECTORY_REJECTED_MESSAGE =
+  'The student directory is not available: the server did not accept the request. It may not be enabled on this server. If this continues, contact your administrator.';

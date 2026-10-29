@@ -72,9 +72,9 @@ describe('role-based navigation comes from backend-derived identity', () => {
   });
 
   it('an administrator can open a not-yet-built page, clearly labelled as not yet available', async () => {
-    // /access used to be this placeholder; Milestone 2 B2 built it (tests/access-page.test.tsx). /students still is one.
-    await open(ADMIN, '/students');
-    expect(screen.getByRole('heading', { name: 'Students' })).toBeInTheDocument();
+    // /access (M2 B2) and /students (M2 B5, tests/students-page.test.tsx) used to be this placeholder; /profile still is one.
+    await open(ADMIN, '/profile');
+    expect(screen.getByRole('heading', { name: 'My profile' })).toBeInTheDocument();
     expect(screen.getByText('Not yet available')).toBeInTheDocument();
   });
 });

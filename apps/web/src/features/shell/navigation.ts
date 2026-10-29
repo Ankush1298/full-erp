@@ -45,7 +45,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'students',
     label: 'Students',
     to: '/students',
-    anyOf: ['student.profile.read'],
+    anyOf: ['student.profile.read', 'student.directory.list', 'student.directory.search'],
     audience: 'staff',
   },
   {

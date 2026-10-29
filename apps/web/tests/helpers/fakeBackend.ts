@@ -113,6 +113,33 @@ export const IMPORT_ADMIN: MeData = {
   capabilities: [...IMPORT_REGISTRAR.capabilities, 'employee.record.create'],
 };
 
+export interface StudentRow {
+  id: string;
+  admissionNumber: string;
+  displayName: string;
+  status: string;
+  tenant: string;
+  visible: boolean;
+}
+function studentRow(
+  id: string,
+  admissionNumber: string,
+  displayName: string,
+  status: string,
+): StudentRow {
+  return { id, admissionNumber, displayName, status, tenant: 't1', visible: true };
+}
+
+const STUDENT_STATUS_VALUES = [
+  'ADMITTED',
+  'ACTIVE',
+  'ON_LEAVE',
+  'SUSPENDED',
+  'DISCONTINUED',
+  'GRADUATED',
+  'TRANSFERRED_OUT',
+];
+
 type Mode = 'ok' | 'invalid' | 'rate' | 'network' | 'server' | 'badjson' | 'badshape';
 
 /** A stand-in for the real backend, implementing the documented contracts including CSRF enforcement. */
@@ -172,6 +199,9 @@ export function createFakeBackend(
       ] as Array<Record<string, unknown>>,
       sections: [] as Array<Record<string, unknown>>,
       enrollments: {} as Record<string, Array<Record<string, unknown>>>,
+      /** how GET /academics/terms and GET /students/:id/term-enrollments answer */
+      termsMode: 'ok' as 'ok' | 'server',
+      enrollmentsMode: 'ok' as 'ok' | 'server',
       /** When set, the next write answers with this status (e.g. 409) and the matching code. */
       failNext: null as null | { status: number; code: string },
     },
@@ -303,6 +333,63 @@ export function createFakeBackend(
       /** the next mutation answers with this status and code (then clears) */
       failNext: null as null | { status: number; code: string },
       seq: 100,
+    },
+    /**
+     * Student records (GET /students/directory, /students?admissionNumber=, /students/:id, /students/:id/identifiers),
+     * modelling the real routes' authorization and tenant rules: every row carries its tenant, and a row of another tenant
+     * or outside the caller's scope (`visible: false`) answers exactly like a missing one (404), never 403.
+     */
+    students: {
+      /** false = server without cursor keys or STUDENT_DIRECTORY_LIST_ENABLED: the path is read as a bad id (400). */
+      directoryEnabled: true,
+      /** how the directory answers, once per request: normal, 500, 429 with Retry-After, network failure */
+      directoryMode: 'ok' as 'ok' | 'server' | 'rate' | 'network' | 'forbidden' | 'badrequest',
+      /** the next cursor request answers 400 INVALID_CURSOR (expired / tampered) */
+      expireCursor: false,
+      pageSize: 2,
+      profileMode: 'ok' as 'ok' | 'server' | 'forbidden',
+      identifiersMode: 'ok' as 'ok' | 'server',
+      records: [
+        studentRow('01900000-0000-7000-8000-000000000001', 'ADM-001', 'Asha Rao', 'ACTIVE'),
+        studentRow('01900000-0000-7000-8000-000000000002', 'ADM-002', 'Bala Iyer', 'ACTIVE'),
+        studentRow('01900000-0000-7000-8000-000000000003', 'ADM-003', 'Chitra Nair', 'ON_LEAVE'),
+        // outside the caller's scope: never listed, 404 on read
+        {
+          ...studentRow(
+            '01900000-0000-7000-8000-000000000004',
+            'ADM-004',
+            'Hidden Scope',
+            'ACTIVE',
+          ),
+          visible: false,
+        },
+        // another tenant's record: never listed, 404 on read
+        {
+          ...studentRow(
+            '01900000-0000-7000-8000-000000000009',
+            'ADM-009',
+            'Other Tenant',
+            'ACTIVE',
+          ),
+          tenant: 't2',
+        },
+      ] as StudentRow[],
+      identifiers: {
+        '01900000-0000-7000-8000-000000000001': [
+          {
+            id: 'sid-1',
+            studentId: '01900000-0000-7000-8000-000000000001',
+            idType: 'UNIVERSITY_PRN',
+            value: 'PRN-2026-0001',
+            issuer: 'State University',
+            validFrom: '2026-06-01',
+            validTo: null,
+            version: 1,
+            createdAt: '2026-06-01T09:00:00.000Z',
+            updatedAt: '2026-06-01T09:00:00.000Z',
+          },
+        ],
+      } as Record<string, Array<Record<string, unknown>>>,
     },
     users: {
       inviteDelivery: 'FAILED' as 'SENT' | 'FAILED' | 'NOT_ATTEMPTED',
@@ -1059,6 +1146,114 @@ export function createFakeBackend(
         }
       }
     }
+    const studentUrl = new URL(path, 'http://x');
+    if (
+      method === 'GET' &&
+      /^\/students(?:\/[^/]+(?:\/identifiers)?)?$/.test(studentUrl.pathname) &&
+      studentUrl.pathname !== '/students/imports'
+    ) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      const st = state.students;
+      const caps = state.me.capabilities;
+      // Only rows of the caller's tenant and inside its scope exist for this caller.
+      const mine = st.records.filter((r) => r.tenant === state.me.tenant_id && r.visible);
+      const entry = (r: StudentRow) => ({
+        id: r.id,
+        admissionNumber: r.admissionNumber,
+        displayName: r.displayName,
+        status: r.status,
+        hasActiveEnrolment: true,
+      });
+      const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const segs = studentUrl.pathname.split('/').filter(Boolean);
+      const q = studentUrl.searchParams;
+
+      if (segs[1] === 'directory' && segs.length === 2) {
+        // Unregistered route: read as GET /students/:id with a malformed id, before any permission check.
+        // Real answer (observed against buildApp): 400 BAD_REQUEST, the same as any schema failure; there is no
+        // feature-disabled code.
+        if (!st.directoryEnabled) return err(400, 'BAD_REQUEST');
+        // Schema validation of the query runs before the permission gate (Fastify), as on the real route.
+        const qs = [...q.keys()];
+        const lim = q.get('limit');
+        const qStatus = q.get('status');
+        if (
+          st.directoryMode === 'badrequest' ||
+          qs.some((k) => !['limit', 'status', 'cursor'].includes(k)) ||
+          (lim !== null && !(/^\d+$/.test(lim) && Number(lim) >= 1 && Number(lim) <= 100)) ||
+          (qStatus !== null && !STUDENT_STATUS_VALUES.includes(qStatus))
+        )
+          return err(400, 'BAD_REQUEST');
+        if (!caps.includes('student.directory.list')) return err(403, 'FORBIDDEN');
+        if (st.directoryMode === 'forbidden') return err(403, 'FORBIDDEN');
+        if (st.directoryMode === 'network') throw new TypeError('Failed to fetch');
+        if (st.directoryMode === 'server') return err(500, 'INTERNAL_ERROR');
+        if (st.directoryMode === 'rate')
+          return err(429, 'TOO_MANY_REQUESTS', { 'retry-after': '30' });
+        const status = q.get('status');
+        const cursor = q.get('cursor');
+        let start = 0;
+        if (cursor !== null) {
+          // The cursor is bound to the user and the status filter, like the real codec.
+          const m = /^cur:([^:]+):([^:]*):(\d+)$/.exec(cursor);
+          if (st.expireCursor || !m || m[1] !== state.me.user_id || m[2] !== (status ?? ''))
+            return err(400, 'INVALID_CURSOR');
+          start = Number(m[3]);
+        }
+        const filtered = mine.filter((r) => !status || r.status === status);
+        const page = filtered.slice(start, start + st.pageSize);
+        const next = start + st.pageSize;
+        return json(200, {
+          success: true,
+          data: page.map(entry),
+          page: {
+            nextCursor:
+              next < filtered.length ? `cur:${state.me.user_id}:${status ?? ''}:${next}` : null,
+          },
+        });
+      }
+      if (segs.length === 1) {
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$/.test(q.get('admissionNumber') ?? ''))
+          return err(400, 'BAD_REQUEST');
+        if (!caps.includes('student.directory.search')) return err(403, 'FORBIDDEN');
+        const found = mine.find((r) => r.admissionNumber === q.get('admissionNumber'));
+        return found
+          ? json(200, { success: true, data: entry(found) })
+          : err(404, 'RESOURCE_NOT_FOUND');
+      }
+      const id = segs[1] as string;
+      if (!UUID.test(id)) return err(400, 'BAD_REQUEST');
+      if (segs.length === 2) {
+        if (!caps.includes('student.profile.read')) return err(403, 'FORBIDDEN');
+        if (st.profileMode === 'forbidden') return err(403, 'FORBIDDEN');
+        if (st.profileMode === 'server') return err(500, 'INTERNAL_ERROR');
+        const r = mine.find((x) => x.id === id);
+        if (!r) return err(404, 'RESOURCE_NOT_FOUND');
+        return json(
+          200,
+          {
+            success: true,
+            data: {
+              id: r.id,
+              organizationId: '01900000-0000-7000-8000-0000000000aa',
+              userId: '01900000-0000-7000-8000-0000000000bb',
+              admissionNumber: r.admissionNumber,
+              admissionDate: '2026-06-01',
+              status: r.status,
+              statusChangedAt: '2026-06-02T10:00:00.000Z',
+              version: 1,
+              createdAt: '2026-06-01T09:00:00.000Z',
+              updatedAt: '2026-06-02T10:00:00.000Z',
+            },
+          },
+          { ETag: '"1"' },
+        );
+      }
+      if (!caps.includes('student.profile.read_sensitive')) return err(403, 'FORBIDDEN');
+      if (st.identifiersMode === 'server') return err(500, 'INTERNAL_ERROR');
+      if (!mine.some((x) => x.id === id)) return err(404, 'RESOURCE_NOT_FOUND');
+      return json(200, { success: true, data: st.identifiers[id] ?? [] });
+    }
     if (path.startsWith('/academics/') || /^\/students\/[^/]+\/term-enrollments/.test(path)) {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       const a = state.academics;
@@ -1085,6 +1280,7 @@ export function createFakeBackend(
         return created(a.years, { ...reqBody, status: 'PLANNED', kind: 'y' });
       }
       if (path === '/academics/terms') {
+        if (method === 'GET' && a.termsMode === 'server') return err(500, 'INTERNAL_ERROR');
         if (method === 'GET') return list(a.terms);
         return created(a.terms, { ...reqBody, status: 'PLANNED', kind: 't' });
       }
@@ -1143,6 +1339,8 @@ export function createFakeBackend(
         // a student outside the caller's access is indistinguishable from a missing one
         if (student.startsWith('ffffffff')) return err(404, 'RESOURCE_NOT_FOUND');
         const rows = (a.enrollments[student] ??= []);
+        if (!enr[2] && method === 'GET' && a.enrollmentsMode === 'server')
+          return err(500, 'INTERNAL_ERROR');
         if (!enr[2] && method === 'GET') return list(rows);
         if (!enr[2] && method === 'POST') {
           if (!headers['idempotency-key']) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');

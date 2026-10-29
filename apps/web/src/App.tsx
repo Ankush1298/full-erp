@@ -17,6 +17,8 @@ import { ImportsPage } from './pages/ImportsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { OrganisationPage } from './pages/OrganisationPage';
 import { NotFoundPage } from './pages/StatePages';
+import { StudentProfilePage } from './pages/StudentProfilePage';
+import { StudentsPage } from './pages/StudentsPage';
 import {
   AboutPage,
   AccessibilityPage,
@@ -101,11 +103,17 @@ export function AppRoutes() {
           <Route
             path="students"
             element={
-              <Guarded
-                path="/students"
-                title="Students"
-                description="Student records you are allowed to see will be listed here."
-              />
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/students'] ?? []}>
+                <StudentsPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="students/:id"
+            element={
+              <RequireCapability anyOf={['student.profile.read']}>
+                <StudentProfilePage />
+              </RequireCapability>
             }
           />
           <Route
