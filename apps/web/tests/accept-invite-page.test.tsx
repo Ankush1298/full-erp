@@ -8,6 +8,9 @@ const VALID_TOKEN = /* secret-scan:allow */ 'abcdefghijklmnopqrstuvwxyz012345678
 const VALID_PW = /* secret-scan:allow */ 'ValidPassword123!';
 const SHORT_PW = /* secret-scan:allow */ 'short';
 
+const VALID_INVITE_PATH = `/accept-invite?${new URLSearchParams({ token: VALID_TOKEN })}`;
+const EMAIL_INVITE_PATH = `/accept-invite?${new URLSearchParams({ token: VALID_TOKEN, email: 'ada@college.test' })}`;
+
 describe('AcceptInvitePage', () => {
   it('renders invalid link state when token is missing', async () => {
     const b = createFakeBackend();
@@ -38,10 +41,7 @@ describe('AcceptInvitePage', () => {
 
   it('renders invitation form when token is valid', async () => {
     const b = createFakeBackend();
-    const { container } = renderApp(
-      b,
-      `/accept-invite?token=${VALID_TOKEN}`,
-    ); /* secret-scan:allow */
+    const { container } = renderApp(b, VALID_INVITE_PATH);
 
     expect(await screen.findByRole('heading', { name: 'Accept invitation' })).toBeInTheDocument();
     expect(
@@ -58,10 +58,7 @@ describe('AcceptInvitePage', () => {
 
   it('displays email context when safe and valid email is in search params', async () => {
     const b = createFakeBackend();
-    renderApp(
-      b,
-      `/accept-invite?token=${VALID_TOKEN}&email=ada%40college.test`,
-    ); /* secret-scan:allow */
+    renderApp(b, EMAIL_INVITE_PATH);
 
     expect(await screen.findByRole('heading', { name: 'Accept invitation' })).toBeInTheDocument();
     expect(screen.getByText(/Activating account for/i)).toBeInTheDocument();
@@ -71,7 +68,7 @@ describe('AcceptInvitePage', () => {
   it('validates password requirements on client side before sending request', async () => {
     const b = createFakeBackend();
     const user = userEvent.setup();
-    renderApp(b, `/accept-invite?token=${VALID_TOKEN}`); /* secret-scan:allow */
+    renderApp(b, VALID_INVITE_PATH);
 
     const submitBtn = await screen.findByRole('button', { name: 'Accept invitation' });
     await user.click(submitBtn);
@@ -110,10 +107,7 @@ describe('AcceptInvitePage', () => {
     const user = userEvent.setup();
     const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
-    const { container } = renderApp(
-      b,
-      `/accept-invite?token=${VALID_TOKEN}`,
-    ); /* secret-scan:allow */
+    const { container } = renderApp(b, VALID_INVITE_PATH);
 
     const pwInput = await screen.findByLabelText('New password');
     const confirmInput = screen.getByLabelText('Confirm password');
@@ -156,7 +150,7 @@ describe('AcceptInvitePage', () => {
     b.state.acceptInviteMode = 'invalid';
     const user = userEvent.setup();
 
-    renderApp(b, `/accept-invite?token=${VALID_TOKEN}`); /* secret-scan:allow */
+    renderApp(b, VALID_INVITE_PATH);
 
     const pwInput = await screen.findByLabelText('New password');
     const confirmInput = screen.getByLabelText('Confirm password');
@@ -183,7 +177,7 @@ describe('AcceptInvitePage', () => {
     b.state.acceptInviteMode = 'rate';
     const user = userEvent.setup();
 
-    renderApp(b, `/accept-invite?token=${VALID_TOKEN}`); /* secret-scan:allow */
+    renderApp(b, VALID_INVITE_PATH);
 
     await user.type(await screen.findByLabelText('New password'), VALID_PW);
     await user.type(screen.getByLabelText('Confirm password'), VALID_PW);
@@ -199,7 +193,7 @@ describe('AcceptInvitePage', () => {
     b.state.acceptInviteMode = 'network';
     const user = userEvent.setup();
 
-    renderApp(b, `/accept-invite?token=${VALID_TOKEN}`); /* secret-scan:allow */
+    renderApp(b, VALID_INVITE_PATH);
 
     await user.type(await screen.findByLabelText('New password'), VALID_PW);
     await user.type(screen.getByLabelText('Confirm password'), VALID_PW);
@@ -215,7 +209,7 @@ describe('AcceptInvitePage', () => {
     b.state.acceptInviteMode = 'server';
     const user = userEvent.setup();
 
-    renderApp(b, `/accept-invite?token=${VALID_TOKEN}`); /* secret-scan:allow */
+    renderApp(b, VALID_INVITE_PATH);
 
     await user.type(await screen.findByLabelText('New password'), VALID_PW);
     await user.type(screen.getByLabelText('Confirm password'), VALID_PW);
@@ -232,7 +226,7 @@ describe('AcceptInvitePage', () => {
     const b = createFakeBackend();
     const user = userEvent.setup();
 
-    renderApp(b, `/accept-invite?token=${VALID_TOKEN}`); /* secret-scan:allow */
+    renderApp(b, VALID_INVITE_PATH);
     await user.type(await screen.findByLabelText('New password'), VALID_PW);
     await user.type(screen.getByLabelText('Confirm password'), VALID_PW);
     await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
