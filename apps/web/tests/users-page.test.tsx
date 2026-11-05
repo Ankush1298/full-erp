@@ -23,7 +23,8 @@ describe('/users: user directory and account management', () => {
 
     expect(await screen.findByText('Loading users…')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'User directory' })).toBeInTheDocument();
+    // The heading renders while the list is still loading; the table appears only once GET /users resolves.
+    expect(await screen.findByRole('table', { name: 'User directory' })).toBeInTheDocument();
 
     // Verify loaded users
     expect(screen.getByText('Fiona Faculty')).toBeInTheDocument();
@@ -270,8 +271,8 @@ describe('/users: user directory and account management', () => {
     expect(lastCall.headers['if-match']).toBe('"1"');
     expect(lastCall.body).toEqual({ reason: 'Pending security review' });
 
-    // Status updated in table
-    const fionaRow = within(screen.getByRole('table', { name: 'User directory' }))
+    // Status updated in table (the success notice and the list reload start together; wait for the reloaded table)
+    const fionaRow = within(await screen.findByRole('table', { name: 'User directory' }))
       .getByText('fiona.faculty@college.test')
       .closest('tr');
     expect(within(fionaRow!).getByText('SUSPENDED')).toBeInTheDocument();
@@ -315,7 +316,7 @@ describe('/users: user directory and account management', () => {
     expect(lastCall.headers['if-match']).toBe('"2"');
     expect(lastCall.body).toEqual({ reason: 'Security review cleared' });
 
-    const samRow = within(screen.getByRole('table', { name: 'User directory' }))
+    const samRow = within(await screen.findByRole('table', { name: 'User directory' }))
       .getByText('sam.staff@college.test')
       .closest('tr');
     expect(within(samRow!).getByText('ACTIVE')).toBeInTheDocument();
