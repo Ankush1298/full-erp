@@ -161,8 +161,18 @@ export async function seedTenant(
   }
 
   const org = res.rows[0] as { id: string; name: string; slug: string };
-  await seedTenantRoles(db, org.id);
-  await seedMfaPermissions(db, org.id);
+  // One transaction (M3 doc 39, PR-3): seedTenantRoles deletes and re-inserts each role's grants, so in autocommit a
+  // concurrent request could see a role without its grants, and a failure part-way left some roles re-synced and
+  // others not. Now the re-sync is all or nothing. The caller passes a dedicated client (cli.ts), never a pooled one.
+  await db.query('BEGIN');
+  try {
+    await seedTenantRoles(db, org.id);
+    await seedMfaPermissions(db, org.id);
+    await db.query('COMMIT');
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  }
 
   return org;
 }

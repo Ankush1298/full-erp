@@ -12,18 +12,24 @@ import {
 import type { ExpectedVersion } from '../../shared/settings/index.js';
 import { invalid, parseDate, parseReason } from '../people/validation.js';
 import { checkVersion, conflict, iso, mapDbError } from '../academics/common.js';
+import { cohortPeriodScope } from '../academics/calendar.service.js';
 import {
   ENROLLMENT_TYPES,
+  PROGRESSION_DECISIONS,
   ROLL_NUMBER_PATTERN,
   TARGET_STATUSES,
   TERMINAL_STATUSES,
   type CreateTermEnrollmentBody,
   type PlaceSectionBody,
+  type ProgressionBody,
+  type PromotionToolBody,
   type TermEnrollmentDto,
   type UpdateTermEnrollmentBody,
 } from './term-enrollment.schemas.js';
 
 export const CREATE_TERM_ENROLLMENT_OPERATION = 'POST /api/v1/students/:id/term-enrollments';
+export const PROGRESSION_OPERATION = 'POST /api/v1/students/:id/term-enrollments/:eid/progression';
+export const PROMOTION_TOOL_OPERATION = 'POST /api/v1/academics/cohort-periods/:id/promotion';
 export const READ = 'enrollment.term.read';
 export const MANAGE = 'enrollment.term.manage';
 
@@ -31,12 +37,12 @@ const ROLL_RE = new RegExp(ROLL_NUMBER_PATTERN);
 const ENROLLABLE_STUDENT_STATUSES: readonly string[] = ['ADMITTED', 'ACTIVE'];
 const lower = (s: string): string => s.toLowerCase();
 
-/** The status machine, mirrored by the migration 0033 guard (the database is the backstop). */
+/** The status machine, mirrored by the migration 0033/0038 guard (the database is the backstop). */
 const TRANSITIONS: Record<string, readonly string[]> = {
   REGISTERED: ['ACTIVE', 'WITHDRAWN'],
   ACTIVE: ['WITHDRAWN', 'DETAINED', 'PROMOTED', 'COMPLETED', 'ON_LEAVE'],
   ON_LEAVE: ['ACTIVE', 'WITHDRAWN'],
-  DETAINED: ['ACTIVE', 'WITHDRAWN'],
+  DETAINED: ['ACTIVE', 'WITHDRAWN', 'COMPLETED'],
   WITHDRAWN: [],
   PROMOTED: [],
   COMPLETED: [],
@@ -242,10 +248,21 @@ export class TermEnrollmentService {
         );
         const period = cp.rows[0];
         if (!period) throw resourceNotFound();
+        // Own cohort, or a later cohort this program enrolment joined by a REPEAT (doc 32 §3; same rule as the 0038
+        // guard). Joining another cohort in the first place is a progression decision, not a plain enrolment.
         if (period.cohort_id !== program.cohort_id) {
-          throw conflict(
-            "The cohort period belongs to a different cohort than the student's program enrolment.",
+          const joined = await tx.query(
+            `SELECT 1 FROM app.term_enrollments e
+               JOIN app.cohort_periods cp ON cp.organization_id = e.organization_id AND cp.id = e.cohort_period_id
+              WHERE e.organization_id = $1 AND e.student_program_id = $2 AND e.enrollment_type = 'REPEAT'
+                AND cp.cohort_id = $3 LIMIT 1`,
+            [ctx.tenantId, program.id, period.cohort_id],
           );
+          if (!joined.rows[0]) {
+            throw conflict(
+              "The cohort period belongs to a different cohort than the student's program enrolment.",
+            );
+          }
         }
         if (period.status !== 'ACTIVE') throw conflict('The cohort period is not ACTIVE.');
         if (period.term_status !== 'PLANNED' && period.term_status !== 'ACTIVE') {
@@ -488,6 +505,382 @@ export class TermEnrollmentService {
       options.meta ?? {},
     );
     return toDto(await TermEnrollmentService.loadScoped(tx, ctx, row.id, MANAGE, false));
+  }
+
+  /**
+   * Promotion or repetition (doc 32 §3, doc 02 §5.3): the source enrolment ends (PROMOTED, or COMPLETED for a repeat)
+   * and the next enrolment opens, atomically, under one reason. Nothing historical is rewritten or deleted.
+   *  - PROMOTE: source ACTIVE; target = period_no + 1 of the source's own cohort.
+   *  - REPEAT:  source ACTIVE or DETAINED; target = the same period_no in a later cohort of the same programme
+   *             (enrollment_type REPEAT). The program enrolment, and so the student's scope, is unchanged.
+   * Both: the target term starts after the source term ends; ACTIVE cohort period; PLANNED/ACTIVE term.
+   * Lock order: student (no key update) -> program (share) -> source enrolment (no key update) -> cohort period (share).
+   */
+  static async progress(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    studentId: string,
+    enrollmentId: string,
+    input: ProgressionBody,
+    options: { idempotencyKey: unknown; meta?: AuditRequestMeta },
+  ): Promise<IdempotentResult> {
+    ensureTrusted(ctx);
+    AuthorizationEngine.assertStaffActor(ctx);
+    if (!input || typeof input !== 'object') throw invalid('Progression payload is required.');
+    if (!isUuidV7(studentId)) throw invalid('Invalid student ID.');
+    if (!isUuidV7(enrollmentId)) throw invalid('Invalid term enrolment ID.');
+    if (!isUuidV7(input.cohortPeriodId)) throw invalid('Invalid cohort period ID.');
+    if (!(PROGRESSION_DECISIONS as readonly string[]).includes(input.decision))
+      throw invalid('decision must be PROMOTE or REPEAT.');
+    const rollNumber = input.rollNumber === undefined ? null : input.rollNumber.trim();
+    if (rollNumber !== null && !ROLL_RE.test(rollNumber))
+      throw invalid('rollNumber has an invalid format.');
+    const reason = parseReason(input.reason);
+    const decision = input.decision;
+    const cohortPeriodId = lower(input.cohortPeriodId);
+
+    await AuthorizationEngine.assert(tx, ctx, MANAGE);
+    // The source's frozen program scope; another student's enrolment or out of scope ⇒ 404.
+    const source = await TermEnrollmentService.loadScoped(
+      tx,
+      ctx,
+      lower(enrollmentId),
+      MANAGE,
+      false,
+      studentId,
+    );
+
+    const key = parseIdempotencyKey(options.idempotencyKey);
+    return runIdempotent(
+      tx,
+      ctx,
+      {
+        key,
+        operation: PROGRESSION_OPERATION,
+        request: { enrollmentId: source.id, decision, cohortPeriodId, rollNumber, reason },
+      },
+      async () => {
+        const id = await TermEnrollmentService.applyDecision(tx, ctx, source, {
+          decision,
+          cohortPeriodId,
+          rollNumber,
+          reason,
+          meta: options.meta ?? {},
+        });
+        return { status: 201, body: { success: true, data: { id } } };
+      },
+    );
+  }
+
+  /**
+   * The promotion tool (Part 16; doc 33 §5). Candidates are the live enrolments of the source cohort period; only ACTIVE
+   * ones are eligible (DETAINED, ON_LEAVE and REGISTERED are listed as excluded: a repeat or a status change is a
+   * per-student decision). `dryRun` returns the preview and writes nothing.
+   *
+   * A commit applies the SAME decision as `progress` (PROMOTE to `targetCohortPeriodId`, via `applyDecision`) to every
+   * selected enrolment in ONE transaction: any refusal (a stale status, a closed programme enrolment, a guard) aborts the
+   * caller's transaction, so nothing of the batch survives. Deterministic lock order: every candidate's STUDENT row is
+   * locked FOR NO KEY UPDATE in ascending student id before any write (the same first lock `progress` takes, so a single
+   * decision and a run cannot invert), then the enrolments are re-read and processed in that order. Two overlapping runs
+   * queue on their first shared student instead of deadlocking; the loser then sees the winner's PROMOTED rows and
+   * refuses as a whole.
+   * Idempotent by key: the fingerprint is the REQUEST (source, target, selection, reason), never the derived candidate
+   * set, so a replay after commit returns the stored response although the candidates have since been promoted.
+   * The response carries counts only (a stored response is capped at 16 KiB; 1,000 id pairs would not fit).
+   * History is never rewritten: each source ends PROMOTED and a new REGULAR enrolment opens (doc 02 §5.3).
+   */
+  static async promoteCohortPeriod(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    cohortPeriodId: string,
+    input: PromotionToolBody,
+    options: { idempotencyKey: unknown; meta?: AuditRequestMeta },
+  ): Promise<IdempotentResult> {
+    ensureTrusted(ctx);
+    AuthorizationEngine.assertStaffActor(ctx);
+    if (!input || typeof input !== 'object') throw invalid('Promotion payload is required.');
+    if (!isUuidV7(cohortPeriodId)) throw invalid('Invalid cohort period ID.');
+    if (!isUuidV7(input.targetCohortPeriodId)) throw invalid('Invalid target cohort period ID.');
+    if (input.enrollmentIds !== undefined) {
+      if (!Array.isArray(input.enrollmentIds) || input.enrollmentIds.length === 0) {
+        throw invalid('enrollmentIds must list at least one enrolment.');
+      }
+      if (input.enrollmentIds.length > 1000) throw invalid('At most 1000 enrolments per run.');
+      if (!input.enrollmentIds.every((x) => typeof x === 'string' && isUuidV7(x))) {
+        throw invalid('Invalid term enrolment ID.');
+      }
+    }
+    const reason = parseReason(input.reason);
+    const source = lower(cohortPeriodId);
+    const target = lower(input.targetCohortPeriodId);
+    const selected = input.enrollmentIds
+      ? [...new Set(input.enrollmentIds.map(lower))].sort()
+      : null;
+
+    await AuthorizationEngine.assert(tx, ctx, MANAGE);
+    const scope = await cohortPeriodScope(tx, ctx, source);
+    await AuthorizationEngine.assert(tx, ctx, MANAGE, {
+      organization_id: ctx.tenantId,
+      campus_id: scope.campusId,
+      department_id: scope.departmentId,
+    });
+
+    type Cand = {
+      id: string;
+      student_id: string;
+      status: TermEnrollmentDto['status'];
+      roll_number: string | null;
+    };
+    const candidates = async (): Promise<Cand[]> => {
+      const r = await tx.query<Cand>(
+        `SELECT id, student_id, status, roll_number FROM app.term_enrollments
+          WHERE organization_id = $1 AND cohort_period_id = $2
+            AND status IN ('REGISTERED', 'ACTIVE', 'DETAINED', 'ON_LEAVE')
+            AND ($3::uuid[] IS NULL OR id = ANY($3::uuid[]))
+          ORDER BY student_id`,
+        [ctx.tenantId, source, selected],
+      );
+      if (selected && r.rows.length !== selected.length) {
+        throw conflict('Some selected enrolments are not live enrolments of this cohort period.');
+      }
+      return r.rows;
+    };
+    const toCandidate = (x: Cand) => ({
+      enrollmentId: x.id,
+      studentId: x.student_id,
+      status: x.status,
+      rollNumber: x.roll_number,
+    });
+
+    if (input.dryRun === true) {
+      const all = await candidates();
+      return {
+        status: 200,
+        body: {
+          success: true,
+          data: {
+            eligible: all.filter((x) => x.status === 'ACTIVE').map(toCandidate),
+            excluded: all.filter((x) => x.status !== 'ACTIVE').map(toCandidate),
+          },
+        },
+        replayed: false,
+      };
+    }
+
+    const key = parseIdempotencyKey(options.idempotencyKey);
+    return runIdempotent(
+      tx,
+      ctx,
+      {
+        key,
+        operation: PROMOTION_TOOL_OPERATION,
+        request: { source, target, enrollmentIds: selected, reason },
+      },
+      async () => {
+        await tx.query(
+          `SELECT 1 FROM app.students WHERE organization_id = $1 AND id = ANY($2::uuid[]) ORDER BY id FOR NO KEY UPDATE`,
+          [ctx.tenantId, (await candidates()).map((x) => x.student_id)],
+        );
+        const locked = await candidates(); // re-read under the student locks
+        const excluded = locked.filter((x) => x.status !== 'ACTIVE');
+        if (selected && excluded.length > 0) {
+          throw conflict(
+            'Only ACTIVE enrolments can be promoted; remove the others from the selection.',
+          );
+        }
+        const eligible = locked.filter((x) => x.status === 'ACTIVE');
+        if (eligible.length === 0) throw conflict('No ACTIVE enrolment to promote.');
+        for (const e of eligible) {
+          const row = await TermEnrollmentService.loadScoped(tx, ctx, e.id, MANAGE, false);
+          await TermEnrollmentService.applyDecision(tx, ctx, row, {
+            decision: 'PROMOTE',
+            cohortPeriodId: target,
+            rollNumber: null,
+            reason,
+            meta: options.meta ?? {},
+          });
+        }
+        return {
+          status: 201,
+          body: {
+            success: true,
+            data: {
+              sourceCohortPeriodId: source,
+              targetCohortPeriodId: target,
+              promoted: eligible.length,
+              excluded: excluded.length,
+            },
+          },
+        };
+      },
+    );
+  }
+
+  /**
+   * One promotion or repetition decision on one enrolment, inside the caller's transaction (used by `progress` and by
+   * the cohort promotion tool, so both apply exactly the same rules, locks and audit). Returns the new enrolment id.
+   */
+  private static async applyDecision(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    source: EnrollmentRow,
+    o: {
+      decision: (typeof PROGRESSION_DECISIONS)[number];
+      cohortPeriodId: string;
+      rollNumber: string | null;
+      reason: string;
+      meta: AuditRequestMeta;
+    },
+  ): Promise<string> {
+    const { decision, cohortPeriodId, rollNumber, reason } = o;
+    const s = await tx.query<{ status: string }>(
+      `SELECT status FROM app.students WHERE organization_id = $1 AND id = $2 FOR NO KEY UPDATE`,
+      [ctx.tenantId, source.student_id],
+    );
+    if (!s.rows[0]) throw resourceNotFound();
+    if (!ENROLLABLE_STUDENT_STATUSES.includes(s.rows[0].status)) {
+      throw conflict('The student cannot be enrolled for a term.');
+    }
+    const sp = await tx.query<{ program_id: string }>(
+      `SELECT program_id FROM app.student_programs
+        WHERE organization_id = $1 AND student_id = $2 AND id = $3 AND status = 'ACTIVE' FOR SHARE`,
+      [ctx.tenantId, source.student_id, source.student_program_id],
+    );
+    if (!sp.rows[0]) throw conflict('The program enrolment of this term enrolment is not active.');
+
+    const cur = await TermEnrollmentService.loadScoped(tx, ctx, source.id, MANAGE, true);
+    const allowed = decision === 'PROMOTE' ? ['ACTIVE'] : ['ACTIVE', 'DETAINED'];
+    if (!allowed.includes(cur.status)) {
+      throw conflict(`A ${cur.status} term enrolment cannot be used for ${decision}.`);
+    }
+    const from = await tx.query<{ cohort_id: string; end_date: string; term_status: string }>(
+      `SELECT cp.cohort_id, t.end_date::text AS end_date, t.status AS term_status
+         FROM app.cohort_periods cp
+         JOIN app.terms t ON t.organization_id = cp.organization_id AND t.id = cp.term_id
+        WHERE cp.organization_id = $1 AND cp.id = $2`,
+      [ctx.tenantId, cur.cohort_period_id],
+    );
+    const src = from.rows[0];
+    if (!src) throw resourceNotFound();
+    if (src.term_status === 'LOCKED') throw conflict('The current term is LOCKED.');
+
+    const to = await tx.query<{
+      cohort_id: string;
+      term_id: string;
+      period_no: number;
+      status: string;
+      program_id: string;
+      department_id: string;
+      campus_id: string;
+      term_status: string;
+      start_date: string;
+    }>(
+      `SELECT cp.cohort_id, cp.term_id, cp.period_no, cp.status, co.program_id, p.department_id, d.campus_id,
+              t.status AS term_status, t.start_date::text AS start_date
+         FROM app.cohort_periods cp
+         JOIN app.cohorts co    ON co.organization_id = cp.organization_id AND co.id = cp.cohort_id
+         JOIN app.programs p    ON p.organization_id = co.organization_id AND p.id = co.program_id
+         JOIN app.departments d ON d.organization_id = p.organization_id AND d.id = p.department_id
+         JOIN app.terms t       ON t.organization_id = cp.organization_id AND t.id = cp.term_id
+        WHERE cp.organization_id = $1 AND cp.id = $2 FOR SHARE OF cp`,
+      [ctx.tenantId, cohortPeriodId],
+    );
+    const target = to.rows[0];
+    if (!target) throw resourceNotFound();
+    // A target outside the caller's scope is "not found", never a hint that it exists.
+    await AuthorizationEngine.assert(tx, ctx, MANAGE, {
+      organization_id: ctx.tenantId,
+      campus_id: target.campus_id,
+      department_id: target.department_id,
+    });
+    if (target.program_id !== sp.rows[0].program_id) {
+      throw conflict('The cohort period belongs to another programme.');
+    }
+    if (target.start_date <= src.end_date) {
+      throw conflict('The next term must start after the current term ends.');
+    }
+    if (decision === 'PROMOTE') {
+      if (target.cohort_id !== src.cohort_id || target.period_no !== cur.period_no + 1) {
+        throw conflict('Promotion moves the student to the next period of the same cohort.');
+      }
+    } else if (target.period_no !== cur.period_no) {
+      throw conflict('Repeating keeps the period and moves the student to a later cohort.');
+    }
+    if (target.status !== 'ACTIVE') throw conflict('The cohort period is not ACTIVE.');
+    if (target.term_status !== 'PLANNED' && target.term_status !== 'ACTIVE') {
+      throw conflict('The term is not open for enrolment.');
+    }
+
+    const endStatus = decision === 'PROMOTE' ? 'PROMOTED' : 'COMPLETED';
+    const type = decision === 'PROMOTE' ? 'REGULAR' : 'REPEAT';
+    const id = uuidv7();
+    try {
+      const u = await tx.query(
+        `UPDATE app.term_enrollments SET status = $3 WHERE organization_id = $1 AND id = $2 AND version = $4`,
+        [ctx.tenantId, cur.id, endStatus, cur.version],
+      );
+      if (u.rowCount !== 1) throw conflict('Term enrolment version mismatch.');
+      await tx.query(
+        `INSERT INTO app.term_enrollments
+           (id, organization_id, student_id, student_program_id, cohort_period_id, term_id, period_no,
+            enrollment_type, roll_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          id,
+          ctx.tenantId,
+          cur.student_id,
+          cur.student_program_id,
+          cohortPeriodId,
+          target.term_id,
+          target.period_no,
+          type,
+          rollNumber,
+        ],
+      );
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      mapEnrollmentError(err);
+    }
+    const audit = {
+      subjectStudentId: cur.student_id,
+      campusId: cur.campus_id,
+      departmentId: cur.department_id,
+      riskTier: 2 as const,
+      reasonText: reason,
+    };
+    await recordAudit(
+      tx,
+      ctx,
+      {
+        ...audit,
+        action: 'enrollment.term.update',
+        resourceType: 'term_enrollment',
+        resourceId: cur.id,
+        changes: { status: { old: cur.status, new: endStatus } },
+      },
+      o.meta,
+    );
+    await recordAudit(
+      tx,
+      ctx,
+      {
+        ...audit,
+        action: 'enrollment.term.progress',
+        resourceType: 'term_enrollment',
+        resourceId: id,
+        changes: {
+          decision: { old: null, new: decision },
+          fromEnrollmentId: { old: null, new: cur.id },
+          cohortPeriodId: { old: cur.cohort_period_id, new: cohortPeriodId },
+          periodNo: { old: cur.period_no, new: target.period_no },
+          enrollmentType: { old: null, new: type },
+          rollNumber: { old: null, new: rollNumber },
+          status: { old: null, new: 'REGISTERED' },
+        },
+      },
+      o.meta,
+    );
+    return id;
   }
 
   /**

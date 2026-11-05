@@ -322,7 +322,7 @@ describe('SettingsService.set: validation', () => {
         'no.such_key',
         'Identity.age_of_majority',
         'identity.age_of_majority ',
-        'terminology',
+        'academic.degree_levels',
         '__proto__',
         '',
       ]) {

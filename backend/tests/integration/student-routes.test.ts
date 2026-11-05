@@ -696,11 +696,12 @@ describe('GET /students/:id', () => {
     });
   });
 
-  it('campus-scoped and department-scoped holders get 404 (a student cannot yet be proven inside their scope); no permission ⇒ 403', async () => {
+  it('campus-scoped and department-scoped holders get 404 (a student cannot yet be proven inside their scope); FACULTY (ASSIGNED, no teaching relationship) 404', async () => {
     expect((await get('campusAdmin', `${BASE}/${studentId}`)).statusCode).toBe(404);
     expect((await get('hod', `${BASE}/${studentId}`)).statusCode).toBe(404);
     expect((await get('registrarCampus', `${BASE}/${studentId}`)).statusCode).toBe(404);
-    expect((await get('faculty', `${BASE}/${studentId}`)).statusCode).toBe(403);
+    // since M3 Batch 3 FACULTY holds student.profile.read as ASSIGNED (doc 33 §2): held, relationship unproven => 404
+    expect((await get('faculty', `${BASE}/${studentId}`)).statusCode).toBe(404);
   });
 
   it("another tenant's administrator gets 404 for tenant A's student", async () => {

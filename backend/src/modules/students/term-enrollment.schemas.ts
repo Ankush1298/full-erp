@@ -63,6 +63,75 @@ export const UpdateTermEnrollmentBodySchema = Type.Object(
 );
 export type UpdateTermEnrollmentBody = Static<typeof UpdateTermEnrollmentBodySchema>;
 
+/**
+ * Promotion or repetition of one term enrolment (doc 32 §3). PROMOTE: the next period of the same cohort; REPEAT: the
+ * same period with a later cohort of the same programme. The source ends PROMOTED / COMPLETED in the same transaction.
+ */
+export const PROGRESSION_DECISIONS = ['PROMOTE', 'REPEAT'] as const;
+export const ProgressionBodySchema = Type.Object(
+  {
+    decision: literalUnion(PROGRESSION_DECISIONS),
+    cohortPeriodId: UuidV7Schema,
+    rollNumber: Type.Optional(
+      Type.String({ minLength: 1, maxLength: 30, pattern: ROLL_NUMBER_PATTERN }),
+    ),
+    reason: ReasonSchema,
+  },
+  strict,
+);
+export type ProgressionBody = Static<typeof ProgressionBodySchema>;
+
+/**
+ * Promotion tool (Part 16): every ACTIVE enrolment of one cohort period (or the listed ones) is promoted to the next
+ * period of the same cohort, all or nothing, under one reason. `dryRun` previews without writing.
+ */
+export const PromotionToolBodySchema = Type.Object(
+  {
+    targetCohortPeriodId: UuidV7Schema,
+    enrollmentIds: Type.Optional(
+      Type.Array(UuidV7Schema, { minItems: 1, maxItems: 1000, uniqueItems: true }),
+    ),
+    reason: ReasonSchema,
+    dryRun: Type.Optional(Type.Boolean()),
+  },
+  strict,
+);
+export type PromotionToolBody = Static<typeof PromotionToolBodySchema>;
+const CandidateSchema = Type.Object(
+  {
+    enrollmentId: UuidV7Schema,
+    studentId: UuidV7Schema,
+    status: literalUnion(TERM_ENROLLMENT_STATUSES),
+    rollNumber: Type.Union([Type.String(), Type.Null()]),
+  },
+  strict,
+);
+export const PromotionPreviewResponseSchema = Type.Object(
+  {
+    success: Type.Literal(true),
+    data: Type.Object(
+      { eligible: Type.Array(CandidateSchema), excluded: Type.Array(CandidateSchema) },
+      strict,
+    ),
+  },
+  strict,
+);
+export const PromotionResultResponseSchema = Type.Object(
+  {
+    success: Type.Literal(true),
+    data: Type.Object(
+      {
+        sourceCohortPeriodId: UuidV7Schema,
+        targetCohortPeriodId: UuidV7Schema,
+        promoted: Type.Integer({ minimum: 1 }),
+        excluded: Type.Integer({ minimum: 0 }),
+      },
+      strict,
+    ),
+  },
+  strict,
+);
+
 export const PlaceSectionBodySchema = Type.Object(
   {
     sectionId: UuidV7Schema,

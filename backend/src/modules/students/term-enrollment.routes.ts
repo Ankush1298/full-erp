@@ -10,9 +10,15 @@ import {
   GetTermEnrollmentResponseSchema,
   ListTermEnrollmentsResponseSchema,
   PlaceSectionBodySchema,
+  ProgressionBodySchema,
+  PromotionPreviewResponseSchema,
+  PromotionResultResponseSchema,
+  PromotionToolBodySchema,
   UpdateTermEnrollmentBodySchema,
   type CreateTermEnrollmentBody,
   type PlaceSectionBody,
+  type ProgressionBody,
+  type PromotionToolBody,
   type UpdateTermEnrollmentBody,
 } from './term-enrollment.schemas.js';
 
@@ -114,6 +120,32 @@ export function registerTermEnrollmentRoutes(app: FastifyInstance, db: Database)
     },
   );
 
+  // Promotion / repetition (doc 32 §3): Idempotency-Key required (passed RAW: the service owns 428/400).
+  app.post<{ Params: EnrollmentParams; Body: ProgressionBody }>(
+    '/:id/term-enrollments/:eid/progression',
+    {
+      config: { permission: 'enrollment.term.manage' },
+      schema: {
+        params: EnrollmentParamsSchema,
+        body: ProgressionBodySchema,
+        response: { 201: CreateTermEnrollmentResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const { id: owner, eid } = req.params;
+      const options = {
+        idempotencyKey: req.headers['idempotency-key'],
+        meta: extractAuditMeta(req),
+      };
+      const result = await db.withTenant(ctx, (tx) =>
+        TermEnrollmentService.progress(tx, ctx, owner, eid, req.body, options),
+      );
+      if (result.replayed) void reply.header('Idempotent-Replayed', 'true');
+      return reply.status(result.status).send(result.body);
+    },
+  );
+
   // Places or moves the student in a section. Not If-Match guarded: the membership history (closed row + new row, both
   // under the enrolment lock) is the audit trail, and a retry after success meets "already in this section" (409).
   app.post<{ Params: EnrollmentParams; Body: PlaceSectionBody }>(
@@ -135,6 +167,37 @@ export function registerTermEnrollmentRoutes(app: FastifyInstance, db: Database)
       );
       etag(reply, data.version);
       return reply.status(200).send({ success: true, data });
+    },
+  );
+}
+
+/**
+ * The cohort promotion tool, mounted under /api/v1/academics (`POST /cohort-periods/:id/promotion`, doc 33 §5).
+ * `dryRun: true` previews (200, no key needed); a commit needs Idempotency-Key (passed RAW: the service owns 428/400)
+ * and is all-or-nothing (201).
+ */
+export function registerPromotionToolRoute(app: FastifyInstance, db: Database): void {
+  app.post<{ Params: { id: string }; Body: PromotionToolBody }>(
+    '/cohort-periods/:id/promotion',
+    {
+      config: { permission: 'enrollment.term.manage' },
+      schema: {
+        params: Type.Object({ id: UuidV7Schema }, { additionalProperties: false }),
+        body: PromotionToolBodySchema,
+        response: { 200: PromotionPreviewResponseSchema, 201: PromotionResultResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const options = {
+        idempotencyKey: req.headers['idempotency-key'],
+        meta: extractAuditMeta(req),
+      };
+      const result = await db.withTenant(ctx, (tx) =>
+        TermEnrollmentService.promoteCohortPeriod(tx, ctx, req.params.id, req.body, options),
+      );
+      if (result.replayed) void reply.header('Idempotent-Replayed', 'true');
+      return reply.status(result.status).send(result.body);
     },
   );
 }

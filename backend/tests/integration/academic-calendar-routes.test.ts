@@ -8,6 +8,7 @@ import { Database } from '../../src/shared/database/index.js';
 import { createPool } from '../../src/shared/database/pool.js';
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import { adminQuery, elevateSession, mfaVerified } from '../support/db-harness.js';
+import { activateTermFixture } from '../support/term-fixture.js';
 import { createIsolatedTenant, type IsolatedTenant } from '../support/isolated-tenant.js';
 
 // HTTP-level tests of the Milestone 3 Batch 1 routes (/api/v1/academics/* and /api/v1/students/:id/term-enrollments*)
@@ -270,14 +271,15 @@ describe('academic calendar, curriculum and sections over HTTP', () => {
         })
       ).statusCode,
     ).toBe(409);
-    expect(
-      (
-        await call('admin', 'PATCH', `${ACA}/terms/${termId}`, {
-          ifMatch: '"1"',
-          payload: { status: 'ACTIVE' },
-        })
-      ).statusCode,
-    ).toBe(200);
+    // Task 9: activating an unstaffed term is refused with the readiness codes (term-activation.test.ts covers the
+    // ready case); this file's later steps need a running term, so the fixture activates it
+    const refused = await call('admin', 'PATCH', `${ACA}/terms/${termId}`, {
+      ifMatch: '"1"',
+      payload: { status: 'ACTIVE' },
+    });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json<{ error: { code: string } }>().error.code).toBe('SETUP_INCOMPLETE');
+    await activateTermFixture(termId);
 
     const course = await call('admin', 'POST', `${ACA}/courses`, {
       payload: {

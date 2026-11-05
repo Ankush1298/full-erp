@@ -6,8 +6,10 @@ modules are placeholders labelled "Not yet available" and contain no data.
 
 ## Backend contract used (verified against `auth.routes.ts` and in a real browser)
 
-All paths are called under the same-origin prefix `/api` (stripped by the dev proxy / production reverse proxy;
-the backend itself has no prefix).
+All paths are called under the same-origin prefix `/api`. For these unversioned `/auth/*` routes the dev proxy and
+the production reverse proxy remove it (the backend serves them without a prefix); the versioned data API is called
+as `/api/v1/...` and forwarded unchanged. Full contract: `docs/deployment/frontend.md` ("Web-to-backend path
+contract").
 
 | Call | Request | Success | Failure the UI handles |
 |---|---|---|---|

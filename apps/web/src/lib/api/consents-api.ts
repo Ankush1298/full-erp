@@ -33,7 +33,7 @@ export const ConsentResponseSchema = z.object({
 });
 
 export function fetchMyConsents(client: ApiClient): Promise<ListConsentsResponse> {
-  return client.get('/me/consents', {
+  return client.get('/v1/me/consents', {
     schema: ListConsentsResponseSchema,
   });
 }
@@ -42,7 +42,7 @@ export function withdrawConsent(
   client: ApiClient,
   consentId: string,
 ): Promise<z.infer<typeof ConsentResponseSchema>> {
-  return client.post(`/me/consents/${encodeURIComponent(consentId)}/withdraw`, {
+  return client.post(`/v1/me/consents/${encodeURIComponent(consentId)}/withdraw`, {
     schema: ConsentResponseSchema,
   });
 }
@@ -56,7 +56,7 @@ export function recordConsent(
     guardian_id?: string;
   },
 ): Promise<z.infer<typeof ConsentResponseSchema>> {
-  return client.post('/me/consents', {
+  return client.post('/v1/me/consents', {
     schema: ConsentResponseSchema,
     body,
   });

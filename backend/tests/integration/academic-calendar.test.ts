@@ -24,6 +24,7 @@ import type { ExpectedVersion } from '../../src/shared/settings/index.js';
 import { issueTrustedContext } from '../../src/shared/tenancy/issue-trusted-context.js';
 import type { TrustedContext } from '../../src/shared/tenancy/trusted-context.js';
 import { adminQuery } from '../support/db-harness.js';
+import { activateTermFixture } from '../support/term-fixture.js';
 import { createIsolatedTenant, type IsolatedTenant } from '../support/isolated-tenant.js';
 
 // Milestone 3 Batch 1 services against the shared disposable integration database. Everything commits, so it runs in a
@@ -186,11 +187,7 @@ async function mkTerm(
       endDate: year.end,
     }),
   );
-  if (activate) {
-    await as(admin, (tx, c) =>
-      TermService.update(tx, c, id, { status: 'ACTIVE' }, { expected: ANY }),
-    );
-  }
+  if (activate) await activateTermFixture(id); // not this file's subject: see term-activation.test.ts
   return id;
 }
 async function mkPeriod(term: string, s: Structure = main, periodNo = 1): Promise<string> {
@@ -521,7 +518,12 @@ describe('TermService', () => {
     const upd = (body: object) =>
       as(admin, (tx, c) => TermService.update(tx, c, t, body, { expected: ANY }));
     await expect(upd({ status: 'CLOSED' })).rejects.toMatchObject({ statusCode: 409 }); // cannot skip ACTIVE
-    expect((await upd({ status: 'ACTIVE' })).status).toBe('ACTIVE');
+    // Task 9: an unstaffed term is refused activation (readiness, term-activation.test.ts); the walk continues from ACTIVE
+    await expect(upd({ status: 'ACTIVE' })).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'SETUP_INCOMPLETE',
+    });
+    await activateTermFixture(t);
     await expect(upd({ startDate: y.start })).resolves.toBeTruthy(); // no-op is fine
     await expect(upd({ startDate: `${2100}-01-01` })).rejects.toMatchObject({ statusCode: 409 }); // dates frozen after PLANNED
     expect((await upd({ status: 'CLOSED' })).status).toBe('CLOSED');

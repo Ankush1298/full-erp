@@ -12,6 +12,7 @@ import { AuthService } from './modules/auth/auth.service.js';
 import { AuthRepository } from './modules/auth/auth.repository.js';
 import { registerOrganizationRoutes } from './modules/organization/organization.routes.js';
 import { registerAcademicsRoutes } from './modules/academics/academic.routes.js';
+import { registerFacultyAssignmentRoutes } from './modules/academics/faculty.routes.js';
 import { registerPeopleRoutes } from './modules/people/employee.routes.js';
 import { registerStudentRoutes } from './modules/students/student.routes.js';
 import { registerStudentGuardianRoutes } from './modules/students/student-guardian.routes.js';
@@ -204,6 +205,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.register(registerOrganizationRoutes, { prefix: '/api/v1/organization', db: deps.db });
   app.register(registerAcademicsRoutes, { prefix: '/api/v1/academics', db: deps.db });
   app.register(registerPeopleRoutes, { prefix: '/api/v1/faculty', db: deps.db });
+  app.register(registerFacultyAssignmentRoutes, { prefix: '/api/v1/faculty', db: deps.db });
   app.register(registerStudentRoutes, { prefix: '/api/v1/students', db: deps.db });
   app.register(registerStudentGuardianRoutes, { prefix: '/api/v1/students', db: deps.db });
   app.register(registerStudentIdentifierRoutes, { prefix: '/api/v1/students', db: deps.db });

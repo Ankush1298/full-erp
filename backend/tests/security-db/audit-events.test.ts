@@ -184,7 +184,11 @@ describe('partition routing (UTC month boundaries) and out-of-range behaviour', 
 describe('append-only: no role can change or remove an audit row', () => {
   it('UPDATE and DELETE are rejected for the superuser too (trigger), on the parent and on a partition directly', async () => {
     await withAdmin(async (c) => {
-      await c.query(insertRow(ID(10), ORG_A, STAFF_A));
+      // Pinned to October 2026: the default now() would route the row elsewhere and the direct partition statements
+      // below would then match nothing instead of reaching the trigger.
+      await c.query(
+        `INSERT INTO app.audit_events ${COLS.replace(')', ', occurred_at)')} VALUES ('${ID(10)}', '${ORG_A}', 'USER', '${STAFF_A}', 'role.assignment.grant', 'role_assignment', 2, '2026-10-15 00:00:00+00')`,
+      );
       for (const sql of [
         `UPDATE app.audit_events SET risk_tier = 3 WHERE id = '${ID(10)}'`,
         `UPDATE app.audit_events SET reason_text = 'rewritten' WHERE id = '${ID(10)}'`,

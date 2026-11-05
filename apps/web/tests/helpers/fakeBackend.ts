@@ -56,6 +56,14 @@ export const ACADEMIC_ADMIN: MeData = {
     'enrollment.term.manage',
   ],
 };
+export const OFFERING_ADMIN: MeData = {
+  ...ACADEMIC_ADMIN,
+  capabilities: [
+    ...ACADEMIC_ADMIN.capabilities,
+    'academic.offering.manage',
+    'academic.faculty.assign',
+  ],
+};
 /** Read-only: a head of department sees academics and enrolments but can change nothing. */
 export const ACADEMIC_READER: MeData = {
   ...ACADEMIC_ADMIN,
@@ -199,11 +207,34 @@ export function createFakeBackend(
       ] as Array<Record<string, unknown>>,
       sections: [] as Array<Record<string, unknown>>,
       enrollments: {} as Record<string, Array<Record<string, unknown>>>,
+      /** Milestone 3 Batch 2 (doc 31): offerings by term, slots and staff-only assignments by offering. */
+      offerings: [] as Array<Record<string, unknown>>,
+      slots: {} as Record<string, Array<Record<string, unknown>>>,
+      assignments: {} as Record<string, Array<Record<string, unknown>>>,
+      /** doc 32: staff-only class-teacher rows by section */
+      classTeachers: {} as Record<string, Array<Record<string, unknown>>>,
+      offeringsMode: 'ok' as 'ok' | 'server',
       /** how GET /academics/terms and GET /students/:id/term-enrollments answer */
       termsMode: 'ok' as 'ok' | 'server',
       enrollmentsMode: 'ok' as 'ok' | 'server',
       /** When set, the next write answers with this status (e.g. 409) and the matching code. */
       failNext: null as null | { status: number; code: string },
+      /** doc 33: elective groups by cohort period, registrations, holidays, terminology, setup checklist */
+      electiveGroups: {} as Record<string, Array<Record<string, unknown>>>,
+      registrations: [] as Array<Record<string, unknown>>,
+      holidays: [] as Array<Record<string, unknown>>,
+      /** a campus-scoped administrator: organization-wide holiday writes and the checklist answer 403 */
+      campusScopedOnly: false,
+      terminology: null as null | Record<string, string>,
+      terminologyMode: 'ok' as 'ok' | 'server',
+      checklist: { complete: false, items: [] as Array<Record<string, unknown>> },
+      /** Task 8 (doc 35): the wizard document GET /academics/setup-wizard answers, period types, per-cohort labels */
+      wizard: null as null | Record<string, unknown>,
+      periodTypes: [] as Array<Record<string, unknown>>,
+      byCohort: {} as Record<string, string>,
+      /** the stored terminology setting's version (null = no row: If-Match "0") */
+      terminologyVersion: null as null | number,
+      campusCodes: ['MAIN'] as string[],
     },
     mfa: {
       enrolled: false,
@@ -349,6 +380,8 @@ export function createFakeBackend(
       pageSize: 2,
       profileMode: 'ok' as 'ok' | 'server' | 'forbidden',
       identifiersMode: 'ok' as 'ok' | 'server',
+      timelineMode: 'ok' as 'ok' | 'server' | 'forbidden',
+      timelines: {} as Record<string, unknown>,
       records: [
         studentRow('01900000-0000-7000-8000-000000000001', 'ADM-001', 'Asha Rao', 'ACTIVE'),
         studentRow('01900000-0000-7000-8000-000000000002', 'ADM-002', 'Bala Iyer', 'ACTIVE'),
@@ -449,7 +482,27 @@ export function createFakeBackend(
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries((reqInit?.headers ?? {}) as Record<string, string>))
       headers[k.toLowerCase()] = v;
-    const path = url.replace(/^\/api/, '');
+    // The real wire contract (docs/deployment/frontend.md): `/api/v1/...` is the versioned API, `/api/auth/...` and
+    // `/api/me/mfa...` are the unversioned session/MFA routes. Handlers below are keyed by the path without that
+    // prefix; anything else (e.g. `/api/academics/...` without `/v1`) is a route the backend does not have.
+    const versioned = /^\/api\/v1(\/.*)$/.exec(url)?.[1];
+    const unversioned = /^\/api(\/(?:auth\/|me\/mfa(?:[/?]|$)).*)$/.exec(url)?.[1];
+    const path =
+      versioned !== undefined && !/^\/(?:auth\/|me\/mfa(?:[/?]|$))/.test(versioned)
+        ? versioned
+        : unversioned;
+    if (path === undefined) {
+      state.calls.push({
+        method,
+        path: url,
+        headers,
+        credentials: reqInit?.credentials,
+        body: undefined,
+      });
+      return json(404, {
+        error: { code: 'RESOURCE_NOT_FOUND', message: 'no such route', requestId: 'req-1' },
+      });
+    }
     state.calls.push({
       method,
       path,
@@ -925,6 +978,54 @@ export function createFakeBackend(
         },
       });
     }
+    if (path === '/organization/settings' && method === 'GET') {
+      const a = state.academics;
+      return json(200, {
+        success: true,
+        data: [
+          {
+            key: 'terminology',
+            value: a.terminology,
+            isDefault: a.terminologyVersion === null,
+            version: a.terminologyVersion,
+            updatedAt: null,
+          },
+        ],
+      });
+    }
+    if (path === '/organization/settings/terminology' && method === 'PUT') {
+      const a = state.academics;
+      const refused = stepUpRefusal('PASSWORD_MFA');
+      if (refused) return refused;
+      if (headers['if-match'] !== `"${a.terminologyVersion ?? 0}"`) return err(409, 'CONFLICT');
+      if (state.academics.failNext) {
+        const f = state.academics.failNext;
+        state.academics.failNext = null;
+        return err(f.status, f.code);
+      }
+      const body = (state.calls.at(-1)?.body ?? {}) as { value: Record<string, string> };
+      a.terminology = body.value;
+      a.terminologyVersion = (a.terminologyVersion ?? 0) + 1;
+      return json(200, {
+        success: true,
+        data: {
+          key: 'terminology',
+          value: body.value,
+          isDefault: false,
+          version: a.terminologyVersion,
+          updatedAt: null,
+        },
+      });
+    }
+    if (path === '/organization/campuses' && method === 'POST') {
+      const code = String((state.calls.at(-1)?.body as { code?: string } | undefined)?.code);
+      if (state.academics.campusCodes.includes(code)) return err(409, 'CONFLICT');
+      state.academics.campusCodes.push(code);
+      return json(201, {
+        success: true,
+        data: { id: `camp-${state.academics.campusCodes.length}` },
+      });
+    }
     if (path === '/organization/campuses' && method === 'GET') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       return json(200, {
@@ -1149,7 +1250,7 @@ export function createFakeBackend(
     const studentUrl = new URL(path, 'http://x');
     if (
       method === 'GET' &&
-      /^\/students(?:\/[^/]+(?:\/identifiers)?)?$/.test(studentUrl.pathname) &&
+      /^\/students(?:\/[^/]+(?:\/(?:identifiers|timeline))?)?$/.test(studentUrl.pathname) &&
       studentUrl.pathname !== '/students/imports'
     ) {
       if (!state.session) return err(401, 'UNAUTHORIZED');
@@ -1249,6 +1350,19 @@ export function createFakeBackend(
           { ETag: '"1"' },
         );
       }
+      if (segs[2] === 'timeline') {
+        if (!caps.includes('student.profile.read')) return err(403, 'FORBIDDEN');
+        if (st.timelineMode === 'forbidden') return err(403, 'FORBIDDEN');
+        if (st.timelineMode === 'server') return err(500, 'INTERNAL_ERROR');
+        const r = mine.find((x) => x.id === id);
+        if (!r) return err(404, 'RESOURCE_NOT_FOUND');
+        const today = '2026-11-02';
+        const asOf = q.get('asOf') ?? today;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf) || asOf > today) return err(400, 'VALIDATION_ERROR');
+        const custom = st.timelines[id] as Record<string, unknown> | undefined;
+        if (custom) return json(200, { success: true, data: { ...custom, asOfDate: asOf, today } });
+        return json(200, { success: true, data: fakeTimeline(id, r.admissionNumber, asOf, today) });
+      }
       if (!caps.includes('student.profile.read_sensitive')) return err(403, 'FORBIDDEN');
       if (st.identifiersMode === 'server') return err(500, 'INTERNAL_ERROR');
       if (!mine.some((x) => x.id === id)) return err(404, 'RESOURCE_NOT_FOUND');
@@ -1275,6 +1389,208 @@ export function createFakeBackend(
         arr.push({ ...row, id, version: 1 });
         return json(201, { success: true, data: { id } });
       };
+      // ---- doc 33 (Batch 3): the real guard's rules, reduced to what the page can trigger --------------------------
+      const ifMatchOk = (row: Record<string, unknown>) =>
+        headers['if-match'] === `"${String(row.version)}"`;
+      const bump = (row: Record<string, unknown>, patch: Record<string, unknown>) => {
+        Object.assign(row, patch, { version: Number(row.version) + 1 });
+        return json(200, { success: true, data: row }, { ETag: `"${String(row.version)}"` });
+      };
+      if (path === '/academics/terminology') {
+        if (a.terminologyMode === 'server') return err(500, 'INTERNAL_ERROR');
+        const labels = {
+          program: 'Programme',
+          cohort: 'Batch',
+          period: 'Semester',
+          section: 'Section',
+          term: 'Term',
+          course: 'Course',
+          ...(a.terminology ?? {}),
+        };
+        const own = (a.terminology ?? {}) as Record<string, unknown>;
+        const pt = (own.periodTypes ?? {}) as Record<string, string>;
+        return json(200, {
+          success: true,
+          data: {
+            labels: Object.fromEntries(Object.entries(labels).filter(([k]) => k !== 'periodTypes')),
+            customised: Object.keys(own).filter((k) => k !== 'periodTypes'),
+            periodTypes: a.periodTypes.map((t) => ({
+              ...t,
+              label: pt[String(t.code)] ?? labels.period,
+              customised: pt[String(t.code)] !== undefined,
+            })),
+            byCohort: a.byCohort,
+          },
+        });
+      }
+      if (path === '/academics/setup-wizard') {
+        if (a.campusScopedOnly) return err(403, 'FORBIDDEN');
+        return json(200, { success: true, data: a.wizard });
+      }
+      const act = /^\/academics\/terms\/([^/]+)\/activation$/.exec(path);
+      if (act && method === 'POST') {
+        const terms = (a.wizard?.terms ?? []) as Array<Record<string, unknown>>;
+        const t = terms.find((x) => x.id === act[1]);
+        if (!t) return err(404, 'RESOURCE_NOT_FOUND');
+        if (!headers['if-match']) return err(428, 'PRECONDITION_REQUIRED');
+        if (!ifMatchOk(t)) return err(409, 'CONFLICT');
+        if (!t.activatable) return err(409, 'SETUP_INCOMPLETE');
+        Object.assign(t, { status: 'ACTIVE', activatable: false });
+        return bump(t, {});
+      }
+      if (path === '/academics/setup-checklist') {
+        if (a.campusScopedOnly) return err(403, 'FORBIDDEN');
+        return json(200, { success: true, data: a.checklist });
+      }
+      const eg = /^\/academics\/cohort-periods\/([^/]+)\/elective-groups$/.exec(path);
+      if (eg) {
+        const rows = (a.electiveGroups[eg[1]!] ??= []);
+        if (method === 'GET') return list(rows);
+        return created(rows, {
+          opensAt: null,
+          closesAt: null,
+          ...reqBody,
+          reason: undefined,
+          cohortPeriodId: eg[1],
+          status: 'PLANNED',
+          kind: 'g',
+        });
+      }
+      const egPatch = /^\/academics\/elective-groups\/([^/]+)$/.exec(path);
+      if (egPatch && method === 'PATCH') {
+        const g = Object.values(a.electiveGroups)
+          .flat()
+          .find((x) => x.id === egPatch[1]);
+        if (!g) return err(404, 'RESOURCE_NOT_FOUND');
+        if (!ifMatchOk(g) || g.status === 'CLOSED') return err(409, 'CONFLICT');
+        if (reqBody.status === 'CLOSED') {
+          const min = Number(reqBody.minSelect ?? g.minSelect);
+          const short = Object.values(a.enrollments)
+            .flat()
+            .filter(
+              (e) =>
+                e.cohortPeriodId === g.cohortPeriodId &&
+                (e.status === 'REGISTERED' || e.status === 'ACTIVE'),
+            )
+            .some(
+              (e) =>
+                a.registrations.filter(
+                  (r) => r.termEnrollmentId === e.id && r.electiveGroupId === g.id && !r.validTo,
+                ).length < min,
+            );
+          if (short) return err(409, 'CONFLICT');
+        }
+        const patch = { ...reqBody };
+        delete patch.reason;
+        return bump(g, patch);
+      }
+      const regs = /^\/academics\/course-offerings\/([^/]+)\/registrations$/.exec(path);
+      if (regs) {
+        const o = a.offerings.find((x) => x.id === regs[1]);
+        if (!o) return err(404, 'RESOURCE_NOT_FOUND');
+        if (method === 'GET')
+          return list(a.registrations.filter((r) => r.courseOfferingId === o.id));
+        const enrollment = Object.values(a.enrollments)
+          .flat()
+          .find((e) => e.id === reqBody.termEnrollmentId);
+        if (!enrollment) return err(404, 'RESOURCE_NOT_FOUND');
+        const live = (r: Record<string, unknown>) => !r.validTo;
+        const group = Object.values(a.electiveGroups)
+          .flat()
+          .find((g) => g.id === o.electiveGroupId);
+        if (group) {
+          const now = Date.now();
+          const inWindow =
+            group.status === 'OPEN' &&
+            (!group.opensAt || now >= Date.parse(group.opensAt as string)) &&
+            (!group.closesAt || now < Date.parse(group.closesAt as string));
+          const held = a.registrations.filter(
+            (r) =>
+              r.termEnrollmentId === enrollment.id && r.electiveGroupId === group.id && live(r),
+          ).length;
+          if (reqBody.source !== 'ELECTIVE_CHOICE' || !inWindow || held >= Number(group.maxSelect))
+            return err(409, 'CONFLICT');
+        }
+        const taken = a.registrations.filter((r) => r.courseOfferingId === o.id && live(r)).length;
+        if (typeof o.capacity === 'number' && taken >= o.capacity) return err(409, 'CONFLICT');
+        const id = `r-${a.registrations.length + 1}`;
+        a.registrations.push({
+          id,
+          termEnrollmentId: enrollment.id,
+          studentId: enrollment.studentId,
+          courseOfferingId: o.id,
+          electiveGroupId: o.electiveGroupId ?? null,
+          status: reqBody.pendingApproval ? 'PENDING_APPROVAL' : 'REGISTERED',
+          validFrom: reqBody.validFrom,
+          validTo: null,
+          source: reqBody.source,
+          registrationKind: 'REGULAR',
+          version: 1,
+          createdAt: '2026-10-01T00:00:00.000Z',
+          updatedAt: '2026-10-01T00:00:00.000Z',
+        });
+        return json(201, { success: true, data: { id } });
+      }
+      const enrRegs = /^\/academics\/term-enrollments\/([^/]+)\/course-registrations$/.exec(path);
+      if (enrRegs) return list(a.registrations.filter((r) => r.termEnrollmentId === enrRegs[1]));
+      const regPatch = /^\/academics\/course-registrations\/([^/]+)$/.exec(path);
+      if (regPatch && method === 'PATCH') {
+        const r = a.registrations.find((x) => x.id === regPatch[1]);
+        if (!r) return err(404, 'RESOURCE_NOT_FOUND');
+        if (!ifMatchOk(r) || r.validTo) return err(409, 'CONFLICT');
+        return bump(r, { status: reqBody.status, validTo: reqBody.validTo ?? null });
+      }
+      if (path.startsWith('/academics/holidays')) {
+        const lockedOn = (campusId: unknown, date: unknown) =>
+          a.terms.some(
+            (t) =>
+              t.status === 'LOCKED' &&
+              (campusId === null || campusId === undefined || t.campusId === campusId) &&
+              String(t.startDate) <= String(date) &&
+              String(date) <= String(t.endDate),
+          );
+        if (method === 'GET') {
+          const q = new URL(path, 'http://x').searchParams;
+          const campus = q.get('campusId');
+          return list(
+            a.holidays.filter(
+              (h) =>
+                (!campus || h.campusId === null || h.campusId === campus) &&
+                (!q.get('from') || String(h.holidayDate) >= q.get('from')!) &&
+                (!q.get('to') || String(h.holidayDate) <= q.get('to')!) &&
+                (q.get('includeCancelled') === 'true' || h.status === 'ACTIVE'),
+            ),
+          );
+        }
+        const hp = /^\/academics\/holidays\/([^/]+)$/.exec(path);
+        if (hp && method === 'PATCH') {
+          const h = a.holidays.find((x) => x.id === hp[1]);
+          if (!h) return err(404, 'RESOURCE_NOT_FOUND');
+          if (h.campusId === null && a.campusScopedOnly) return err(403, 'FORBIDDEN');
+          if (!ifMatchOk(h) || h.status === 'CANCELLED' || lockedOn(h.campusId, h.holidayDate))
+            return err(409, 'CONFLICT');
+          const patch = { ...reqBody };
+          delete patch.reason;
+          return bump(h, patch);
+        }
+        const campusId = (reqBody.campusId as string | undefined) ?? null;
+        if (campusId === null && a.campusScopedOnly) return err(403, 'FORBIDDEN');
+        const dup = a.holidays.some(
+          (h) =>
+            h.status === 'ACTIVE' &&
+            h.campusId === campusId &&
+            h.holidayDate === reqBody.holidayDate &&
+            String(h.name).toLowerCase() === String(reqBody.name).toLowerCase(),
+        );
+        if (dup || lockedOn(campusId, reqBody.holidayDate)) return err(409, 'CONFLICT');
+        return created(a.holidays, {
+          campusId,
+          holidayDate: reqBody.holidayDate,
+          name: reqBody.name,
+          kind: reqBody.kind,
+          status: 'ACTIVE',
+        });
+      }
       if (path === '/academics/academic-years') {
         if (method === 'GET') return list(a.years);
         return created(a.years, { ...reqBody, status: 'PLANNED', kind: 'y' });
@@ -1295,6 +1611,243 @@ export function createFakeBackend(
         });
       }
       if (path === '/academics/cohort-periods') return list(a.periods);
+      if (path.startsWith('/academics/course-offerings')) {
+        if (method === 'GET') {
+          if (a.offeringsMode === 'server') return err(500, 'INTERNAL_ERROR');
+          const sub =
+            /^\/academics\/course-offerings\/([^/?]+)\/(timetable-slots|faculty-assignments)$/.exec(
+              path,
+            );
+          if (sub) {
+            if (!a.offerings.some((o) => o.id === sub[1])) return err(404, 'RESOURCE_NOT_FOUND');
+            if (sub[2] === 'timetable-slots') return list(a.slots[sub[1]!] ?? []);
+            // staff-only rows (RLS): a student sees an empty list, never an error
+            return list(state.me.actor_kind === 'STAFF' ? (a.assignments[sub[1]!] ?? []) : []);
+          }
+          const termId = new URL(path, 'http://x').searchParams.get('termId');
+          return list(a.offerings.filter((o) => !termId || o.termId === termId));
+        }
+        if (path === '/academics/course-offerings' && method === 'POST') {
+          const term = a.terms.find((t) => t.id === reqBody.termId);
+          if (!term) return err(404, 'RESOURCE_NOT_FOUND');
+          if (term.status === 'LOCKED' || term.status === 'CLOSED') return err(409, 'TERM_LOCKED');
+          const course = a.courses.find((c) => c.id === reqBody.courseId);
+          const id = `off-${a.offerings.length + 1}`;
+          const newOffering = {
+            id,
+            campusId: term.campusId,
+            termId: reqBody.termId,
+            courseId: reqBody.courseId,
+            cohortPeriodId: reqBody.cohortPeriodId ?? null,
+            sectionId: reqBody.sectionId ?? null,
+            offeringKind: reqBody.offeringKind ?? 'CORE',
+            groupLabel: reqBody.groupLabel ?? null,
+            codeSnapshot: course ? String(course.code) : 'CRS',
+            titleSnapshot: course ? String(course.title) : 'Course Title',
+            creditsSnapshot: course ? `${String(course.credits)}.0` : '3.0',
+            tracksAttendance: true,
+            registrationPolicy: reqBody.registrationPolicy ?? 'AUTO_FROM_SECTION',
+            capacity: typeof reqBody.capacity === 'number' ? reqBody.capacity : null,
+            electiveGroupId: reqBody.electiveGroupId ?? null,
+            status: 'DRAFT',
+            publishedAt: null,
+            version: 1,
+            createdAt: '2026-10-01T00:00:00.000Z',
+            updatedAt: '2026-10-01T00:00:00.000Z',
+          };
+          a.offerings.push(newOffering);
+          return json(201, { success: true, data: { id } });
+        }
+        const fromSecMatch =
+          /^\/academics\/course-offerings\/([^/?]+)\/registrations\/from-section$/.exec(path);
+        if (fromSecMatch && method === 'POST') {
+          const o = a.offerings.find((x) => x.id === fromSecMatch[1]);
+          if (!o) return err(404, 'RESOURCE_NOT_FOUND');
+          const term = a.terms.find((t) => t.id === o.termId);
+          if (term && (term.status === 'LOCKED' || term.status === 'CLOSED'))
+            return err(409, 'TERM_LOCKED');
+          if (!o.sectionId) return err(409, 'OFFERING_HAS_NO_SECTION');
+          const members = Object.values(a.enrollments)
+            .flat()
+            .filter(
+              (e) =>
+                (e.currentSection as { sectionId: string } | null)?.sectionId === o.sectionId &&
+                (e.status === 'ACTIVE' || e.status === 'REGISTERED'),
+            );
+          let createdCount = 0;
+          let alreadyRegisteredCount = 0;
+          for (const m of members) {
+            const live = a.registrations.some(
+              (r) => r.courseOfferingId === o.id && r.termEnrollmentId === m.id && !r.validTo,
+            );
+            if (live) {
+              alreadyRegisteredCount++;
+            } else {
+              const currentLive = a.registrations.filter(
+                (r) => r.courseOfferingId === o.id && !r.validTo,
+              ).length;
+              if (typeof o.capacity === 'number' && currentLive >= o.capacity) {
+                return err(409, 'CAPACITY_EXCEEDED');
+              }
+              const id = `r-${a.registrations.length + 1}`;
+              a.registrations.push({
+                id,
+                termEnrollmentId: m.id,
+                studentId: m.studentId,
+                courseOfferingId: o.id,
+                electiveGroupId: o.electiveGroupId ?? null,
+                status: 'REGISTERED',
+                validFrom: reqBody.validFrom,
+                validTo: null,
+                source: 'AUTO_SECTION',
+                registrationKind: 'REGULAR',
+                version: 1,
+                createdAt: '2026-10-01T00:00:00.000Z',
+                updatedAt: '2026-10-01T00:00:00.000Z',
+              });
+              createdCount++;
+            }
+          }
+          return json(200, {
+            success: true,
+            data: { created: createdCount, alreadyRegistered: alreadyRegisteredCount },
+          });
+        }
+        const faPostMatch = /^\/academics\/course-offerings\/([^/?]+)\/faculty-assignments$/.exec(
+          path,
+        );
+        if (faPostMatch && method === 'POST') {
+          const o = a.offerings.find((x) => x.id === faPostMatch[1]);
+          if (!o) return err(404, 'RESOURCE_NOT_FOUND');
+          const term = a.terms.find((t) => t.id === o.termId);
+          if (term && (term.status === 'LOCKED' || term.status === 'CLOSED'))
+            return err(409, 'TERM_LOCKED');
+          if (
+            reqBody.employeeId === 'inactive-emp' ||
+            reqBody.employeeId === 'no-posting-emp' ||
+            (typeof reqBody.employeeId === 'string' && reqBody.employeeId.includes('unposted'))
+          ) {
+            return err(409, 'EMPLOYEE_NOT_ELIGIBLE');
+          }
+          const oId = String(o.id);
+          const listFa = (a.assignments[oId] ??= []);
+          if (
+            reqBody.teachingRole === 'PRIMARY' &&
+            listFa.some(
+              (fa: Record<string, unknown>) => fa.teachingRole === 'PRIMARY' && !fa.validTo,
+            )
+          ) {
+            return err(409, 'PRIMARY_FACULTY_CONFLICT');
+          }
+          const id = `fa-${listFa.length + 1}`;
+          listFa.push({
+            id,
+            courseOfferingId: oId,
+            employeeId: reqBody.employeeId,
+            teachingRole: reqBody.teachingRole,
+            validFrom: reqBody.validFrom,
+            validTo: reqBody.validTo ?? null,
+            version: 1,
+          });
+          return json(201, { success: true, data: { id } });
+        }
+        const tsPostMatch = /^\/academics\/course-offerings\/([^/?]+)\/timetable-slots$/.exec(path);
+        if (tsPostMatch && method === 'POST') {
+          const o = a.offerings.find((x) => x.id === tsPostMatch[1]);
+          if (!o) return err(404, 'RESOURCE_NOT_FOUND');
+          const term = a.terms.find((t) => t.id === o.termId);
+          if (term && (term.status === 'LOCKED' || term.status === 'CLOSED'))
+            return err(409, 'TERM_LOCKED');
+          const weekday = Number(reqBody.weekday);
+          const start = String(reqBody.startTime);
+          const end = String(reqBody.endTime);
+          const allSlots = Object.values(a.slots).flat();
+          const overlap = (s: Record<string, unknown>) =>
+            Number(s.weekday) === weekday &&
+            !s.effectiveTo &&
+            String(s.startTime) < end &&
+            start < String(s.endTime);
+          if (reqBody.roomId && allSlots.some((s) => s.roomId === reqBody.roomId && overlap(s))) {
+            return err(409, 'ROOM_CONFLICT');
+          }
+          if (
+            reqBody.facultyAssignmentId &&
+            allSlots.some(
+              (s) => s.facultyAssignmentId === reqBody.facultyAssignmentId && overlap(s),
+            )
+          ) {
+            return err(409, 'TEACHER_CONFLICT');
+          }
+          const oId = String(o.id);
+          const listSlots = (a.slots[oId] ??= []);
+          const id = `ts-${listSlots.length + 1}`;
+          listSlots.push({
+            id,
+            courseOfferingId: oId,
+            roomId: reqBody.roomId ?? null,
+            facultyAssignmentId: reqBody.facultyAssignmentId ?? null,
+            weekday,
+            startTime: start,
+            endTime: end,
+            effectiveFrom: reqBody.effectiveFrom,
+            effectiveTo: reqBody.effectiveTo ?? null,
+            version: 1,
+          });
+          return json(201, { success: true, data: { id } });
+        }
+        const offPatchMatch = /^\/academics\/course-offerings\/([^/?]+)$/.exec(path);
+        if (offPatchMatch && method === 'PATCH') {
+          const o = a.offerings.find((x) => x.id === offPatchMatch[1]);
+          if (!o) return err(404, 'RESOURCE_NOT_FOUND');
+          if (!headers['if-match']) return err(428, 'PRECONDITION_REQUIRED');
+          if (headers['if-match'] !== `"${String(o.version)}"`) return err(409, 'CONFLICT');
+          const term = a.terms.find((t) => t.id === o.termId);
+          if (term && (term.status === 'LOCKED' || term.status === 'CLOSED'))
+            return err(409, 'TERM_LOCKED');
+          if (reqBody.status) {
+            // as offering.service.ts: both final states (CLOSED, CANCELLED) require a reason
+            if (
+              (reqBody.status === 'CANCELLED' || reqBody.status === 'CLOSED') &&
+              (typeof reqBody.reason !== 'string' || reqBody.reason.length < 5)
+            ) {
+              return err(400, 'BAD_REQUEST');
+            }
+            o.status = reqBody.status;
+            if (reqBody.status === 'PUBLISHED') o.publishedAt = '2026-10-01T00:00:00.000Z';
+          }
+          if ('capacity' in reqBody) {
+            o.capacity = typeof reqBody.capacity === 'number' ? reqBody.capacity : null;
+          }
+          o.version = Number(o.version) + 1;
+          return json(200, { success: true, data: o }, { ETag: `"${String(o.version)}"` });
+        }
+      }
+      const faEndMatch = /^\/academics\/faculty-assignments\/([^/?]+)$/.exec(path);
+      if (faEndMatch && method === 'PATCH') {
+        const row = Object.values(a.assignments)
+          .flat()
+          .find((r) => r.id === faEndMatch[1]);
+        if (!row) return err(404, 'RESOURCE_NOT_FOUND');
+        if (!headers['if-match']) return err(428, 'PRECONDITION_REQUIRED');
+        if (headers['if-match'] !== `"${String(row.version)}"` || row.validTo)
+          return err(409, 'CONFLICT');
+        row.validTo = reqBody.validTo;
+        row.version = Number(row.version) + 1;
+        return json(200, { success: true, data: row }, { ETag: `"${String(row.version)}"` });
+      }
+      const tsEndMatch = /^\/academics\/timetable-slots\/([^/?]+)$/.exec(path);
+      if (tsEndMatch && method === 'PATCH') {
+        const row = Object.values(a.slots)
+          .flat()
+          .find((r) => r.id === tsEndMatch[1]);
+        if (!row) return err(404, 'RESOURCE_NOT_FOUND');
+        if (!headers['if-match']) return err(428, 'PRECONDITION_REQUIRED');
+        if (headers['if-match'] !== `"${String(row.version)}"` || row.effectiveTo)
+          return err(409, 'CONFLICT');
+        row.effectiveTo = reqBody.effectiveTo;
+        row.version = Number(row.version) + 1;
+        return json(200, { success: true, data: row }, { ETag: `"${String(row.version)}"` });
+      }
       if (path === '/academics/sections') {
         if (method === 'GET') return list(a.sections);
         return created(a.sections, {
@@ -1316,6 +1869,32 @@ export function createFakeBackend(
         row.version = Number(row.version) + 1;
         return json(200, { success: true, data: row });
       }
+      const ctList = /^\/academics\/sections\/([^/]+)\/class-teachers$/.exec(path);
+      if (ctList) {
+        if (!a.sections.some((x) => x.id === ctList[1])) return err(404, 'RESOURCE_NOT_FOUND');
+        const rows = (a.classTeachers[ctList[1]!] ??= []);
+        // staff-only rows (RLS): a student sees an empty list, never an error
+        if (method === 'GET') return list(state.me.actor_kind === 'STAFF' ? rows : []);
+        if (
+          reqBody.classTeacherRole === 'PRIMARY' &&
+          rows.some((r) => r.classTeacherRole === 'PRIMARY' && !r.validTo)
+        )
+          return err(409, 'CONFLICT');
+        return created(rows, { ...reqBody, sectionId: ctList[1], validTo: null, kind: 'ct' });
+      }
+      const ctEnd = /^\/academics\/class-teachers\/([^/]+)$/.exec(path);
+      if (ctEnd && method === 'PATCH') {
+        if (!headers['if-match']) return err(428, 'PRECONDITION_REQUIRED');
+        const row = Object.values(a.classTeachers)
+          .flat()
+          .find((r) => r.id === ctEnd[1]);
+        if (!row) return err(404, 'RESOURCE_NOT_FOUND');
+        if (headers['if-match'] !== `"${String(row.version)}"` || row.validTo)
+          return err(409, 'CONFLICT');
+        row.validTo = reqBody.validTo;
+        row.version = Number(row.version) + 1;
+        return json(200, { success: true, data: row });
+      }
       const rosterMatch = /^\/academics\/sections\/([^/]+)\/members$/.exec(path);
       if (rosterMatch) {
         return list(
@@ -1333,7 +1912,8 @@ export function createFakeBackend(
             })),
         );
       }
-      const enr = /^\/students\/([^/]+)\/term-enrollments(?:\/([^/]+)\/section)?$/.exec(path);
+      const enr =
+        /^\/students\/([^/]+)\/term-enrollments(?:\/([^/]+)\/(section|progression))?$/.exec(path);
       if (enr) {
         const student = enr[1] as string;
         // a student outside the caller's access is indistinguishable from a missing one
@@ -1354,6 +1934,31 @@ export function createFakeBackend(
             status: 'REGISTERED',
             enrollmentType: 'REGULAR',
             rollNumber: reqBody.rollNumber ?? null,
+            currentSection: null,
+            version: 1,
+          });
+          return json(201, { success: true, data: { id } });
+        }
+        if (enr[3] === 'progression' && method === 'POST') {
+          if (!headers['idempotency-key']) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');
+          const src = rows.find((r) => r.id === enr[2]);
+          if (!src) return err(404, 'RESOURCE_NOT_FOUND');
+          const promote = reqBody.decision === 'PROMOTE';
+          const ok = promote ? ['ACTIVE'] : ['ACTIVE', 'DETAINED'];
+          if (!ok.includes(String(src.status))) return err(409, 'CONFLICT');
+          const target = a.periods.find((x) => x.id === reqBody.cohortPeriodId);
+          src.status = promote ? 'PROMOTED' : 'COMPLETED';
+          src.currentSection = null;
+          const id = `e-${rows.length + 1}`;
+          rows.push({
+            id,
+            studentId: student,
+            cohortPeriodId: reqBody.cohortPeriodId,
+            termId: target?.termId ?? 't2',
+            periodNo: target?.periodNo ?? Number(src.periodNo) + (promote ? 1 : 0),
+            status: 'REGISTERED',
+            enrollmentType: promote ? 'REGULAR' : 'REPEAT',
+            rollNumber: null,
             currentSection: null,
             version: 1,
           });
@@ -1390,3 +1995,183 @@ export function createFakeBackend(
 }
 
 export type FakeBackend = ReturnType<typeof createFakeBackend>;
+
+/** A school pupil (Grade 5 -> section move -> Grade 6), filtered by `asOf` like the server (doc 34). */
+function fakeTimeline(id: string, admissionNumber: string, asOf: string, today: string) {
+  const P = { id: '01900000-0000-7000-8000-0000000000a1', name: 'Primary School', code: 'SCH' };
+  const T1 = { id: '01900000-0000-7000-8000-0000000000b1', code: 'AY25', name: 'Session 2025-26' };
+  const T2 = { id: '01900000-0000-7000-8000-0000000000b2', code: 'AY26', name: 'Session 2026-27' };
+  const ev = (
+    eventType: string,
+    eventDate: string | null,
+    description: string,
+    extra: Record<string, unknown> = {},
+  ) => ({
+    id: `${eventType}:${eventDate ?? 'undated'}`,
+    sourceId: '01900000-0000-7000-8000-0000000000e1',
+    eventType,
+    eventDate,
+    temporal: 'HISTORICAL',
+    description,
+    programme: null,
+    cohortName: null,
+    term: null,
+    periodNo: null,
+    periodLabel: null,
+    section: null,
+    course: null,
+    status: null,
+    ...extra,
+  });
+  const g = (term: typeof T1, n: number) => ({
+    programme: P,
+    cohortName: 'Batch 2019',
+    term,
+    periodNo: n,
+    periodLabel: 'Grade',
+  });
+  const all = [
+    ev('ADMISSION', '2025-04-01', `Admitted (${admissionNumber}).`),
+    ev('PROGRAMME_STARTED', '2025-04-01', 'Joined Primary School (Batch 2019) as REGULAR.', {
+      programme: P,
+      cohortName: 'Batch 2019',
+    }),
+    ev('TERM_ENROLLED', '2025-04-01', 'Enrolled in Grade 5, Session 2025-26 (REGULAR).', g(T1, 5)),
+    ev('SECTION_PLACED', '2025-04-01', 'Placed in section A until 2025-09-30.', {
+      ...g(T1, 5),
+      section: { id: '01900000-0000-7000-8000-0000000000c1', name: 'A' },
+    }),
+    ev('SECTION_TRANSFERRED', '2025-10-01', 'Moved to section B.', {
+      ...g(T1, 5),
+      section: { id: '01900000-0000-7000-8000-0000000000c2', name: 'B' },
+    }),
+    ev('TERM_ENROLLED', '2026-04-01', 'Enrolled in Grade 6, Session 2026-27 (REGULAR).', g(T2, 6)),
+    ev('COURSE_REGISTERED', '2026-04-10', 'Registered for MATH6 Mathematics (REGULAR, MANUAL).', {
+      ...g(T2, 6),
+      course: {
+        offeringId: '01900000-0000-7000-8000-0000000000d1',
+        code: 'MATH6',
+        title: 'Mathematics',
+        credits: '4.0',
+      },
+      status: 'REGISTERED',
+    }),
+  ].map((e) => ({
+    ...e,
+    temporal:
+      asOf >= '2026-04-01' && (e.term as { id: string } | null)?.id === T2.id
+        ? 'CURRENT'
+        : e.temporal,
+  }));
+  const events = all.filter((e) => e.eventDate! <= asOf);
+  const inG6 = asOf >= '2026-04-01';
+  const inG5 = asOf >= '2025-04-01' && asOf <= '2026-03-31';
+  const admitted = asOf >= '2025-04-01';
+  return {
+    studentId: id,
+    asOfDate: asOf,
+    today,
+    timezone: 'Asia/Kolkata',
+    position: {
+      admitted,
+      studentStatus: asOf >= '2026-06-02' ? 'ACTIVE' : null,
+      programme: admitted
+        ? {
+            studentProgramId: '01900000-0000-7000-8000-0000000000f1',
+            id: P.id,
+            name: P.name,
+            code: P.code,
+            cohortId: '01900000-0000-7000-8000-0000000000f2',
+            cohortName: 'Batch 2019',
+            entryType: 'REGULAR',
+            startDate: '2025-04-01',
+            endDate: null,
+          }
+        : null,
+      terms:
+        inG5 || inG6
+          ? [
+              {
+                termEnrollmentId: '01900000-0000-7000-8000-0000000000f3',
+                term: inG6
+                  ? { ...T2, startDate: '2026-04-01', endDate: '2027-03-31' }
+                  : { ...T1, startDate: '2025-04-01', endDate: '2026-03-31' },
+                periodNo: inG6 ? 6 : 5,
+                periodLabel: 'Grade',
+                enrollmentType: 'REGULAR',
+                recordedStatus: inG6 ? 'ACTIVE' : 'PROMOTED',
+                rollNumber: null,
+                section: inG6
+                  ? null
+                  : asOf >= '2025-10-01'
+                    ? {
+                        id: '01900000-0000-7000-8000-0000000000c2',
+                        name: 'B',
+                        validFrom: '2025-10-01',
+                        validTo: null,
+                      }
+                    : {
+                        id: '01900000-0000-7000-8000-0000000000c1',
+                        name: 'A',
+                        validFrom: '2025-04-01',
+                        validTo: '2025-09-30',
+                      },
+                registrations:
+                  inG6 && asOf >= '2026-04-10'
+                    ? [
+                        {
+                          registrationId: '01900000-0000-7000-8000-0000000000d2',
+                          offeringId: '01900000-0000-7000-8000-0000000000d1',
+                          code: 'MATH6',
+                          title: 'Mathematics',
+                          credits: '4.0',
+                          registrationKind: 'REGULAR',
+                          source: 'MANUAL',
+                          validFrom: '2026-04-10',
+                          validTo: null,
+                          recordedStatus: 'REGISTERED',
+                          statusOnDate: 'REGISTERED',
+                        },
+                      ]
+                    : [],
+              },
+            ]
+          : [],
+    },
+    events,
+    undatedOutcomes:
+      asOf >= '2025-04-01'
+        ? [
+            ev(
+              'PROMOTED',
+              null,
+              'Recorded outcome of Grade 5 (Session 2025-26): PROMOTED. The date of this decision is not recorded.',
+              {
+                ...g(T1, 5),
+                temporal: 'UNDATED',
+                status: 'PROMOTED',
+              },
+            ),
+          ]
+        : [],
+    futureEventsExcluded: all.length - events.length,
+    limitations: [
+      ...(asOf >= '2026-06-02'
+        ? []
+        : [
+            {
+              code: 'STATUS_BEFORE_LAST_CHANGE_UNKNOWN',
+              message: `Only the latest status change (2026-06-02) is recorded; the status on ${asOf} is unknown.`,
+            },
+          ]),
+      ...(asOf >= '2025-04-01'
+        ? [
+            {
+              code: 'TERM_OUTCOMES_UNDATED',
+              message: 'Promotion, detention, completion and withdrawal decisions are not dated.',
+            },
+          ]
+        : []),
+    ],
+  };
+}

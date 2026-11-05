@@ -36,9 +36,10 @@ import type {
   UpdateSectionBody,
   UpdateTermBody,
 } from './calendar.schemas.js';
+import { setupIncomplete, termReadiness } from './term-readiness.js';
 
 type Meta = AuditRequestMeta | undefined;
-interface UpdateOptions {
+export interface UpdateOptions {
   expected: ExpectedVersion;
   meta?: Meta;
 }
@@ -48,7 +49,7 @@ const READ_PERMISSION = 'academic.program.read';
 const lower = (s: string): string => s.toLowerCase();
 
 /** Campuses the caller may read terms of: ORGANIZATION grant ⇒ all; CAMPUS ⇒ itself; DEPARTMENT ⇒ the department's campus. */
-async function campusScopeFilter(
+export async function campusScopeFilter(
   tx: TenantTx,
   ctx: TrustedContext,
 ): Promise<{ orgWide: boolean; campusIds: string[] }> {
@@ -468,6 +469,13 @@ export class TermService {
     if (status !== row.status && TERM_NEXT[row.status] !== status) {
       throw conflict(`A term cannot move from ${row.status} to ${status}.`);
     }
+    // Task 9 (doc 35 §3): every PLANNED -> ACTIVE transition, from any route, must pass the activation readiness rules.
+    // Read after the term row lock and the version check, in this transaction; other changes (name, dates, CLOSED,
+    // LOCKED) are not affected.
+    if (row.status === 'PLANNED' && status === 'ACTIVE') {
+      const ready = await termReadiness(tx, ctx.tenantId, row.id);
+      if (ready && ready.blocking.length > 0) throw setupIncomplete(ready.blocking);
+    }
     const locking = status === 'LOCKED'; // row.status is never LOCKED here (rejected above)
     const reason = locking || input.reason !== undefined ? parseReason(input.reason) : undefined;
 
@@ -493,6 +501,16 @@ export class TermService {
       mapDbError(err, 'The term conflicts with an existing record.');
     }
     if (!updated) throw conflict('Term version mismatch.');
+    // An activation that also moves the dates is checked again on the new dates (e.g. an end date now beyond a
+    // teacher's assignment); throwing here rolls the whole transaction back.
+    if (
+      row.status === 'PLANNED' &&
+      status === 'ACTIVE' &&
+      (startDate !== row.start_date || endDate !== row.end_date)
+    ) {
+      const again = await termReadiness(tx, ctx.tenantId, row.id);
+      if (again && again.blocking.length > 0) throw setupIncomplete(again.blocking);
+    }
     await recordAudit(
       tx,
       ctx,

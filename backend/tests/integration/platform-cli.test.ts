@@ -105,6 +105,69 @@ describe('Platform CLI (Integration, ADR-002 & Doc 05/11)', () => {
     expect(afterCount.rows[0]!.count).toBe(beforeCount.rows[0]!.count);
   });
 
+  // M3 doc 39 PR-3: what a re-seed changes, what it never touches, and that a failure part-way changes nothing.
+  it('re-seed: resets hand-made grant drift, never touches role assignments, and is all or nothing', async () => {
+    const slug = `reseed-${Date.now().toString(36)}`;
+    const tenant = await createTenant(client, {
+      name: 'Reseed Drift School',
+      slug,
+      adminEmail: `a@${slug}.test`,
+    });
+    const grants = async () =>
+      (
+        await client.query<{ role: string; perm: string; mode: string }>(
+          `SELECT r.code AS role, rp.permission_code AS perm, rp.scope_mode AS mode
+             FROM app.role_permissions rp JOIN app.roles r ON r.id = rp.role_id
+            WHERE rp.organization_id = $1 ORDER BY 1, 2`,
+          [tenant.id],
+        )
+      ).rows;
+    const assignments = async () =>
+      (
+        await client.query<Record<string, unknown>>(
+          `SELECT id, user_id, role_id, scope_type, scope_id, status, valid_from, valid_until
+             FROM app.role_assignments WHERE organization_id = $1 ORDER BY id`,
+          [tenant.id],
+        )
+      ).rows;
+    const matrix = await grants();
+    const assigned = await assignments();
+    expect(assigned).toHaveLength(1);
+
+    // Drift a privileged session could create: an extra grant and a changed scope mode.
+    await client.query(
+      `INSERT INTO app.role_permissions (organization_id, role_id, permission_code, scope_mode)
+       SELECT $1::uuid, r.id, 'academic.term.manage', 'GRANTED' FROM app.roles r WHERE r.organization_id = $1::uuid AND r.code = 'HOD'`,
+      [tenant.id],
+    );
+    await client.query(
+      `UPDATE app.role_permissions rp SET scope_mode = 'GRANTED' FROM app.roles r
+        WHERE r.id = rp.role_id AND rp.organization_id = $1 AND r.code = 'FACULTY' AND rp.permission_code = 'student.profile.read'`,
+      [tenant.id],
+    );
+    const drifted = await grants();
+    expect(drifted).not.toEqual(matrix);
+
+    // A failure part-way (the third role's grant insert) rolls the whole re-sync back: the drift is still there.
+    let inserts = 0;
+    const failing = {
+      query: (text: string, values?: readonly unknown[]) => {
+        if (text.includes('INSERT INTO app.role_permissions') && ++inserts === 40) {
+          return Promise.reject(new Error('simulated failure'));
+        }
+        return client.query(text, values as unknown[]);
+      },
+    };
+    await expect(seedTenant(failing, slug)).rejects.toThrow('simulated failure');
+    expect(await grants()).toEqual(drifted);
+    expect(await assignments()).toEqual(assigned);
+
+    // A complete re-seed restores exactly the matrix and leaves every assignment as it was.
+    await seedTenant(client, slug);
+    expect(await grants()).toEqual(matrix);
+    expect(await assignments()).toEqual(assigned);
+  });
+
   it('suspends an organization (tenant:suspend)', async () => {
     const slug = `suspendtest-${Date.now().toString(36)}`;
     const tenant = await createTenant(client, {

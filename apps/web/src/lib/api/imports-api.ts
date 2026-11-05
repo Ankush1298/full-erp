@@ -60,7 +60,7 @@ const Committed = z.object({
   }),
 });
 
-const root = (kind: ImportKind): string => `/${kind}/imports`;
+const root = (kind: ImportKind): string => `/v1/${kind}/imports`;
 const at = (kind: ImportKind, id: string): string => `${root(kind)}/${encodeURIComponent(id)}`;
 
 /** One resupplied matching entry: the row it belongs to (number and e-mail) and the matching-only cells. Never stored by the server. */

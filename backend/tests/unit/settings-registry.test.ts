@@ -25,6 +25,7 @@ describe('settings registry: structure', () => {
       'guardian.notification_policy',
       'identity.age_of_majority',
       'identity.dob_required',
+      'terminology', // doc 33 §6: closed label slots, no registry default
     ]);
   });
 
@@ -75,7 +76,7 @@ describe('settings registry: lookup is exact', () => {
       'identity.age_of_majority ',
       'identity.age_of_majority\n',
       'identity.unknown_dob_policy', // referenced by doc 02 §4.4 but not completely specified: not registered
-      'terminology',
+      'academic.degree_levels',
       'security.password_policy',
       '__proto__',
       'constructor',
@@ -239,5 +240,82 @@ describe('settings concurrency: computeCollectionETag', () => {
       { key: 'identity.age_of_majority', version: 2 },
     ];
     expect(computeCollectionETag(list3)).not.toBe(etag1);
+  });
+});
+
+describe('settings registry: terminology (doc 33 §6)', () => {
+  it('accepts any non-empty subset of the closed label slots and nothing else', () => {
+    const d = def('terminology');
+    expect(isValidSettingValue(d, { cohort: 'Batch' })).toBe(true);
+    expect(
+      isValidSettingValue(d, {
+        program: 'Curriculum',
+        period: 'Grade',
+        section: 'Class',
+        term: 'Session',
+        course: 'Subject',
+        cohort: 'Intake',
+      }),
+    ).toBe(true);
+    for (const bad of [
+      {},
+      { grade: 'X' },
+      { section: '' },
+      { section: 'x'.repeat(41) },
+      { section: 1 },
+      'Class',
+      null,
+      [],
+    ]) {
+      expect(isValidSettingValue(d, bad), JSON.stringify(bad)).toBe(false);
+    }
+    expect(d.default).toBeUndefined();
+  });
+});
+
+describe('settings registry: terminology labels and period-type labels (Task 8, doc 35 §4)', () => {
+  const d = def('terminology');
+  const accepted = (v: unknown) => isValidSettingValue(d, v) && d.validate?.(v) === null;
+  it('keeps every earlier valid value valid and accepts period-type labels', () => {
+    expect(accepted({ cohort: 'Batch' })).toBe(true);
+    expect(
+      accepted({
+        program: 'Class',
+        period: 'Grade',
+        course: 'Subject',
+        section: 'Section',
+        term: 'Term',
+      }),
+    ).toBe(true);
+    expect(accepted({ periodTypes: { YEAR: 'Year', SEMESTER: 'Semester' } })).toBe(true);
+    expect(accepted({ cohort: 'Intake', periodTypes: { 'B.Tech SEM': 'Semester' } })).toBe(true);
+  });
+  it('refuses padded, control-character and bracketed labels and malformed period-type maps', () => {
+    for (const bad of [
+      { section: ' Class' },
+      { section: 'Class ' },
+      { section: 'Cl\nass' },
+      { section: '<Class>' },
+      { periodTypes: { YEAR: '' } },
+      { periodTypes: { YEAR: 'x'.repeat(41) } },
+      { periodTypes: { '': 'Year' } },
+      { periodTypes: 'Year' },
+      { periodTypes: { YEAR: 1 } },
+    ]) {
+      expect(isValidSettingValue(d, bad), JSON.stringify(bad)).toBe(false);
+    }
+  });
+  it('the rule names duplicate slots (counting the fallbacks of unset ones) and never echoes a label', () => {
+    expect(d.validate?.({ program: 'Class', section: 'class' })).toBe(
+      'The labels of "program" and "section" must differ.',
+    );
+    expect(d.validate?.({ section: 'Batch' })).toBe(
+      'The labels of "cohort" and "section" must differ.',
+    );
+    expect(d.validate?.({ periodTypes: { YEAR: 'TERM' } })).toBe(
+      'The label of period type "YEAR" must differ from the label of "term".',
+    );
+    // a period type may reuse the institution-wide period label: that slot is the one it overrides
+    expect(d.validate?.({ periodTypes: { SEMESTER: 'Semester' } })).toBeNull();
   });
 });

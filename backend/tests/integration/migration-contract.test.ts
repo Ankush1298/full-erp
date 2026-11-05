@@ -115,6 +115,9 @@ describe('contract gate against a real database', () => {
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]);
     expect(first.blockedBy).toBe('0009');
     expect(await ledgerOf(db)).toEqual(APPLIED_BY_DEFAULT);
@@ -153,6 +156,9 @@ describe('contract gate against a real database', () => {
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]);
     expect(await ledgerOf(db)).toEqual(APPLIED_BY_DEFAULT);
 
@@ -188,6 +194,9 @@ describe('contract gate against a real database', () => {
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]);
     expect(await constraintNames(db)).toContain('ra_scope_integrity_ck');
   });
@@ -260,6 +269,9 @@ describe('contract gate against a real database', () => {
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]);
     const step2 = await migrate({ connectionString: db.migrator, allowContract: ['0009'] });
     expect(step2.applied).toEqual([
@@ -957,6 +969,9 @@ describe('empty-ledger exemption: only a genuinely fresh database can be built i
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]);
 
     // 5. Verify database state: ledger head is exactly 0019, 0020+ remain unapplied

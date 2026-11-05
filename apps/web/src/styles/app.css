@@ -284,6 +284,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0; /* a wide table scrolls inside its wrapper instead of widening the page */
   width: 100%;
 }
 .content {
@@ -631,6 +632,8 @@
 
 /* Role administration (/access): plain data tables and the inline action panel. */
 .data-table {
+  /* Contains the absolutely positioned .sr-only header labels, so an overflow-x wrapper clips them too. */
+  position: relative;
   width: 100%;
   border-collapse: collapse;
   margin: var(--space-3) 0;

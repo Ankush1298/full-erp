@@ -22,6 +22,10 @@ const DEPT = 'src/modules/organization/department.service.ts';
 const ACADEMIC = 'src/modules/academics/academic.service.ts';
 // Milestone 3: reads the ACTIVE enrolment (scope + cohort) before creating a term enrolment; never writes it.
 const TERM_ENROLLMENT = 'src/modules/students/term-enrollment.service.ts';
+// Course registrations read the enrolment's frozen programme scope (doc 33 §3); read-only, pinned below.
+const REGISTRATION = 'src/modules/academics/registration.service.ts';
+/** read-only timeline (doc 34) */
+const TIMELINE = 'src/modules/students/student-timeline.service.ts';
 const text = (path: string): string => files.find((f) => f.path === path)!.text;
 
 /** The body of `static async <name>(` up to the next `static async` (or the end of the class). */
@@ -44,14 +48,23 @@ describe('only StudentProgramService writes app.student_programs and app.student
   const WRITE =
     /\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE(\s+TABLE)?)\s+app\.student_program(s|_events)\b/i;
 
-  it('no other source file names the tables except the two deactivation guards and the two directory readers (lookup and paginated list), which only read', () => {
+  it('no other source file names the tables except the two deactivation guards, the two directory readers (lookup and paginated list), the registration and timeline readers, which only read', () => {
     const naming = files.filter((f) => TABLE.test(f.text)).map((f) => f.path);
     expect(naming.sort()).toEqual(
-      [ACADEMIC, DEPT, DIRECTORY, DIRECTORY_LIST, SERVICE, TERM_ENROLLMENT].sort(),
+      [
+        ACADEMIC,
+        DEPT,
+        DIRECTORY,
+        DIRECTORY_LIST,
+        REGISTRATION,
+        SERVICE,
+        TERM_ENROLLMENT,
+        TIMELINE,
+      ].sort(),
     );
     const writers = files.filter((f) => WRITE.test(f.text)).map((f) => f.path);
     expect(writers).toEqual([SERVICE]);
-    for (const guard of [DEPT, ACADEMIC, DIRECTORY, DIRECTORY_LIST]) {
+    for (const guard of [DEPT, ACADEMIC, DIRECTORY, DIRECTORY_LIST, REGISTRATION, TIMELINE]) {
       expect(text(guard)).not.toMatch(/(INSERT|UPDATE|DELETE|TRUNCATE)[^;`]{0,40}student_program/i);
     }
   });

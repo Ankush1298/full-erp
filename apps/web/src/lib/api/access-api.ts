@@ -78,16 +78,16 @@ export async function fetchAccessUsers(
   afterId?: string,
 ): Promise<{ users: AccessUser[]; nextAfterId: string | null }> {
   const query = `?limit=${USERS_PAGE_SIZE}${afterId ? `&afterId=${encodeURIComponent(afterId)}` : ''}`;
-  const res = await client.get(`/users${query}`, { schema: ListUsersResponseSchema });
+  const res = await client.get(`/v1/users${query}`, { schema: ListUsersResponseSchema });
   return { users: res.data, nextAfterId: res.page.nextAfterId };
 }
 
 export async function fetchAccessRoles(client: ApiClient): Promise<AccessRole[]> {
-  return (await client.get('/roles', { schema: ListRolesResponseSchema })).data;
+  return (await client.get('/v1/roles', { schema: ListRolesResponseSchema })).data;
 }
 
 export async function fetchAssignments(client: ApiClient, userId: string): Promise<Assignment[]> {
-  const path = `/users/${encodeURIComponent(userId)}/role-assignments`;
+  const path = `/v1/users/${encodeURIComponent(userId)}/role-assignments`;
   return (await client.get(path, { schema: ListAssignmentsResponseSchema })).data;
 }
 
@@ -104,7 +104,7 @@ export async function grantRole(
   userId: string,
   input: GrantInput,
 ): Promise<string> {
-  const res = await client.post(`/users/${encodeURIComponent(userId)}/role-assignments`, {
+  const res = await client.post(`/v1/users/${encodeURIComponent(userId)}/role-assignments`, {
     body: input,
     schema: GrantResponseSchema,
   });
@@ -116,7 +116,7 @@ export async function revokeAssignment(
   assignmentId: string,
   reason: string,
 ): Promise<void> {
-  await client.post(`/role-assignments/${encodeURIComponent(assignmentId)}/revoke`, {
+  await client.post(`/v1/role-assignments/${encodeURIComponent(assignmentId)}/revoke`, {
     body: { reason },
     schema: SuccessSchema,
   });
@@ -128,7 +128,7 @@ export async function changeExpiry(
   assignment: Pick<Assignment, 'id' | 'version'>,
   input: { validUntil: string | null; reason: string },
 ): Promise<void> {
-  await client.patch(`/role-assignments/${encodeURIComponent(assignment.id)}`, {
+  await client.patch(`/v1/role-assignments/${encodeURIComponent(assignment.id)}`, {
     body: input,
     headers: { 'If-Match': `"${assignment.version}"` },
     schema: ExpiryResponseSchema,

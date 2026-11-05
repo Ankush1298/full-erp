@@ -141,6 +141,8 @@ export class SettingsService {
       // Never echoes the submitted value.
       throw invalid(`The value does not satisfy the schema of setting "${key}".`);
     }
+    const rule = definition.validate?.(value);
+    if (rule) throw invalid(rule);
     if (Buffer.byteLength(JSON.stringify(value)) > SETTING_VALUE_MAX_BYTES) {
       throw invalid(`The value of setting "${key}" is too large.`);
     }

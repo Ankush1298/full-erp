@@ -12,8 +12,12 @@ import { Value } from '@sinclair/typebox/value';
  *  A default is registered only where the document gives one (`identity.age_of_majority` = 18); a key without a
  *  default has no value until an administrator sets one, and consumers must handle that.
  *
+ * `terminology` (02 §4.2 "{cohort:"Batch", section:"Section", ...} display labels only") is registered by Milestone 3
+ * Batch 3 (doc 33 §6) with a CLOSED set of label slots and no registry default; the display fallbacks (11 R-9 "Batch /
+ * Section / Semester") are applied by `GET /academics/terminology`, never stored.
+ *
  * NOT REGISTERED (deliberately; the architecture does not yet give a complete schema or default, and this file must
- * not invent them): `terminology`, `academic.degree_levels`, `identity.admission_number`, `privacy.student_fields`,
+ * not invent them): `academic.degree_levels`, `identity.admission_number`, `privacy.student_fields`,
  * `security.password_policy` / session lifetimes, `retention.*`, `attendance.default_policy_id`, and
  * `identity.unknown_dob_policy` (referenced in 02 §4.4 but absent from the §4.2 key list). Each is added by the
  * slice that owns its meaning, together with a schema, a default decision and tests.
@@ -28,6 +32,70 @@ export interface SettingDefinition {
   readonly schema: TSchema;
   /** Applies while no row exists. Absent = no value until one is set. */
   readonly default?: unknown;
+  /**
+   * Rules the schema cannot state (e.g. no two labels alike). Runs after the schema check; returns a message naming the
+   * offending slots (never the submitted value), or null when the value is acceptable.
+   */
+  readonly validate?: (value: unknown) => string | null;
+}
+
+/** The label slots of the `terminology` setting (doc 33 §6). */
+export const TERMINOLOGY_SLOTS = [
+  'program',
+  'cohort',
+  'period',
+  'section',
+  'term',
+  'course',
+] as const;
+
+/** Display fallbacks while a slot is unset: doc 11 R-9 ("Batch / Section / Semester"); the rest are the model's names. */
+export const TERMINOLOGY_DEFAULTS: Record<(typeof TERMINOLOGY_SLOTS)[number], string> = {
+  program: 'Programme',
+  cohort: 'Batch',
+  period: 'Semester',
+  section: 'Section',
+  term: 'Term',
+  course: 'Course',
+};
+
+/**
+ * A display label: 1..40 characters, no leading or trailing whitespace, no control characters and no angle brackets
+ * (labels are rendered as text everywhere, the brackets are refused only to keep them plainly readable in exports).
+ */
+const LABEL = Type.String({
+  minLength: 1,
+  maxLength: 40,
+  pattern: '^[^\\s<>\\x00-\\x1f\\x7f](?:[^<>\\x00-\\x1f\\x7f]*[^\\s<>\\x00-\\x1f\\x7f])?$',
+});
+
+/**
+ * Task 8: no two slots may show the same label (two tabs called "Class" would be ambiguous), counting the fallbacks of
+ * unset slots; and a per-period-type `periodTypes` label must not reuse a non-period slot's label (a "Year" period may
+ * not read "Term"). Case and inner spacing are ignored when comparing.
+ */
+function validateTerminology(value: unknown): string | null {
+  const v = value as Partial<Record<(typeof TERMINOLOGY_SLOTS)[number], string>> & {
+    periodTypes?: Record<string, string>;
+  };
+  const norm = (x: string) => x.trim().replace(/\s+/g, ' ').toLowerCase();
+  const effective = TERMINOLOGY_SLOTS.map(
+    (k) => [k, norm(v[k] ?? TERMINOLOGY_DEFAULTS[k])] as const,
+  );
+  for (let i = 0; i < effective.length; i += 1) {
+    for (let j = i + 1; j < effective.length; j += 1) {
+      if (effective[i]![1] === effective[j]![1]) {
+        return `The labels of "${effective[i]![0]}" and "${effective[j]![0]}" must differ.`;
+      }
+    }
+  }
+  const others = new Map(effective.filter(([k]) => k !== 'period').map(([k, l]) => [l, k]));
+  for (const [code, label] of Object.entries(v.periodTypes ?? {})) {
+    const clash = others.get(norm(label));
+    if (clash)
+      return `The label of period type "${code}" must differ from the label of "${clash}".`;
+  }
+  return null;
 }
 
 /** `module.name` style: lower-case segments of letters/digits/underscore separated by dots (02 §4.2 key names). */
@@ -66,6 +134,26 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
       Type.Literal('ALWAYS_WHEN_LINKED'),
       Type.Literal('NEVER'),
     ]),
+  },
+  {
+    // 02 §4.2: display labels only. Closed label slots (doc 33 §6), each a LABEL; at least one key. Changing a label
+    // never touches academic data: period_types.label still names each period type. Task 8 (doc 35 §4): optional
+    // `periodTypes` = { <period type code>: label } overrides the period label for programmes of that period type, so
+    // a college can show "Year" for its annual and "Semester" for its semester programmes.
+    key: 'terminology',
+    schema: Type.Object(
+      {
+        ...Object.fromEntries(TERMINOLOGY_SLOTS.map((k) => [k, Type.Optional(LABEL)])),
+        periodTypes: Type.Optional(
+          Type.Record(Type.String({ pattern: '^[^\\x00-\\x1f\\x7f]{1,30}$' }), LABEL, {
+            additionalProperties: false,
+            maxProperties: 50,
+          }),
+        ),
+      },
+      { additionalProperties: false, minProperties: 1 },
+    ),
+    validate: validateTerminology,
   },
 ];
 

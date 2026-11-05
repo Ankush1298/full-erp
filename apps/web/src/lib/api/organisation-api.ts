@@ -37,7 +37,7 @@ export const ListDepartmentsResponseSchema = z.object({
 
 export function fetchCampuses(client: ApiClient): Promise<CampusItem[]> {
   return client
-    .get('/organization/campuses', {
+    .get('/v1/organization/campuses', {
       schema: ListCampusesResponseSchema,
     })
     .then((res) => res.data);
@@ -45,7 +45,7 @@ export function fetchCampuses(client: ApiClient): Promise<CampusItem[]> {
 
 export function fetchDepartments(client: ApiClient): Promise<DepartmentItem[]> {
   return client
-    .get('/organization/departments', {
+    .get('/v1/organization/departments', {
       schema: ListDepartmentsResponseSchema,
     })
     .then((res) => res.data);
@@ -85,7 +85,7 @@ export interface CreateRoomInput {
 
 export function fetchRooms(client: ApiClient, campusId: string): Promise<RoomItem[]> {
   return client
-    .get(`/organization/campuses/${campusId}/rooms`, {
+    .get(`/v1/organization/campuses/${campusId}/rooms`, {
       schema: ListRoomsResponseSchema,
     })
     .then((res) => res.data);
@@ -97,9 +97,82 @@ export function createRoom(
   input: CreateRoomInput,
 ): Promise<string> {
   return client
-    .post(`/organization/campuses/${encodeURIComponent(campusId)}/rooms`, {
+    .post(`/v1/organization/campuses/${encodeURIComponent(campusId)}/rooms`, {
       schema: CreateRoomResponseSchema,
       body: input,
     })
     .then((res) => res.data.id);
 }
+
+// ---- organization settings (GET /organization/settings, PUT /organization/settings/:key) ------------------------
+const SettingSchema = z.object({
+  key: z.string(),
+  value: z.unknown(),
+  isDefault: z.boolean(),
+  version: z.number().nullable(),
+  updatedAt: z.string().nullable(),
+});
+export type SettingRecord = z.infer<typeof SettingSchema>;
+export const fetchSettings = (c: ApiClient) =>
+  c
+    .get('/v1/organization/settings', {
+      schema: z.object({ success: z.boolean(), data: z.array(SettingSchema) }),
+    })
+    .then((r) => r.data);
+/** CRITICAL (org.settings.manage): reason required, If-Match = the stored version, "0" while none is stored. */
+export const putSetting = (
+  c: ApiClient,
+  key: string,
+  value: unknown,
+  reason: string,
+  version: number | null,
+) =>
+  c.put(`/v1/organization/settings/${encodeURIComponent(key)}`, {
+    schema: z.object({ success: z.boolean(), data: SettingSchema }),
+    body: { value, reason },
+    headers: { 'If-Match': `"${version ?? 0}"` },
+  });
+
+// ---- setup wizard (Task 8): existing create endpoints ------------------------------------------------------------
+const CreatedId = z.object({ success: z.boolean(), data: z.object({ id: z.string() }) });
+export const createCampus = (
+  c: ApiClient,
+  body: { name: string; code: string; timezone: string },
+) => c.post('/v1/organization/campuses', { schema: CreatedId, body });
+export const createDepartment = (
+  c: ApiClient,
+  body: { campusId: string; name: string; code: string },
+) => c.post('/v1/organization/departments', { schema: CreatedId, body });
+export const EmployeeSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  employeeCode: z.string(),
+  employeeType: z.string(),
+  status: z.string(),
+});
+export type Employee = z.infer<typeof EmployeeSchema>;
+export const fetchEmployees = (c: ApiClient) =>
+  c
+    .get('/v1/faculty/employees', {
+      schema: z.object({ success: z.boolean(), data: z.array(EmployeeSchema) }),
+    })
+    .then((r) => r.data);
+export const createEmployee = (
+  c: ApiClient,
+  body: {
+    userId: string;
+    employeeCode: string;
+    employeeType: string;
+    joiningDate: string;
+    reason: string;
+  },
+) => c.post('/v1/faculty/employees', { schema: CreatedId, body });
+export const createPosting = (
+  c: ApiClient,
+  employeeId: string,
+  body: { departmentId: string; validFrom: string; isPrimary: boolean; reason: string },
+) =>
+  c.post(`/v1/faculty/employees/${encodeURIComponent(employeeId)}/postings`, {
+    schema: CreatedId,
+    body,
+  });

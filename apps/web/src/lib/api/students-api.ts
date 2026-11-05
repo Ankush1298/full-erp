@@ -88,7 +88,7 @@ export async function fetchStudentDirectory(
   const params = new URLSearchParams({ limit: String(DIRECTORY_PAGE_SIZE) });
   if (query.status) params.set('status', query.status);
   if (query.cursor) params.set('cursor', query.cursor);
-  const res = await client.get(`/students/directory?${params.toString()}`, {
+  const res = await client.get(`/v1/students/directory?${params.toString()}`, {
     schema: DirectoryPageSchema,
   });
   return { entries: res.data, nextCursor: res.page.nextCursor };
@@ -100,13 +100,13 @@ export async function lookupStudent(
   admissionNumber: string,
 ): Promise<StudentDirectoryEntry> {
   const params = new URLSearchParams({ admissionNumber });
-  const res = await client.get(`/students?${params.toString()}`, { schema: LookupSchema });
+  const res = await client.get(`/v1/students?${params.toString()}`, { schema: LookupSchema });
   return res.data;
 }
 
 /** GET /students/:id (permission student.profile.read). Missing, other-tenant and out-of-scope records are one 404. */
 export async function fetchStudent(client: ApiClient, id: string): Promise<StudentRecord> {
-  const res = await client.get(`/students/${encodeURIComponent(id)}`, { schema: RecordSchema });
+  const res = await client.get(`/v1/students/${encodeURIComponent(id)}`, { schema: RecordSchema });
   return res.data;
 }
 
@@ -115,8 +115,132 @@ export async function fetchStudentIdentifiers(
   client: ApiClient,
   id: string,
 ): Promise<StudentIdentifier[]> {
-  const res = await client.get(`/students/${encodeURIComponent(id)}/identifiers`, {
+  const res = await client.get(`/v1/students/${encodeURIComponent(id)}/identifiers`, {
     schema: IdentifiersSchema,
+  });
+  return res.data;
+}
+
+// ---- GET /v1/students/:id/timeline (doc 34): read-only timeline and as-of-date position.
+export const TIMELINE_EVENT_TYPES = [
+  'ADMISSION',
+  'STUDENT_STATUS_CHANGED',
+  'PROGRAMME_STARTED',
+  'PROGRAMME_ENDED',
+  'TERM_ENROLLED',
+  'REPEAT_ENROLLED',
+  'SECTION_PLACED',
+  'SECTION_TRANSFERRED',
+  'COURSE_REGISTERED',
+  'COURSE_REREGISTERED',
+  'COURSE_DROPPED',
+  'COURSE_WITHDRAWN',
+  'COURSE_COMPLETED',
+  'COURSE_REJECTED',
+  'PROMOTED',
+  'DETAINED',
+  'TERM_COMPLETED',
+  'TERM_WITHDRAWN',
+  'TERM_ON_LEAVE',
+] as const;
+export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];
+
+const Ref = z.object({ id: z.string(), code: z.string(), name: z.string() });
+export const TimelineEventSchema = z.object({
+  id: z.string(),
+  sourceId: z.string(),
+  eventType: z.enum(TIMELINE_EVENT_TYPES),
+  eventDate: z.string().nullable(),
+  temporal: z.enum(['CURRENT', 'HISTORICAL', 'UNDATED']),
+  description: z.string(),
+  programme: Ref.nullable(),
+  cohortName: z.string().nullable(),
+  term: Ref.nullable(),
+  periodNo: z.number().int().nullable(),
+  periodLabel: z.string().nullable(),
+  section: z.object({ id: z.string(), name: z.string() }).nullable(),
+  course: z
+    .object({ offeringId: z.string(), code: z.string(), title: z.string(), credits: z.string() })
+    .nullable(),
+  status: z.string().nullable(),
+});
+export type TimelineEvent = z.infer<typeof TimelineEventSchema>;
+
+const PositionTermSchema = z.object({
+  termEnrollmentId: z.string(),
+  term: Ref.extend({ startDate: z.string(), endDate: z.string() }),
+  periodNo: z.number().int(),
+  periodLabel: z.string(),
+  enrollmentType: z.string(),
+  recordedStatus: z.string(),
+  rollNumber: z.string().nullable(),
+  section: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      validFrom: z.string(),
+      validTo: z.string().nullable(),
+    })
+    .nullable(),
+  registrations: z.array(
+    z.object({
+      registrationId: z.string(),
+      offeringId: z.string(),
+      code: z.string(),
+      title: z.string(),
+      credits: z.string(),
+      registrationKind: z.string(),
+      source: z.string(),
+      validFrom: z.string(),
+      validTo: z.string().nullable(),
+      recordedStatus: z.string(),
+      statusOnDate: z.enum(['REGISTERED', 'PENDING_APPROVAL']),
+    }),
+  ),
+});
+export type TimelinePositionTerm = z.infer<typeof PositionTermSchema>;
+
+export const StudentTimelineSchema = z.object({
+  studentId: z.string(),
+  asOfDate: z.string(),
+  today: z.string(),
+  timezone: z.string(),
+  position: z.object({
+    admitted: z.boolean().nullable(),
+    studentStatus: z.enum(STUDENT_STATUSES).nullable(),
+    programme: z
+      .object({
+        studentProgramId: z.string(),
+        id: z.string(),
+        name: z.string(),
+        code: z.string(),
+        cohortId: z.string(),
+        cohortName: z.string(),
+        entryType: z.string(),
+        startDate: z.string(),
+        endDate: z.string().nullable(),
+      })
+      .nullable(),
+    terms: z.array(PositionTermSchema),
+  }),
+  events: z.array(TimelineEventSchema),
+  undatedOutcomes: z.array(TimelineEventSchema),
+  futureEventsExcluded: z.number().int(),
+  limitations: z.array(z.object({ code: z.string(), message: z.string() })),
+});
+export type StudentTimeline = z.infer<typeof StudentTimelineSchema>;
+
+const TimelineResponseSchema = z.object({ success: z.literal(true), data: StudentTimelineSchema });
+
+/** GET /v1/students/:id/timeline (student.profile.read; same 404 as the profile). `asOf` omitted = today. */
+export async function fetchStudentTimeline(
+  client: ApiClient,
+  studentId: string,
+  asOf?: string,
+): Promise<StudentTimeline> {
+  const query = asOf ? `?asOf=${encodeURIComponent(asOf)}` : '';
+  const res = await client.get(`/v1/students/${encodeURIComponent(studentId)}/timeline${query}`, {
+    schema: TimelineResponseSchema,
   });
   return res.data;
 }

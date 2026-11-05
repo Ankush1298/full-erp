@@ -57,12 +57,14 @@ export async function fetchUsers(
   params.set('limit', String(filter?.limit ?? USERS_PAGE_SIZE));
   if (filter?.status) params.set('status', filter.status);
   if (filter?.afterId) params.set('afterId', filter.afterId);
-  const res = await client.get(`/users?${params.toString()}`, { schema: ListUsersResponseSchema });
+  const res = await client.get(`/v1/users?${params.toString()}`, {
+    schema: ListUsersResponseSchema,
+  });
   return { users: res.data, nextAfterId: res.page.nextAfterId };
 }
 
 export async function fetchUser(client: ApiClient, userId: string): Promise<User> {
-  const res = await client.get(`/users/${encodeURIComponent(userId)}`, {
+  const res = await client.get(`/v1/users/${encodeURIComponent(userId)}`, {
     schema: GetUserResponseSchema,
   });
   return res.data;
@@ -78,7 +80,7 @@ export async function inviteUser(
   client: ApiClient,
   input: InviteUserInput,
 ): Promise<InviteUserResult> {
-  const res = await client.post('/users/invite', {
+  const res = await client.post('/v1/users/invite', {
     body: input,
     schema: InviteUserResponseSchema,
   });
@@ -94,7 +96,7 @@ export async function suspendUser(
   user: Pick<User, 'id' | 'version'>,
   input: UserStatusChangeInput,
 ): Promise<User> {
-  const res = await client.post(`/users/${encodeURIComponent(user.id)}/suspend`, {
+  const res = await client.post(`/v1/users/${encodeURIComponent(user.id)}/suspend`, {
     body: input,
     headers: { 'If-Match': `"${user.version}"` },
     schema: GetUserResponseSchema,
@@ -107,7 +109,7 @@ export async function reactivateUser(
   user: Pick<User, 'id' | 'version'>,
   input: UserStatusChangeInput,
 ): Promise<User> {
-  const res = await client.post(`/users/${encodeURIComponent(user.id)}/reactivate`, {
+  const res = await client.post(`/v1/users/${encodeURIComponent(user.id)}/reactivate`, {
     body: input,
     headers: { 'If-Match': `"${user.version}"` },
     schema: GetUserResponseSchema,

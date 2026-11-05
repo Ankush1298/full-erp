@@ -4,6 +4,13 @@ import { AppError } from '../../shared/errors/http-errors.js';
 import type { AuditRequestMeta } from '../../shared/audit/index.js';
 import { PeriodTypeService, ProgramService, CohortService } from './academic.service.js';
 import { registerCalendarRoutes } from './calendar.routes.js';
+import { registerOfferingRoutes } from './offering.routes.js';
+import { registerClassTeacherRoutes } from './class-teacher.routes.js';
+import { registerRegistrationRoutes } from './registration.routes.js';
+import { registerHolidayRoutes } from './holiday.routes.js';
+import { registerSetupRoutes } from './setup.routes.js';
+import { registerFacultyStudentResolver } from './assigned-resolver.js';
+import { registerPromotionToolRoute } from '../students/term-enrollment.routes.js';
 import {
   CreatePeriodTypeBodySchema,
   type CreatePeriodTypeBody,
@@ -191,4 +198,11 @@ export const registerAcademicsRoutes: FastifyPluginAsync<{ db: Database }> = asy
 
   // Milestone 3 Batch 1: academic years, terms, cohort periods, sections, courses, curriculum.
   registerCalendarRoutes(app, opts.db);
+  registerOfferingRoutes(app, opts.db);
+  registerClassTeacherRoutes(app, opts.db);
+  registerRegistrationRoutes(app, opts.db);
+  registerHolidayRoutes(app, opts.db);
+  registerSetupRoutes(app, opts.db);
+  registerPromotionToolRoute(app, opts.db);
+  registerFacultyStudentResolver();
 };

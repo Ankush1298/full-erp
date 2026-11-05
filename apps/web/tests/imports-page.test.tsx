@@ -107,7 +107,7 @@ describe('Imports page: validate, preview, commit', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('form', { name: 'Commit import' })).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: /Download the error report/ });
-    expect(link).toHaveAttribute('href', '/api/students/imports/job-1/error-report');
+    expect(link).toHaveAttribute('href', '/api/v1/students/imports/job-1/error-report');
     expect(link).toHaveAttribute('download');
   });
 

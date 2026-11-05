@@ -152,6 +152,16 @@ export async function createIsolatedTenant(passwordHash: string): Promise<Isolat
           'app.student_guardians',
           'app.guardians',
           'app.students',
+          // registrations reference enrolments, offerings and elective groups (RESTRICT); holidays nothing
+          'app.course_registrations',
+          'app.holidays',
+          // slots reference assignments, assignments reference offerings and employees (all RESTRICT)
+          'app.timetable_slots',
+          'app.faculty_assignments',
+          'app.course_offerings',
+          'app.elective_groups',
+          // class teachers reference sections and employees (RESTRICT)
+          'app.section_class_teachers',
           // postings reference employees (RESTRICT)
           'app.employee_postings',
           'app.employees',

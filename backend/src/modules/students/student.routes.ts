@@ -8,6 +8,7 @@ import { StudentService } from './student.service.js';
 import { StudentProgramService } from './student-program.service.js';
 import { StudentDirectoryService } from './student-directory.service.js';
 import { StudentStatusService } from './student-status.service.js';
+import { StudentTimelineService } from './student-timeline.service.js';
 import {
   CreateStudentBodySchema,
   type CreateStudentBody,
@@ -28,6 +29,9 @@ import {
   CloseStudentProgramResponseSchema,
   ChangeStudentStatusBodySchema,
   type ChangeStudentStatusBody,
+  TimelineQuerySchema,
+  type TimelineQuery,
+  StudentTimelineResponseSchema,
 } from './student.schemas.js';
 
 function extractAuditMeta(req: FastifyRequest): AuditRequestMeta {
@@ -99,6 +103,26 @@ export const registerStudentRoutes: FastifyPluginAsync<{ db: Database }> = async
         StudentService.getById(tx, ctx, req.params.id),
       );
       reply.header('ETag', `"${data.version}"`);
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  app.get<{ Params: StudentIdParam; Querystring: TimelineQuery }>(
+    '/:id/timeline',
+    {
+      config: { permission: 'student.profile.read' },
+      schema: {
+        params: StudentIdParamSchema,
+        querystring: TimelineQuerySchema,
+        response: { 200: StudentTimelineResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        StudentTimelineService.getTimeline(tx, ctx, req.params.id, req.query.asOf),
+      );
       return reply.status(200).send({ success: true, data });
     },
   );

@@ -6,6 +6,17 @@ export const CSRF_HEADER = 'x-csrf-token';
 const REQUEST_TIMEOUT_MS = 15_000;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+/**
+ * The web-to-backend path contract (docs/deployment/frontend.md). Under the API base path (`/api` by default):
+ *  - `/v1/...`      the versioned API; the proxy forwards `/api/v1/...` UNCHANGED to the backend's `/api/v1/...`;
+ *  - `/auth/...`    and `/me/mfa...`: the backend's unversioned session and MFA routes; the proxy removes `/api`.
+ * Anything else would reach no backend route (or lose its `/v1`), so it is refused here before any request is sent.
+ */
+const API_PATH = /^\/(?:v1\/(?!auth\/|me\/mfa(?:[/?]|$))|auth\/|me\/mfa(?:[/?]|$))/;
+export function isApiPath(path: string): boolean {
+  return API_PATH.test(path) && !path.includes('//');
+}
+
 export interface RequestOptions<S extends z.ZodType> {
   schema: S;
   body?: unknown;
@@ -43,6 +54,7 @@ export class ApiClient {
 
   /** Same-origin URL of an API path, for a plain browser download (a GET that the session cookie authorises). */
   url(path: string): string {
+    if (!isApiPath(path)) throw new Error('API path outside the web-to-backend contract');
     return `${this.basePath}${path}`;
   }
   setCsrfToken(value: string): void {
@@ -77,6 +89,9 @@ export class ApiClient {
   patch<S extends z.ZodType>(path: string, o: RequestOptions<S>): Promise<z.infer<S>> {
     return this.request('PATCH', path, o);
   }
+  put<S extends z.ZodType>(path: string, o: RequestOptions<S>): Promise<z.infer<S>> {
+    return this.request('PUT', path, o);
+  }
   delete<S extends z.ZodType>(path: string, o: RequestOptions<S>): Promise<z.infer<S>> {
     return this.request('DELETE', path, o);
   }
@@ -98,9 +113,10 @@ export class ApiClient {
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const signal = o.signal ? AbortSignal.any([o.signal, timeout]) : timeout;
 
+    const url = this.url(path); // outside the try: a contract violation is a programming error, not a network failure
     let response: Response;
     try {
-      response = await this.fetchImpl(`${this.basePath}${path}`, {
+      response = await this.fetchImpl(url, {
         method,
         headers,
         credentials: 'same-origin',

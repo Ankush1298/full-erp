@@ -27,7 +27,11 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
-  await adminQuery('DELETE FROM app.employees');
+  // only this file's fixture tenants: other files keep employees in their own (isolated) tenants, referenced by
+  // RESTRICT foreign keys (postings, faculty assignments), and run concurrently with this one
+  await adminQuery('DELETE FROM app.employees WHERE organization_id = ANY($1::uuid[])', [
+    [ORG_A, ORG_B],
+  ]);
 });
 
 const insert = (org: string, user: string, over: Record<string, string> = {}): string => {

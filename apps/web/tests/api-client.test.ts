@@ -41,7 +41,7 @@ describe('ApiClient: request shape', () => {
   it('sends the CSRF header on every unsafe request once a token is known', async () => {
     const { b, client } = make();
     await fetchMe(client); // delivers the token
-    await client.post('/t/mutate', { body: {}, schema: Any });
+    await client.post('/v1/t/mutate', { body: {}, schema: Any });
     await client.post('/auth/logout', { body: {}, schema: Any, public: true });
     for (const c of b.state.calls.filter((x) => x.method === 'POST')) {
       expect(c.headers['x-csrf-token']).toBe(b.state.csrf);
@@ -52,7 +52,7 @@ describe('ApiClient: request shape', () => {
     const { b, client } = make(createFakeBackend());
     await login(client, { email: 'a@b.edu', password: /* secret-scan:allow */ 'pw-pw-pw-pw' });
     expect(b.callsTo('POST', '/auth/login')[0]!.headers['x-csrf-token']).toBeUndefined();
-    await client.post('/t/mutate', { body: {}, schema: Any });
+    await client.post('/v1/t/mutate', { body: {}, schema: Any });
     expect(b.callsTo('POST', '/t/mutate')[0]!.headers['x-csrf-token']).toBe(b.state.csrf);
   });
 
@@ -62,7 +62,7 @@ describe('ApiClient: request shape', () => {
       await fetchMe(client);
     });
     client.setCsrfToken('stale-token-stale-token-1');
-    await expect(client.post('/t/mutate', { body: {}, schema: Any })).resolves.toEqual({
+    await expect(client.post('/v1/t/mutate', { body: {}, schema: Any })).resolves.toEqual({
       success: true,
     });
     const posts = b.callsTo('POST', '/t/mutate');
@@ -83,21 +83,21 @@ describe('ApiClient: request shape', () => {
       return Promise.resolve();
     }); // refresh does not fix the token
     client.setCsrfToken('stale-token-stale-token-1');
-    expect(await kindOf(client.post('/t/mutate', { body: {}, schema: Any }))).toBe('csrf');
+    expect(await kindOf(client.post('/v1/t/mutate', { body: {}, schema: Any }))).toBe('csrf');
     expect(refreshCount).toBe(1);
     expect(b.callsTo('POST', '/t/mutate')).toHaveLength(2);
   });
 
   it('a missing token is rejected by the server (the client does not invent one)', async () => {
     const { client } = make();
-    expect(await kindOf(client.post('/t/mutate', { body: {}, schema: Any }))).toBe('csrf');
+    expect(await kindOf(client.post('/v1/t/mutate', { body: {}, schema: Any }))).toBe('csrf');
   });
 });
 
 describe('ApiClient: errors', () => {
   it.each([
-    ['/t/missing', 'not_found', 404],
-    ['/t/forbidden', 'forbidden', 403],
+    ['/v1/t/missing', 'not_found', 404],
+    ['/v1/t/forbidden', 'forbidden', 403],
   ])('GET %s -> %s', async (path, kind, status) => {
     const { client } = make();
     const e = (await client.get(path, { schema: Any }).catch((x: unknown) => x)) as ApiError;
@@ -142,7 +142,7 @@ describe('ApiClient: errors', () => {
   it('error objects never carry the server message or response body', async () => {
     const { client } = make(createFakeBackend());
     const e = (await client
-      .get('/t/forbidden', { schema: Any })
+      .get('/v1/t/forbidden', { schema: Any })
       .catch((x: unknown) => x)) as ApiError;
     expect(JSON.stringify(e)).not.toContain('server text');
     expect(e.message).not.toContain('server text');

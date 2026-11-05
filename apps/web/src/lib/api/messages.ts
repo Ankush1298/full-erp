@@ -76,6 +76,9 @@ export function academicsErrorMessage(err: unknown): string {
     case 'network':
       return 'Cannot reach the server. Check your connection and try again.';
     case 'validation':
+      // Task 9: every activation path answers an incomplete term with this one code (doc 35 §3)
+      if (err.code === 'SETUP_INCOMPLETE')
+        return 'This term is not ready to be activated yet. The Setup wizard lists what is still missing.';
       return err.code === 'CONFLICT'
         ? 'That conflicts with an existing record or its current state. Reload and try again.'
         : err.code === 'IDEMPOTENCY_KEY_REUSED' || err.status === 422

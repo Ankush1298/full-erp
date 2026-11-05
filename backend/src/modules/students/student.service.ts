@@ -12,6 +12,7 @@ import {
 } from '../../shared/idempotency/index.js';
 import { invalid, parseDate, parseReason } from '../people/validation.js';
 import { StudentDuplicateService, duplicateWarningError } from './student-duplicate.service.js';
+import { readActiveEnrolment } from './student-program.service.js';
 import {
   ADMISSION_NUMBER_PATTERN,
   type CreateStudentBody,
@@ -309,11 +310,18 @@ export class StudentService {
     );
     const row = res.rows[0];
     if (!row) throw resourceNotFound();
-    // student_id / user_id let a SELF holder prove the record is their own; no campus/department can be supplied.
+    // student_id / user_id let a SELF holder prove the record is their own. A CAMPUS/DEPARTMENT grant is judged against
+    // the student's ACTIVE enrolment (its frozen campus and department, read here, never from the request), the same
+    // placement the directory and the identifier/guardian reads use. No ACTIVE enrolment means no campus or department:
+    // only ORGANIZATION-scoped and SELF holders can then read the record (fail closed, the same 404).
+    const placement = await readActiveEnrolment(tx, ctx.tenantId, row.id);
     await AuthorizationEngine.assert(tx, ctx, 'student.profile.read', {
       organization_id: ctx.tenantId,
       student_id: row.id,
       user_id: row.user_id,
+      ...(placement
+        ? { campus_id: placement.campus_id, department_id: placement.department_id }
+        : {}),
     });
     return toDto(row);
   }

@@ -93,10 +93,10 @@ describe('Students: exactly one source file writes app.students (the audited ser
     }
   });
 
-  it('the student routes expose exactly POST /, GET / (admission-number lookup), GET /:id, the two program-enrolment POSTs and POST /:id/status (no list, PATCH or DELETE route)', () => {
+  it('the student routes expose exactly POST /, GET / (admission-number lookup), GET /:id, GET /:id/timeline (read-only, doc 34), the two program-enrolment POSTs and POST /:id/status (no list, PATCH or DELETE route)', () => {
     const text = readFileSync(join(backend, 'src/modules/students/student.routes.ts'), 'utf8');
     const verbs = [...text.matchAll(/app\.(get|post|put|patch|delete)</g)].map((m) => m[1]);
-    expect(verbs.sort()).toEqual(['get', 'get', 'post', 'post', 'post', 'post']);
+    expect(verbs.sort()).toEqual(['get', 'get', 'get', 'post', 'post', 'post', 'post']);
     const paths = [...text.matchAll(/^\s+'(\/[^']*)',$/gm)].map((m) => m[1]);
     expect(paths.sort()).toEqual([
       '/',
@@ -105,6 +105,7 @@ describe('Students: exactly one source file writes app.students (the audited ser
       '/:id/programs',
       '/:id/programs/:pid/close',
       '/:id/status',
+      '/:id/timeline',
     ]);
     expect(text).toMatch(/permission: 'student\.record\.create'/);
     expect(text).toMatch(/permission: 'student\.profile\.read'/);

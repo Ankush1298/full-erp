@@ -1,4 +1,4 @@
-import { Type, type Static } from '@sinclair/typebox';
+import { Type, type Static, type TSchema } from '@sinclair/typebox';
 
 // Self-contained primitives (the module does not reach into other modules' schemas).
 export const UUID_V7_PATTERN =
@@ -238,3 +238,174 @@ export const ChangeStudentStatusBodySchema = Type.Object(
   { additionalProperties: false },
 );
 export type ChangeStudentStatusBody = Static<typeof ChangeStudentStatusBodySchema>;
+
+// ---- Student academic timeline (doc 34). Read-only, derived from the authoritative rows; see student-timeline.service.ts.
+export const TIMELINE_EVENT_TYPES = [
+  'ADMISSION',
+  'STUDENT_STATUS_CHANGED',
+  'PROGRAMME_STARTED',
+  'PROGRAMME_ENDED',
+  'TERM_ENROLLED',
+  'REPEAT_ENROLLED',
+  'SECTION_PLACED',
+  'SECTION_TRANSFERRED',
+  'COURSE_REGISTERED',
+  'COURSE_REREGISTERED',
+  'COURSE_DROPPED',
+  'COURSE_WITHDRAWN',
+  'COURSE_COMPLETED',
+  'COURSE_REJECTED',
+  // undated outcomes of a term enrolment (no date is recorded for them)
+  'PROMOTED',
+  'DETAINED',
+  'TERM_COMPLETED',
+  'TERM_WITHDRAWN',
+  'TERM_ON_LEAVE',
+] as const;
+export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];
+
+export const TimelineQuerySchema = Type.Object(
+  { asOf: Type.Optional(Type.String({ pattern: DATE_PATTERN })) },
+  { additionalProperties: false },
+);
+export type TimelineQuery = Static<typeof TimelineQuerySchema>;
+
+const closed = { additionalProperties: false } as const;
+const Nullable = <T extends TSchema>(t: T) => Type.Union([t, Type.Null()]);
+const DateStr = Type.String({ pattern: DATE_PATTERN });
+
+export const TimelineEventSchema = Type.Object(
+  {
+    id: Type.String(),
+    sourceId: UuidV7Schema,
+    eventType: Type.Union(TIMELINE_EVENT_TYPES.map((t) => Type.Literal(t))),
+    eventDate: Nullable(DateStr),
+    temporal: Type.Union([
+      Type.Literal('CURRENT'),
+      Type.Literal('HISTORICAL'),
+      Type.Literal('UNDATED'),
+    ]),
+    description: Type.String(),
+    programme: Nullable(
+      Type.Object({ id: UuidV7Schema, name: Type.String(), code: Type.String() }, closed),
+    ),
+    cohortName: Nullable(Type.String()),
+    term: Nullable(
+      Type.Object({ id: UuidV7Schema, code: Type.String(), name: Type.String() }, closed),
+    ),
+    periodNo: Nullable(Type.Integer()),
+    periodLabel: Nullable(Type.String()),
+    section: Nullable(Type.Object({ id: UuidV7Schema, name: Type.String() }, closed)),
+    course: Nullable(
+      Type.Object(
+        {
+          offeringId: UuidV7Schema,
+          code: Type.String(),
+          title: Type.String(),
+          credits: Type.String(),
+        },
+        closed,
+      ),
+    ),
+    status: Nullable(Type.String()),
+  },
+  closed,
+);
+export type TimelineEventDto = Static<typeof TimelineEventSchema>;
+
+const PositionRegistrationSchema = Type.Object(
+  {
+    registrationId: UuidV7Schema,
+    offeringId: UuidV7Schema,
+    code: Type.String(),
+    title: Type.String(),
+    credits: Type.String(),
+    registrationKind: Type.String(),
+    source: Type.String(),
+    validFrom: DateStr,
+    validTo: Nullable(DateStr),
+    recordedStatus: Type.String(),
+    statusOnDate: Type.Union([Type.Literal('REGISTERED'), Type.Literal('PENDING_APPROVAL')]),
+  },
+  closed,
+);
+
+export const TimelinePositionTermSchema = Type.Object(
+  {
+    termEnrollmentId: UuidV7Schema,
+    term: Type.Object(
+      {
+        id: UuidV7Schema,
+        code: Type.String(),
+        name: Type.String(),
+        startDate: DateStr,
+        endDate: DateStr,
+      },
+      closed,
+    ),
+    periodNo: Type.Integer(),
+    periodLabel: Type.String(),
+    enrollmentType: Type.String(),
+    recordedStatus: Type.String(),
+    rollNumber: Nullable(Type.String()),
+    section: Nullable(
+      Type.Object(
+        { id: UuidV7Schema, name: Type.String(), validFrom: DateStr, validTo: Nullable(DateStr) },
+        closed,
+      ),
+    ),
+    registrations: Type.Array(PositionRegistrationSchema),
+  },
+  closed,
+);
+export type TimelinePositionTermDto = Static<typeof TimelinePositionTermSchema>;
+
+export const TimelineLimitationSchema = Type.Object(
+  { code: Type.String(), message: Type.String() },
+  closed,
+);
+export type TimelineLimitationDto = Static<typeof TimelineLimitationSchema>;
+
+export const StudentTimelineSchema = Type.Object(
+  {
+    studentId: UuidV7Schema,
+    asOfDate: DateStr,
+    today: DateStr,
+    timezone: Type.String(),
+    position: Type.Object(
+      {
+        admitted: Nullable(Type.Boolean()),
+        studentStatus: Nullable(StudentStatusSchema),
+        programme: Nullable(
+          Type.Object(
+            {
+              studentProgramId: UuidV7Schema,
+              id: UuidV7Schema,
+              name: Type.String(),
+              code: Type.String(),
+              cohortId: UuidV7Schema,
+              cohortName: Type.String(),
+              entryType: Type.String(),
+              startDate: DateStr,
+              endDate: Nullable(DateStr),
+            },
+            closed,
+          ),
+        ),
+        terms: Type.Array(TimelinePositionTermSchema),
+      },
+      closed,
+    ),
+    events: Type.Array(TimelineEventSchema),
+    undatedOutcomes: Type.Array(TimelineEventSchema),
+    futureEventsExcluded: Type.Integer({ minimum: 0 }),
+    limitations: Type.Array(TimelineLimitationSchema),
+  },
+  closed,
+);
+export type StudentTimelineDto = Static<typeof StudentTimelineSchema>;
+
+export const StudentTimelineResponseSchema = Type.Object(
+  { success: Type.Literal(true), data: StudentTimelineSchema },
+  closed,
+);

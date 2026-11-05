@@ -63,7 +63,7 @@ export function fetchNotifications(
   query.set('limit', String(limit));
   const queryString = query.toString() ? `?${query.toString()}` : '';
 
-  return client.get(`/notifications${queryString}`, {
+  return client.get(`/v1/notifications${queryString}`, {
     schema: ListNotificationsResponseSchema,
   });
 }
@@ -72,7 +72,7 @@ export function markNotificationRead(
   client: ApiClient,
   notificationId: string,
 ): Promise<z.infer<typeof NotificationDtoSchema>> {
-  return client.post(`/notifications/${encodeURIComponent(notificationId)}/read`, {
+  return client.post(`/v1/notifications/${encodeURIComponent(notificationId)}/read`, {
     schema: NotificationDtoSchema,
   });
 }
@@ -80,13 +80,13 @@ export function markNotificationRead(
 export function markAllNotificationsRead(
   client: ApiClient,
 ): Promise<z.infer<typeof MarkAllReadResponseSchema>> {
-  return client.post('/notifications/read-all', {
+  return client.post('/v1/notifications/read-all', {
     schema: MarkAllReadResponseSchema,
   });
 }
 
 export function fetchNotificationPreferences(client: ApiClient): Promise<NotificationPreferences> {
-  return client.get('/notifications/preferences', {
+  return client.get('/v1/notifications/preferences', {
     schema: NotificationPreferencesSchema,
   });
 }

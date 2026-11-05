@@ -46,7 +46,7 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | 21 | `academic.program.manage` | S | – | – | – | – | G | G | G | G |
 | 22 | `academic.cohort.manage` | S | – | – | – | – | G | G | G | G |
 | **Students** |
-| 23 | `student.profile.read` | S | S | A¹ | – | G | G | G | G | G |
+| 23 | `student.profile.read` | S | S | A | – | G | G | G | G | G |
 | 24 | `student.profile.read_sensitive` (guardian contacts, DOB, address, IDs) | S | S | – | – | – | G | G | G | G |
 | 25 | `student.directory.search` | S | – | – | – | G | G | G | G | G |
 | 25a | `student.directory.list` | S | – | – | – | G | G | G | G | G |
@@ -81,15 +81,18 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | 48 | `assistant.use` | N | S | S | – | – | – | – | – | – |
 | 49 | `assistant.conversation.read` (own) | N | S | S | – | – | – | – | – | – |
 | **Academic calendar & enrollment (Milestone 3, Batch 1)** |
-| 50 | `academic.term.manage` (academic years - organization scope - and campus terms, cohort periods are under `academic.cohort.manage`) | S | – | – | – | – | – | G | G | G |
+| 50 | `academic.term.manage` (academic years - organization scope - and campus terms, cohort periods are under `academic.cohort.manage`; holidays (doc 33: a campus row by campus scope, an organization-wide row and the setup checklist by organization scope)) | S | – | – | – | – | – | G | G | G |
 | 51 | `academic.course.manage` (courses and curriculum entries) | S | – | – | – | – | G | G | G | G |
 | 52 | `academic.section.manage` (sections) | S | – | – | – | – | G | G | G | G |
-| 53 | `enrollment.term.read` (term enrolments and section memberships) | S | S | – | – | G | G | G | G | G |
-| 54 | `enrollment.term.manage` (create / change term enrolments, place students in sections) | S | – | – | – | – | G | G | G | G |
+| 53 | `enrollment.term.read` (term enrolments, section memberships and course registrations) | S | S | – | – | G | G | G | G | G |
+| 54 | `enrollment.term.manage` (create / change term enrolments, place students in sections, promotion / repetition decisions (doc 32) and the cohort promotion tool, course registrations (doc 33)) | S | – | – | – | – | G | G | G | G |
 | **Imports (Milestone 2, Batch 2)** |
 | 55 | `import.job.manage` (create, validate, preview, commit and download the error report of the caller's own student and faculty import jobs; a commit additionally requires `student.record.create` / `employee.record.create` at organization scope) | S | – | – | – | – | – | – | G | G |
+| **Course offerings & scheduling (Milestone 3, Batch 2; doc 31)** |
+| 56 | `academic.offering.manage` (course offerings - create, publish, close, cancel - their timetable slots, and elective groups of a cohort period (doc 33), by the derived department) | S | – | – | – | – | G | G | G | G |
+| 57 | `academic.faculty.assign` (assign and end teachers on an offering, and class teachers of a section (doc 32); A2, every change audited at tier 2 with a reason) | S | – | – | – | – | G | G | G | G |
 
-¹ FACULTY `student.profile.read` is `A` (assigned) but the resolver needs course registrations (M3); in M1 the permission is **not seeded for FACULTY**, only the resolver contract is tested with a stub.
+¹ FACULTY `student.profile.read` is `A` (assigned). In M1 it was not seeded and only the resolver contract was tested with a stub; Milestone 3 Batch 3 (doc 33 §2, X-12) seeds it with the real resolver: an ACTIVE teacher reads a student only while one of the teacher's faculty assignments and the student's course registration on the same PUBLISHED/CLOSED offering are both valid today. Existing tenants need their roles re-seeded (runbook `m3b3-electives-registrations-rollout.md`).
 
 Notes
 - `G` for STUDENT/FACULTY/STAFF on rows 15 and 20 means *organization-wide read of non-sensitive structure* via their implicit ORGANIZATION-scope assignment.

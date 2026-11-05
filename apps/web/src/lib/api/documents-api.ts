@@ -37,7 +37,7 @@ export function fetchStudentDocuments(
   studentId: string,
 ): Promise<DocumentItem[]> {
   return client
-    .get(`/students/${encodeURIComponent(studentId)}/documents`, {
+    .get(`/v1/students/${encodeURIComponent(studentId)}/documents`, {
       schema: ListStudentDocumentsResponseSchema,
     })
     .then((res) => res.data);
@@ -53,7 +53,7 @@ export function initiateUpload(
   },
   idempotencyKey?: string,
 ) {
-  return client.post('/documents/uploads', {
+  return client.post('/v1/documents/uploads', {
     schema: InitiateUploadResponseSchema,
     body,
     ...(idempotencyKey ? { headers: { 'idempotency-key': idempotencyKey } } : {}),

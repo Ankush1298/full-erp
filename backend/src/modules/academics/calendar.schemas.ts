@@ -5,7 +5,7 @@ import { UuidV7Schema } from './academic.schemas.js';
 
 const DATE_PATTERN = '^\\d{4}-\\d{2}-\\d{2}$';
 export const DateSchema = Type.String({ pattern: DATE_PATTERN });
-const ReasonSchema = Type.String({ minLength: 5, maxLength: 500 });
+export const ReasonSchema = Type.String({ minLength: 5, maxLength: 500 });
 const strict = { additionalProperties: false } as const;
 
 export const ACADEMIC_YEAR_STATUSES = ['PLANNED', 'ACTIVE', 'CLOSED'] as const;

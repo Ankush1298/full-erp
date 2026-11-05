@@ -96,6 +96,9 @@ beforeAll(async () => {
     '0034',
     '0035',
     '0036',
+    '0037',
+    '0038',
+    '0039',
   ]);
 }, 180_000);
 
@@ -124,6 +127,9 @@ describe('0019 is gated', () => {
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]); // 0020 (the person-identity backstop) waits behind 0019
     expect(r.blockedBy).toBe('0019');
     expect(await ledger()).not.toContain('0019');
@@ -198,9 +204,12 @@ describe('0019 after an operator-approved backfill', () => {
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]); // 0020 follows 0019 in the same invocation, without its own opt-in
     expect(r.deferred).toEqual([]);
-    expect((await ledger()).slice(-18)).toEqual([
+    expect((await ledger()).slice(-21)).toEqual([
       '0019',
       '0020',
       '0021',
@@ -219,6 +228,9 @@ describe('0019 after an operator-approved backfill', () => {
       '0034',
       '0035',
       '0036',
+      '0037',
+      '0038',
+      '0039',
     ]);
 
     expect(await columns()).toEqual({ admission_date: 'NO', status_changed_at: 'NO' });

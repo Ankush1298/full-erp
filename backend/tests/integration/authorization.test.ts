@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, inject, it } from 'vitest';
 import { AppError } from '../../src/shared/errors/http-errors.js';
 import {
   AuthorizationEngine,
@@ -503,28 +503,9 @@ describe('authorization matrix (real PostgreSQL, real engine)', () => {
 });
 
 describe('ASSIGNED scope (resolver contract, stub relationship)', () => {
-  let facultyRole: string;
-  beforeAll(async () => {
-    // FACULTY student.profile.read is intentionally not in the seeded matrix (doc 10 ¹); the contract is
-    // exercised with an explicit test-only grant, removed afterwards.
-    facultyRole = (
-      await adminQuery<{ id: string }>(
-        `SELECT id FROM app.roles WHERE organization_id = $1 AND code = 'FACULTY'`,
-        [ORG_A],
-      )
-    )[0]!.id;
-    await adminQuery(
-      `INSERT INTO app.role_permissions (organization_id, role_id, permission_code, scope_mode) VALUES ($1, $2, 'student.profile.read', 'ASSIGNED')`,
-      [ORG_A, facultyRole],
-    );
-  });
-  afterAll(async () => {
-    clearAssignedResolvers();
-    await adminQuery(
-      `DELETE FROM app.role_permissions WHERE role_id = $1 AND permission_code = 'student.profile.read'`,
-      [facultyRole],
-    );
-  });
+  // FACULTY student.profile.read (ASSIGNED) is seeded since M3 Batch 3 (doc 10 ¹, doc 33 §2); the M1 contract is still
+  // exercised here with a stub relationship that replaces the real resolver for the duration of each test.
+  afterAll(clearAssignedResolvers);
   afterEach(clearAssignedResolvers);
 
   it('with no resolver registered ASSIGNED denies everything (fail closed)', async () => {

@@ -209,7 +209,7 @@ describe('/students: directory', () => {
   it('the fake backend rejects malformed directory queries like the real schema (contract pin for these tests)', async () => {
     const b = createFakeBackend({ session: true, me: REGISTRAR });
     for (const q of ['limit=0', 'limit=101', 'limit=abc', 'status=BOGUS', 'campusId=x']) {
-      const r = await b.fetch(`/api/students/directory?${q}`);
+      const r = await b.fetch(`/api/v1/students/directory?${q}`);
       expect(r.status, q).toBe(400);
       expect(((await r.json()) as { error: { code: string } }).error.code, q).toBe('BAD_REQUEST');
     }
@@ -323,7 +323,10 @@ describe('/students: permission combinations', () => {
     const { b, view } = setup(me, `/students/${ASHA}`);
     view();
     expect(await screen.findByRole('heading', { name: 'Student ADM-001' })).toBeInTheDocument();
-    expect(gets(b, `/students/${ASHA}/`)).toEqual([]);
+    // only the timeline, which student.profile.read itself authorizes (doc 34)
+    expect(gets(b, `/students/${ASHA}/`).map((c) => c.path)).toEqual([
+      `/students/${ASHA}/timeline`,
+    ]);
     expect(gets(b, '/academics/')).toEqual([]);
   });
 
@@ -495,7 +498,10 @@ describe('/students/:id: profile', () => {
     expect(screen.getByText(/Some sections are not shown/)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Identifiers' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Term enrolments' })).not.toBeInTheDocument();
-    expect(gets(b, `/students/${ASHA}/`)).toEqual([]);
+    // only the timeline, which student.profile.read itself authorizes (doc 34)
+    expect(gets(b, `/students/${ASHA}/`).map((c) => c.path)).toEqual([
+      `/students/${ASHA}/timeline`,
+    ]);
     expect(gets(b, '/academics/')).toEqual([]);
   });
 
