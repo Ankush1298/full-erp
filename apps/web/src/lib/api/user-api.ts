@@ -74,14 +74,28 @@ export interface InviteUserInput {
   email: string;
   displayName: string;
   reason: string;
+  idempotencyKey?: string;
 }
 
 export async function inviteUser(
   client: ApiClient,
   input: InviteUserInput,
 ): Promise<InviteUserResult> {
+  const idempotencyKey =
+    input.idempotencyKey ||
+    (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `invite-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
+
   const res = await client.post('/v1/users/invite', {
-    body: input,
+    body: {
+      email: input.email,
+      displayName: input.displayName,
+      reason: input.reason,
+    },
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
     schema: InviteUserResponseSchema,
   });
   return res.data;

@@ -183,8 +183,8 @@ export class StudentProgramService {
       },
       async () => {
         // 1. student
-        const s = await tx.query<{ status: string; admission_date: string | null }>(
-          `SELECT status, admission_date::text AS admission_date FROM app.students
+        const s = await tx.query<{ status: string; admission_date: string | null; campus_id: string | null }>(
+          `SELECT status, admission_date::text AS admission_date, campus_id FROM app.students
             WHERE organization_id = $1 AND id = $2 FOR NO KEY UPDATE`,
           [ctx.tenantId, student],
         );
@@ -229,6 +229,9 @@ export class StudentProgramService {
         // answer must not reveal the student's status or whether/when they were admitted (same text for both 409s).
         if (!ENROLLABLE_STUDENT_STATUSES.includes(stu.status) || stu.admission_date === null) {
           throw conflict('The student cannot be enrolled in a program.');
+        }
+        if (stu.campus_id !== null && stu.campus_id !== scope.campus_id) {
+          throw conflict('Student admission campus does not match program campus.');
         }
         if (startDate < stu.admission_date) {
           throw invalid('startDate is not acceptable for this student.');

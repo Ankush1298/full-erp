@@ -96,6 +96,24 @@ export class ApiClient {
     return this.request('DELETE', path, o);
   }
 
+  async getBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const sig = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const url = this.url(path);
+    const response = await this.fetchImpl(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+      redirect: 'error',
+      signal: sig,
+    });
+    if (!response.ok) {
+      throw new ApiError('server', response.status);
+    }
+    return response.blob();
+  }
+
   private async request<S extends z.ZodType>(
     method: string,
     path: string,

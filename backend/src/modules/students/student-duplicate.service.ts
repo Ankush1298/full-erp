@@ -111,14 +111,22 @@ export class StudentDuplicateService {
     tx: TenantTx,
     ctx: TrustedContext,
     probes: readonly DuplicateProbe[],
+    scope?: { campusId?: string },
   ): Promise<(string | null)[]> {
     ensureTrusted(ctx);
     AuthorizationEngine.assertStaffActor(ctx);
     await AuthorizationEngine.assert(tx, ctx, 'student.record.create');
     try {
-      await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
-        organization_id: ctx.tenantId,
-      });
+      if (scope?.campusId) {
+        await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+          organization_id: ctx.tenantId,
+          campus_id: scope.campusId,
+        });
+      } else {
+        await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+          organization_id: ctx.tenantId,
+        });
+      }
     } catch (err) {
       if (err instanceof AppError && err.statusCode === 404) {
         throw new AppError(403, 'FORBIDDEN', 'Access denied.');
@@ -149,6 +157,7 @@ export class StudentDuplicateService {
       tx,
       ctx,
       res.rows.map((r) => r.id),
+      scope,
     );
     const candidates = res.rows.map((r) => ({
       id: r.id,

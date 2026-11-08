@@ -77,8 +77,7 @@ describe('permission catalog and role matrix equal docs/architecture/v3/10', () 
   });
 
   it('reserved namespaces are not seeded (doc 10 §3)', () => {
-    for (const p of PERMISSION_CATALOG)
-      expect(p.code).not.toMatch(/^(attendance|exam|result|finance)\./);
+    for (const p of PERMISSION_CATALOG) expect(p.code).not.toMatch(/^(finance)\./);
   });
 
   it('grant rules and role scope types are defined for every role and reference real roles only', () => {

@@ -27,3 +27,10 @@ secrets/
 
 # generated knowledge-graph output (graphify); rebuild with /graphify, not needed by app or CI
 graphify-out/
+
+# local agent / scratch files
+.claude/
+CLAUDE.md
+TASK_PROMPT.md
+PROJECT_CONTEXT.md
+

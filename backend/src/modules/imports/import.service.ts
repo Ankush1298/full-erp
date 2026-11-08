@@ -78,8 +78,38 @@ async function assertOrganizationScope(
   }
 }
 
-async function authorize(tx: TenantTx, ctx: TrustedContext, adapter: ImportAdapter): Promise<void> {
+async function authorize(
+  tx: TenantTx,
+  ctx: TrustedContext,
+  adapter: ImportAdapter,
+  options?: { campusId?: string; forJob?: boolean },
+): Promise<void> {
   AuthorizationEngine.assertStaffActor(ctx);
+  if (options?.campusId) {
+    try {
+      await AuthorizationEngine.assert(tx, ctx, IMPORT_PERMISSION, {
+        organization_id: ctx.tenantId,
+        campus_id: options.campusId,
+      });
+      await AuthorizationEngine.assert(tx, ctx, adapter.createPermission, {
+        organization_id: ctx.tenantId,
+        campus_id: options.campusId,
+      });
+      return;
+    } catch (err) {
+      if (err instanceof AppError && err.statusCode === 404) {
+        throw new AppError(403, 'FORBIDDEN', 'Access denied.');
+      }
+      throw err;
+    }
+  }
+
+  if (options?.forJob && adapter.type === 'STUDENT_RECORDS') {
+    const hasImport = await AuthorizationEngine.hasPermission(tx, ctx, IMPORT_PERMISSION);
+    const hasCreate = await AuthorizationEngine.hasPermission(tx, ctx, adapter.createPermission);
+    if (hasImport && hasCreate) return;
+  }
+
   await assertOrganizationScope(tx, ctx, IMPORT_PERMISSION);
   // The job can only ever create records the actor may create: refusing early beats a job nobody could commit.
   await assertOrganizationScope(tx, ctx, adapter.createPermission);
@@ -104,18 +134,26 @@ function isWellFormed(s: string): boolean {
   return Buffer.from(s, 'utf8').toString('utf8') === s;
 }
 
-function parseRows(input: unknown): RawRow[] {
+function parseRows(input: unknown): { rows: RawRow[]; campusId?: string } {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw invalid('Import payload is required.');
   }
-  if (Object.keys(input).some((k) => k !== 'rows')) {
+  if (Object.keys(input).some((k) => k !== 'rows' && k !== 'campusId')) {
     throw invalid('The payload contains an unknown field.');
   }
-  const rows = (input as { rows?: unknown }).rows;
-  if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_IMPORT_ROWS) {
+  let campusId: string | undefined;
+  const rawCampusId = (input as { campusId?: unknown }).campusId;
+  if (rawCampusId !== undefined && rawCampusId !== null && rawCampusId !== '') {
+    if (typeof rawCampusId !== 'string' || !isUuidV7(rawCampusId)) {
+      throw invalid('Invalid campus ID.');
+    }
+    campusId = rawCampusId.toLowerCase();
+  }
+  const rawRows = (input as { rows?: unknown }).rows;
+  if (!Array.isArray(rawRows) || rawRows.length < 1 || rawRows.length > MAX_IMPORT_ROWS) {
     throw invalid(`rows must hold 1 to ${MAX_IMPORT_ROWS} rows.`);
   }
-  return rows.map((row: unknown, index) => {
+  const rows = rawRows.map((row: unknown, index) => {
     const where = `Row ${index + 1}`;
     if (!row || typeof row !== 'object' || Array.isArray(row)) {
       throw invalid(`${where} must be an object of text cells.`);
@@ -155,6 +193,15 @@ function parseRows(input: unknown): RawRow[] {
     // fromEntries defines own properties, so a column called "__proto__" stays data
     return Object.fromEntries(entries);
   });
+  if (campusId) {
+    for (const r of rows) {
+      if (!r.campusId) {
+        r.campusId = campusId;
+      }
+    }
+    return { rows, campusId };
+  }
+  return { rows };
 }
 
 // ---- rows of the database --------------------------------------------------------------------------------------------
@@ -563,15 +610,28 @@ export class ImportService {
   ): Promise<IdempotentResult> {
     ensureTrusted(ctx);
     const adapter = ADAPTERS[type];
-    const rows = parseRows(input);
-    await authorize(tx, ctx, adapter);
+    const { rows, campusId } = parseRows(input);
+    const rowCampuses = [
+      ...new Set(
+        rows
+          .map((r) => (typeof r.campusId === 'string' && r.campusId ? r.campusId.toLowerCase() : null))
+          .filter((c): c is string => c !== null),
+      ),
+    ];
+    if (campusId) {
+      await authorize(tx, ctx, adapter, { campusId });
+    } else if (rowCampuses.length === 1 && rows.every((r) => r.campusId) && rowCampuses[0]) {
+      await authorize(tx, ctx, adapter, { campusId: rowCampuses[0] });
+    } else {
+      await authorize(tx, ctx, adapter);
+    }
     const key = parseIdempotencyKey(options.idempotencyKey);
     const meta = options.meta ?? {};
 
     return runIdempotent(
       tx,
       ctx,
-      { key, operation: adapter.createOperation, request: { type, rows } },
+      { key, operation: adapter.createOperation, request: { type, rows, campusId: campusId ?? null } },
       async () => {
         const jobId = uuidv7();
         await tx.query(
@@ -623,7 +683,7 @@ export class ImportService {
     const id = parseJobId(jobId);
     const matchingInput = matchingFrom(body);
     const adapter = ADAPTERS[type];
-    await authorize(tx, ctx, adapter);
+    await authorize(tx, ctx, adapter, { forJob: true });
     const job = await loadJob(tx, ctx, type, id, true);
     if (job.status !== 'DRAFT' && job.status !== 'VALIDATED') throw jobStateError(job);
 
@@ -648,7 +708,7 @@ export class ImportService {
   ): Promise<ImportJobDto> {
     ensureTrusted(ctx);
     const id = parseJobId(jobId);
-    await authorize(tx, ctx, ADAPTERS[type]);
+    await authorize(tx, ctx, ADAPTERS[type], { forJob: true });
     return toJobDto(await loadJob(tx, ctx, type, id, false));
   }
 
@@ -675,7 +735,7 @@ export class ImportService {
     if (!Number.isInteger(limit) || limit < 1 || limit > IMPORT_ROWS_PAGE_SIZE) {
       throw invalid(`limit must be 1 to ${IMPORT_ROWS_PAGE_SIZE}.`);
     }
-    await authorize(tx, ctx, ADAPTERS[type]);
+    await authorize(tx, ctx, ADAPTERS[type], { forJob: true });
     const job = await loadJob(tx, ctx, type, id, false);
 
     const res = await tx.query<{
@@ -717,7 +777,7 @@ export class ImportService {
   ): Promise<string> {
     ensureTrusted(ctx);
     const id = parseJobId(jobId);
-    await authorize(tx, ctx, ADAPTERS[type]);
+    await authorize(tx, ctx, ADAPTERS[type], { forJob: true });
     const job = await loadJob(tx, ctx, type, id, false);
     const res = await tx.query<{ row_no: number; errors: RowIssue[]; warnings: RowIssue[] }>(
       `SELECT row_no, errors, warnings FROM app.import_job_rows
@@ -766,7 +826,7 @@ export class ImportService {
     const acknowledged = input.acknowledgeWarnings === true;
     const expectedVersion = requireExactVersion(options.expected);
     const adapter = ADAPTERS[type];
-    await authorize(tx, ctx, adapter);
+    await authorize(tx, ctx, adapter, { forJob: true });
     const key = parseIdempotencyKey(options.idempotencyKey);
     const meta = options.meta ?? {};
 

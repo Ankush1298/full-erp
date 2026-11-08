@@ -36,6 +36,7 @@ export const StudentRecordSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
   userId: z.string(),
+  campusId: z.string().nullable().optional(),
   admissionNumber: z.string(),
   admissionDate: z.string().nullable(),
   status: z.enum(STUDENT_STATUSES),
@@ -229,6 +230,42 @@ export const StudentTimelineSchema = z.object({
   limitations: z.array(z.object({ code: z.string(), message: z.string() })),
 });
 export type StudentTimeline = z.infer<typeof StudentTimelineSchema>;
+
+export const CreateStudentResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    id: z.string(),
+  }),
+});
+
+export interface CreateStudentPayload {
+  userId: string;
+  admissionNumber: string;
+  admissionDate: string;
+  reason: string;
+  campusId?: string;
+  name?: string;
+  dateOfBirth?: string;
+  guardianPhone?: string;
+  duplicateAcknowledgement?: string;
+}
+
+export async function createStudent(
+  client: ApiClient,
+  payload: CreateStudentPayload,
+  idempotencyKey?: string,
+): Promise<{ id: string }> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey;
+  }
+  const res = await client.post('/v1/students', {
+    schema: CreateStudentResponseSchema,
+    body: payload,
+    headers,
+  });
+  return res.data;
+}
 
 const TimelineResponseSchema = z.object({ success: z.literal(true), data: StudentTimelineSchema });
 

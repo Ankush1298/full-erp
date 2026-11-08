@@ -1,0 +1,125 @@
+/**
+ * Explicit exception policy for the database privilege guardrails (doc 48 §5). Anything the guardrail test finds that is not
+ * covered by a rule or by an entry here FAILS: a new table, grant or SECURITY DEFINER function can never pass silently. Every
+ * entry names why it exists and who answers for it; `review` is the condition that should end the exception. Adding an entry
+ * is a security decision (code review by the platform security owner), not a way to make a test green.
+ */
+export const PLATFORM_SECURITY_OWNER =
+  'Platform security owner (project owner designates; open decision)';
+
+export interface Exception {
+  readonly reason: string;
+  readonly owner: string;
+  readonly review: string;
+}
+
+/** Tables with no `organization_id` column. Every one must appear here, with the row-level-security state it is allowed to have. */
+export interface GlobalTable extends Exception {
+  /** `forced` = RLS enabled and forced is required; `none` = global infrastructure deliberately without RLS. */
+  readonly rls: 'forced' | 'none';
+  /** The ONLY privileges app_runtime may hold on the table (table-level or column-level). */
+  readonly runtimePrivileges: readonly ('SELECT' | 'INSERT' | 'UPDATE' | 'DELETE')[];
+  /** For `none` tables with column-level INSERT/UPDATE: the exact writable columns. */
+  readonly insertColumns?: readonly string[];
+  readonly updateColumns?: readonly string[];
+}
+
+export const GLOBAL_TABLES: Readonly<Record<string, GlobalTable>> = {
+  'app.organizations': {
+    reason:
+      'The tenant table itself; keyed by id, not organization_id. RLS limits a session to its own row.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never: this is the tenant key.',
+    rls: 'forced',
+    runtimePrivileges: ['SELECT'],
+  },
+  'platform.permissions': {
+    reason:
+      'Global permission catalogue shared by all tenants; read-only reference data (no RLS in the live schema; the runtime role has SELECT only).',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'If tenant-specific permissions are ever introduced.',
+    rls: 'none',
+    runtimePrivileges: ['SELECT'],
+  },
+  'platform.identities': {
+    reason:
+      'Global login identity (one identity can belong to several tenants; sign-in looks it up by e-mail before any tenant is known), so tenant RLS cannot apply. Writes are narrowed to the columns the application changes (0043). SELECT remains table-wide: ACCEPTED RESIDUAL RISK (doc 48 §4).',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Replace direct SELECT by SECURITY DEFINER lookup functions (doc 48 §4.3).',
+    rls: 'none',
+    runtimePrivileges: ['SELECT', 'INSERT', 'UPDATE'],
+    insertColumns: ['id', 'email', 'password_hash', 'status'],
+    updateColumns: ['failed_login_count', 'locked_until'],
+  },
+  'platform.auth_sessions': {
+    reason:
+      'Global session registry (tenant_id is a column, the lookup key is the token hash, resolved before a tenant context exists). Writes narrowed to what the application changes (0043). SELECT remains table-wide: ACCEPTED RESIDUAL RISK (doc 48 §4).',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Replace direct SELECT by SECURITY DEFINER session functions (doc 48 §4.3).',
+    rls: 'none',
+    runtimePrivileges: ['SELECT', 'INSERT', 'UPDATE'],
+    insertColumns: ['id', 'identity_id', 'tenant_id', 'token_hash', 'expires_at'],
+    updateColumns: ['revoked_at', 'step_up_at', 'auth_strength', 'mfa_verified_at'],
+  },
+  'platform.schema_migrations': {
+    reason: 'Migration ledger owned by the migration role; the runtime role needs no access.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never.',
+    rls: 'none',
+    runtimePrivileges: [],
+  },
+};
+
+/** Tenant tables where app_runtime may DELETE (RLS still confines it to its tenant). Every other table: no DELETE. */
+export const RUNTIME_DELETE_ALLOWED: Readonly<Record<string, Exception>> = {
+  'app.curriculum_courses': {
+    reason:
+      'Curriculum membership rows are removed and re-added by the curriculum service (history is not kept here).',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'If curriculum history becomes a retention requirement.',
+  },
+  'app.student_guardians': {
+    reason:
+      'A guardian link is removed by the guardian service (the removal is audited as student_guardian.remove).',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'If link history becomes a retention requirement.',
+  },
+};
+
+/** SECURITY DEFINER functions: the complete approved set. Each runs as the migration role with a fixed search_path. */
+export const SECURITY_DEFINER_FUNCTIONS: Readonly<
+  Record<string, Exception & { readonly maxSearchPath: string }>
+> = {
+  'app.context_ok': {
+    reason: 'Reads the transaction-local tenant context for every RLS policy.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.get_identity_memberships': {
+    reason:
+      'Login: lists the tenants one identity belongs to (id, slug, name only) before a tenant context exists.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'With the identity lookup functions (doc 48 §4.3).',
+    maxSearchPath: 'app, platform, pg_temp',
+  },
+  'platform.lock_invitation': {
+    reason: 'Invitation acceptance: finds and locks one usable invitation by token hash.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.complete_invitation': {
+    reason: 'Invitation acceptance: consumes the token and activates the membership atomically.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.admin_reset_user_mfa': {
+    reason:
+      "Administrative MFA reset: removes a user's factors across the identity boundary under audit.",
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never.',
+    maxSearchPath: 'pg_catalog',
+  },
+};

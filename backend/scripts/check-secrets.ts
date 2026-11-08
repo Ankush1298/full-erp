@@ -26,6 +26,12 @@ const RULES: { name: string; re: RegExp }[] = [
   { name: 'jwt', re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/ },
   // scheme://user:password@host with a real-looking password
   { name: 'url-embedded-password', re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:([^\s@/]{3,})@/i },
+  // A quoted literal assigned to an identifier that merely STARTS with "password" (passwordPlain, password_plain,
+  // passwordValue ...), which the rule below misses because it needs the bare word. Quoted literals only, to stay quiet.
+  {
+    name: 'password-literal',
+    re: /\bpassword[A-Za-z_]+\s*[:=]\s*['"]([^'"\s]{8,})['"]/i,
+  },
   {
     name: 'assigned-secret',
     re: /\b(?:password|passwd|secret|api[_-]?key|token|private[_-]?key)\b\s*[:=]\s*['"]?([^\s'"#]{8,})/i,

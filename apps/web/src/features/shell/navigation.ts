@@ -62,6 +62,41 @@ export const NAV_ITEMS: readonly NavItem[] = [
     audience: 'staff',
   },
   {
+    id: 'attendance',
+    label: 'Attendance',
+    to: '/attendance',
+    anyOf: [
+      'attendance.session.mark',
+      'attendance.record.read',
+      'attendance.correction.approve',
+    ],
+    audience: 'staff',
+  },
+  {
+    id: 'examinations',
+    label: 'Examinations',
+    to: '/examinations',
+    anyOf: ['exam.manage', 'exam.marks.enter', 'result.publish', 'result.read'],
+  },
+  {
+    id: 'finance',
+    label: 'Fees & Finance',
+    to: '/fees',
+    anyOf: ['fee.structure.read', 'fee.dues.read', 'fee.receipt.read'],
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    to: '/reports',
+    anyOf: [
+      'student.directory.list',
+      'attendance.record.read',
+      'result.read',
+      'fee.receipt.read',
+    ],
+    audience: 'staff',
+  },
+  {
     id: 'imports',
     label: 'Imports',
     to: '/imports',

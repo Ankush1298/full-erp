@@ -27,7 +27,10 @@ const RowSchema = Type.Record(Type.String(), Type.String({ maxLength: MAX_CELL_L
 });
 
 export const CreateImportBodySchema = Type.Object(
-  { rows: Type.Array(RowSchema, { minItems: 1, maxItems: MAX_IMPORT_ROWS }) },
+  {
+    rows: Type.Array(RowSchema, { minItems: 1, maxItems: MAX_IMPORT_ROWS }),
+    campusId: Type.Optional(UuidV7),
+  },
   { additionalProperties: false },
 );
 export type CreateImportBody = Static<typeof CreateImportBodySchema>;

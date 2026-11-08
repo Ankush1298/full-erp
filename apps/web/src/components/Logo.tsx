@@ -1,11 +1,17 @@
-export function Logo() {
+export function Logo({ variant = 'default' }: { variant?: 'default' | 'light' }) {
   return (
-    <span className="logo">
-      <svg className="logo-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-        <rect width="64" height="64" rx="14" fill="currentColor" />
+    <span className={`logo logo--${variant}`}>
+      <svg className="logo-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle cx="24" cy="13" r="6" fill="currentColor" />
         <path
-          d="M28 14 12 50h8.4l3.2-8h16.8l3.2 8H52L36 14h-8Zm-2.6 21L32 19.4 38.6 35H25.4Z"
-          fill="#fff"
+          d="M24 22c-5.2 0-12 3.2-16 6.8v10.4c4-3.2 10.4-5.2 16-5.2s12 2 16 5.2V28.8c-4-3.6-10.8-6.8-16-6.8z"
+          fill="currentColor"
+        />
+        <path
+          d="M24 23.5v10.5"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          strokeLinecap="round"
         />
       </svg>
       <span className="logo-text">Anesa</span>

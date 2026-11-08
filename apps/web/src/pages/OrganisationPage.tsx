@@ -3,7 +3,11 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { TextField } from '../components/ui/TextField';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -56,8 +60,12 @@ export function OrganisationPage() {
         }
         setLoading(false);
       })
-      .catch((err: Error) => {
-        setError(err.message || 'Failed to load organization structure.');
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error && err.message && !err.message.startsWith('API ')
+            ? err.message
+            : 'Failed to load organization structure.',
+        );
         setLoading(false);
       });
   }, [client, selectedCampusId]);
@@ -76,8 +84,12 @@ export function OrganisationPage() {
           setRooms(rList);
           setLoadingRooms(false);
         })
-        .catch((err: Error) => {
-          setRoomActionError(err.message || 'Failed to load rooms for this campus.');
+        .catch((err: unknown) => {
+          setRoomActionError(
+            err instanceof Error && err.message && !err.message.startsWith('API ')
+              ? err.message
+              : 'Failed to load rooms for this campus.',
+          );
           setLoadingRooms(false);
         });
     },
@@ -124,52 +136,60 @@ export function OrganisationPage() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Organisation Structure</h1>
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <Button
-            variant={activeTab === 'campuses' ? 'primary' : 'secondary'}
-            onClick={() => setActiveTab('campuses')}
-            aria-pressed={activeTab === 'campuses'}
-          >
-            Campuses ({campuses.length})
-          </Button>
-          <Button
-            variant={activeTab === 'departments' ? 'primary' : 'secondary'}
-            onClick={() => setActiveTab('departments')}
-            aria-pressed={activeTab === 'departments'}
-          >
-            Departments ({departments.length})
-          </Button>
-          <Button
-            variant={activeTab === 'rooms' ? 'primary' : 'secondary'}
-            onClick={() => setActiveTab('rooms')}
-            aria-pressed={activeTab === 'rooms'}
-          >
-            Rooms ({rooms.length})
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Organisation Structure"
+        subtitle="Institutional structure records, campuses, academic departments, and physical facilities."
+        actions={
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <Button
+              variant={activeTab === 'campuses' ? 'primary' : 'secondary'}
+              onClick={() => setActiveTab('campuses')}
+              aria-pressed={activeTab === 'campuses'}
+            >
+              Campuses ({campuses.length})
+            </Button>
+            <Button
+              variant={activeTab === 'departments' ? 'primary' : 'secondary'}
+              onClick={() => setActiveTab('departments')}
+              aria-pressed={activeTab === 'departments'}
+            >
+              Departments ({departments.length})
+            </Button>
+            <Button
+              variant={activeTab === 'rooms' ? 'primary' : 'secondary'}
+              onClick={() => setActiveTab('rooms')}
+              aria-pressed={activeTab === 'rooms'}
+            >
+              Rooms ({rooms.length})
+            </Button>
+          </div>
+        }
+      />
 
-      <p className="lead">
-        Institutional structure records, campuses, academic departments, and physical facilities.
-      </p>
-
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && (
+        <ErrorState
+          title="Structure error"
+          message={error}
+          onRetry={loadBaseData}
+          retryLabel="Retry"
+        />
+      )}
 
       {loading ? (
         <Spinner label="Loading organisation structure…" />
       ) : activeTab === 'campuses' ? (
         campuses.length === 0 ? (
-          <Card title="No campuses">
-            <p className="muted">No campuses have been created yet.</p>
-          </Card>
+          <EmptyState
+            title="No campuses"
+            description="No campuses have been created yet."
+            compact
+          />
         ) : (
           <div className="grid">
             {campuses.map((c) => (
               <Card key={c.id} title={c.name}>
                 <div style={{ marginBottom: 'var(--space-2)' }}>
-                  <Badge>{c.status}</Badge>
+                  <StatusBadge status={c.status} />
                 </div>
                 <dl className="defs">
                   <dt>Code</dt>
@@ -183,15 +203,17 @@ export function OrganisationPage() {
         )
       ) : activeTab === 'departments' ? (
         departments.length === 0 ? (
-          <Card title="No departments">
-            <p className="muted">No departments have been created yet.</p>
-          </Card>
+          <EmptyState
+            title="No departments"
+            description="No departments have been created yet."
+            compact
+          />
         ) : (
           <div className="grid">
             {departments.map((d) => (
               <Card key={d.id} title={d.name}>
                 <div style={{ marginBottom: 'var(--space-2)' }}>
-                  <Badge>{d.status}</Badge>
+                  <StatusBadge status={d.status} />
                 </div>
                 <dl className="defs">
                   <dt>Code</dt>

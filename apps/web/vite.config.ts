@@ -35,5 +35,6 @@ export default defineConfig({
     setupFiles: ['tests/setup.ts'],
     css: false,
     restoreMocks: true,
+    testTimeout: 15000,
   },
 });

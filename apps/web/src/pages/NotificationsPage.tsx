@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
 import {
@@ -30,8 +33,12 @@ export function NotificationsPage() {
         setNotifications(res.data);
         setLoading(false);
       })
-      .catch((err: Error) => {
-        setError(err.message || 'Failed to load notifications.');
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error && err.message && !err.message.startsWith('API ')
+            ? err.message
+            : 'Failed to load notifications.',
+        );
         setLoading(false);
       });
   }, [client, unreadOnly]);
@@ -72,42 +79,54 @@ export function NotificationsPage() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Notifications</h1>
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <Button
-            variant="secondary"
-            onClick={() => setUnreadOnly((prev) => !prev)}
-            aria-pressed={unreadOnly}
-          >
-            {unreadOnly ? 'Show all' : 'Unread only'}
-          </Button>
-          {unreadCount > 0 && (
+      <PageHeader
+        title="Notifications"
+        subtitle="Activity updates, policy notices, and administrative announcements."
+        actions={
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <Button
               variant="secondary"
-              onClick={() => {
-                void handleMarkAllRead();
-              }}
-              disabled={acting}
+              onClick={() => setUnreadOnly((prev) => !prev)}
+              aria-pressed={unreadOnly}
             >
-              Mark all as read
+              {unreadOnly ? 'Show all' : 'Unread only'}
             </Button>
-          )}
-        </div>
-      </div>
+            {unreadCount > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void handleMarkAllRead();
+                }}
+                disabled={acting}
+              >
+                Mark all as read
+              </Button>
+            )}
+          </div>
+        }
+      />
 
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && (
+        <ErrorState
+          title="Notification error"
+          message={error}
+          onRetry={loadNotifications}
+          retryLabel="Retry"
+        />
+      )}
 
       {loading ? (
         <Spinner label="Loading notifications…" />
       ) : notifications.length === 0 ? (
-        <Card title="No notifications">
-          <p className="muted">
-            {unreadOnly
+        <EmptyState
+          title="No notifications"
+          description={
+            unreadOnly
               ? 'You have no unread notifications.'
-              : 'You have no notifications at this time.'}
-          </p>
-        </Card>
+              : 'You have no notifications at this time.'
+          }
+          compact
+        />
       ) : (
         <div className="grid">
           {notifications.map((item) => (
@@ -116,7 +135,7 @@ export function NotificationsPage() {
                 style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}
               >
                 <Badge>{item.category}</Badge>
-                {!item.read_at && <Badge>Unread</Badge>}
+                {!item.read_at && <StatusBadge status="review" label="Unread" tone="warning" />}
               </div>
               <p>{item.body}</p>
               <div

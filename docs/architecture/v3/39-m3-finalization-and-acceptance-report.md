@@ -286,3 +286,11 @@ Until then M3 is **not accepted**.
 ## 14. M4 gate
 
 Milestone 4 (Attendance) **must not start** until M3 is formally accepted per §13. Nothing in this campaign started M4: no attendance tables, routes, sessions or policies were created.
+
+**Owner amendment (2026-11-05): M4 early start.** The product owner authorised Milestone 4 development on synthetic data before formal M3 acceptance, on these conditions:
+- M3 D2 and G1 remain mandatory and pending; M3 is not formally accepted.
+- M4 cannot be formally accepted before M3.
+- No real school data and no production deployment are authorised.
+- Future real-school validation may require M4 changes.
+
+This amends only the sequencing rule above; no M3 requirement changes.

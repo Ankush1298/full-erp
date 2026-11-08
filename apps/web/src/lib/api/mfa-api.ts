@@ -79,6 +79,9 @@ export async function startMfaEnrollment(
   const res = await client.post('/me/mfa/totp/enroll', {
     body,
     schema: MfaEnrollStartResponseSchema,
+    // A wrong or expired enrollment ticket is a 401 INVALID_TICKET. It is not a lost session, so it must not trigger the
+    // "session expired" sign-out (found in the browser rehearsal, doc 47 A2); the error is shown in the dialog instead.
+    public: true,
   });
   return res.data;
 }
@@ -91,6 +94,7 @@ export async function verifyMfaEnrollment(client: ApiClient, code: string): Prom
   const res = await client.post('/me/mfa/totp/verify', {
     body: { code },
     schema: MfaVerifyResponseSchema,
+    public: true,
   });
   return res.data;
 }
@@ -102,6 +106,7 @@ export async function submitMfaChallenge(
   const res = await client.post('/auth/mfa/challenge', {
     body: input,
     schema: MfaChallengeResponseSchema,
+    public: true,
   });
   return res.data;
 }

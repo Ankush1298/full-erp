@@ -25,6 +25,7 @@ describe('settings registry: structure', () => {
       'guardian.notification_policy',
       'identity.age_of_majority',
       'identity.dob_required',
+      'institution.type', // doc 44: closed enumeration, display only
       'terminology', // doc 33 §6: closed label slots, no registry default
     ]);
   });

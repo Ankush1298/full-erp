@@ -39,6 +39,8 @@ export interface SettingDefinition {
   readonly validate?: (value: unknown) => string | null;
 }
 
+import { INSTITUTION_TYPES, INSTITUTION_TYPE_KEY } from './institution.js';
+
 /** The label slots of the `terminology` setting (doc 33 §6). */
 export const TERMINOLOGY_SLOTS = [
   'program',
@@ -134,6 +136,13 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
       Type.Literal('ALWAYS_WHEN_LINKED'),
       Type.Literal('NEVER'),
     ]),
+  },
+  {
+    // Doc 44: the institution chosen at onboarding. A closed enumeration, no default (unset = the pre-onboarding labels). It is
+    // a display and workflow-presentation key: no permission, grant or access rule reads it. Changing a stored value is
+    // restricted by SettingsService (only while no academic year exists).
+    key: INSTITUTION_TYPE_KEY,
+    schema: Type.Union(INSTITUTION_TYPES.map((t) => Type.Literal(t))),
   },
   {
     // 02 §4.2: display labels only. Closed label slots (doc 33 §6), each a LABEL; at least one key. Changing a label

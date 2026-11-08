@@ -7,6 +7,9 @@ export interface Identity {
   readonly actorKind: 'STUDENT' | 'STAFF';
   readonly roles: readonly string[];
   readonly capabilities: ReadonlySet<string>;
+  /** Display names for this user's roles as the institution chose (doc 44). Never consulted for access. */
+  readonly roleLabels?: Readonly<Record<string, string>>;
+  readonly institutionType?: 'SCHOOL' | 'COLLEGE' | 'UNIVERSITY' | null;
 }
 
 export function toIdentity(me: MeResponse): Identity {
@@ -16,6 +19,8 @@ export function toIdentity(me: MeResponse): Identity {
     actorKind: me.actor_kind,
     roles: me.roles,
     capabilities: new Set(me.capabilities),
+    roleLabels: me.role_labels,
+    institutionType: me.institution_type,
   };
 }
 
@@ -51,6 +56,7 @@ const ROLE_LABELS: Record<string, string> = {
   REGISTRAR: 'Registrar',
 };
 
-export function roleLabel(code: string): string {
-  return ROLE_LABELS[code] ?? code;
+/** The role's display name: the institution's (from the server) over the built-in default. Display only. */
+export function roleLabel(code: string, identity?: Pick<Identity, 'roleLabels'> | null): string {
+  return identity?.roleLabels?.[code] ?? ROLE_LABELS[code] ?? code;
 }

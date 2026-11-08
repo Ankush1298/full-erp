@@ -2,6 +2,8 @@
 
 Status: implemented, uncommitted (Task 8; activation integrity and `/faculty` assignments added in Task 9). Canonical requirement: `04` Part 16, Milestone 3, Features "setup checklist", "Terminology via settings" and UI "setup wizard". No migration, no new table, no new permission. Milestone 4 not started.
 
+> **Later note (2026-11-07):** step 1 of the wizard now also holds the institution-type selector (School, College, University) and the role display names that follow from it; see doc 44. Nothing below was changed.
+
 ## 1. What was built
 
 | Piece | Where |

@@ -3,6 +3,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -79,13 +80,16 @@ export function AccountPage() {
 
   return (
     <>
-      <h1>Account</h1>
+      <PageHeader
+        title="Account"
+        subtitle="Profile details, active institutional roles, and multi-factor security credentials."
+      />
       <Card title="Profile">
         <dl className="defs">
           <dt>Name</dt>
           <dd>{identity.displayName || 'Not set'}</dd>
           <dt>Roles</dt>
-          <dd>{identity.roles.map(roleLabel).join(', ') || 'None'}</dd>
+          <dd>{identity.roles.map((r) => roleLabel(r, identity)).join(', ') || 'None'}</dd>
         </dl>
       </Card>
 

@@ -9,6 +9,7 @@ import {
   SETTING_DEFINITIONS,
   SETTING_VALUE_MAX_BYTES,
   findSettingDefinition,
+  INSTITUTION_TYPE_KEY,
   isValidSettingValue,
   type ExpectedVersion,
 } from '../../shared/settings/index.js';
@@ -67,6 +68,24 @@ function toDto(key: string, row: SettingRow): SettingRecordDto {
 }
 
 export class SettingsService {
+  /**
+   * Controlled institution-type change (doc 44 §6): choosing the type for the first time is always allowed; CHANGING it is
+   * allowed only while the tenant has no academic year, i.e. before any academic structure depends on the wording. After that
+   * it is a 409 until the owner defines a migration path (decision OD-I3). Fails closed.
+   */
+  private static async assertTypeChangeAllowed(tx: TenantTx, ctx: TrustedContext): Promise<void> {
+    const r = await tx.query(
+      `SELECT 1 FROM app.academic_years WHERE organization_id = $1 LIMIT 1`,
+      [ctx.tenantId],
+    );
+    if ((r.rowCount ?? 0) > 0)
+      throw new AppError(
+        409,
+        'CONFLICT',
+        'The institution type cannot be changed once academic years exist.',
+      );
+  }
+
   /**
    * Lists every registered setting that currently has a value: the stored value, or the registry default while
    * nothing is stored. Keys that have neither are omitted. Stored rows whose key is no longer registered are never
@@ -181,6 +200,7 @@ export class SettingsService {
         }
 
         if (isDeepStrictEqual(existing.value, value)) return toDto(key, existing);
+        if (key === INSTITUTION_TYPE_KEY) await SettingsService.assertTypeChangeAllowed(tx, ctx);
         const updated = await tx.query<SettingRow>(
           `UPDATE app.organization_settings
               SET value = $3::jsonb, updated_by = $4

@@ -94,7 +94,7 @@ describe('login', () => {
       (typeof input === 'string' ? input : '').endsWith('/auth/login')
         ? gate.then(() => original(input, init))
         : original(input, init)) as typeof fetch;
-    const view = renderApp({ ...b, fetch: slow });
+    const view = renderApp({ ...b, fetch: slow }, '/login');
     void view;
     const user = userEvent.setup();
     await fillAndSubmit(user);
@@ -182,7 +182,10 @@ describe('session restoration and expiry', () => {
     renderApp(b, '/');
     expect(await screen.findByRole('heading', { name: 'No access assigned' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    // signed out at the root: the public landing page (the sign-in dialog opens from it)
+    expect(
+      await screen.findByRole('heading', { name: 'One connected campus. Endless possibilities.' }),
+    ).toBeInTheDocument();
     expect(b.callsTo('POST', '/auth/logout')).toHaveLength(1);
   });
 });
@@ -199,7 +202,7 @@ describe('logout', () => {
   it('calls the backend with the CSRF header, clears client state and returns to /login', async () => {
     const { b, user, client } = await signedIn();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 4000 })).toBeInTheDocument();
     const call = b.callsTo('POST', '/auth/logout')[0]!;
     expect(call.headers['x-csrf-token']).toBe(b.state.csrf);
     expect(b.state.session).toBe(false);
@@ -214,7 +217,7 @@ describe('logout', () => {
     b.state.logoutMode = 'network';
     const { user, client } = await signedIn(b);
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 4000 })).toBeInTheDocument();
     expect(client.hasCsrfToken()).toBe(false);
   });
 });

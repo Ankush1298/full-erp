@@ -168,7 +168,9 @@ describe('step-up on a CRITICAL operation (second factor, the backend default PA
     await user.click(screen.getByRole('button', { name: 'Verify' }));
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // the step-up dialog is gone; the only dialog left is the sign-in dialog
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Sign in');
+    expect(screen.queryByLabelText('Verification code')).not.toBeInTheDocument();
     expect(regenerate(b)).toHaveLength(1);
   });
 

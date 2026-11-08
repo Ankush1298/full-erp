@@ -624,6 +624,8 @@ const TerminologySchema = z.object({
       )
       .default([]),
     byCohort: z.record(z.string(), z.string()).default({}),
+    // Doc 44: absent from older servers.
+    institutionType: z.enum(['SCHOOL', 'COLLEGE', 'UNIVERSITY']).nullable().default(null),
   }),
 });
 export type TerminologyDetail = z.infer<typeof TerminologySchema>['data'];

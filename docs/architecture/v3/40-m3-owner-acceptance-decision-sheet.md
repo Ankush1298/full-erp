@@ -158,7 +158,7 @@ Before formal M3 acceptance:
 ## 7. Explicit scope boundary
 
 - M3 remains the current milestone.
-- No M4 attendance implementation may begin before formal M3 acceptance.
+- ~~No M4 attendance implementation may begin before formal M3 acceptance.~~ Amended 2026-11-05 by the product owner: M4 development may proceed on synthetic data before formal M3 acceptance. M3 D2/G1 remain mandatory and pending, M3 is not accepted, M4 cannot be formally accepted before M3, no real school data or production deployment is authorised, and future real-school validation may require M4 changes.
 - This decision sheet authorises no production migrations, no production role re-seeding and no production data loading.
 - Production Nginx verification, the backup and restore rehearsal, real invitation delivery, and production security and load testing remain separate operational-readiness work.
 
@@ -183,4 +183,4 @@ Before formal M3 acceptance:
 
 **Formal M3 acceptance:** NOT YET GRANTED
 
-**M4 authorisation:** NOT GRANTED
+**M4 authorisation:** synthetic-data development authorised (owner amendment 2026-11-05, §7); M4 formal acceptance NOT GRANTED and impossible before M3 acceptance

@@ -39,6 +39,7 @@ export interface StudentRow {
   id: string;
   organization_id: string;
   user_id: string;
+  campus_id: string | null;
   admission_number: string;
   admission_date: string | null;
   status: StudentStatus;
@@ -50,7 +51,7 @@ export interface StudentRow {
 
 // Dates are selected as text: the pg driver would otherwise build a JS Date in the server's time zone and a
 // calendar date could shift by a day.
-const COLS = `id, organization_id, user_id, admission_number, admission_date::text AS admission_date,
+const COLS = `id, organization_id, user_id, campus_id, admission_number, admission_date::text AS admission_date,
               status, status_changed_at, version, created_at, updated_at`;
 
 function toDto(r: StudentRow): StudentRecordDto {
@@ -58,6 +59,7 @@ function toDto(r: StudentRow): StudentRecordDto {
     id: r.id,
     organizationId: r.organization_id,
     userId: r.user_id,
+    campusId: r.campus_id ?? null,
     admissionNumber: r.admission_number,
     admissionDate: r.admission_date,
     status: r.status,
@@ -106,6 +108,14 @@ export class StudentService {
     }
     const admissionDate = parseDate(input.admissionDate, 'admissionDate');
     const reason = parseReason(input.reason);
+    const rawCampusId = (input as { campusId?: unknown }).campusId;
+    let campusId: string | undefined;
+    if (rawCampusId !== undefined && rawCampusId !== null && rawCampusId !== '') {
+      if (typeof rawCampusId !== 'string' || !isUuidV7(rawCampusId)) {
+        throw invalid('Invalid campus ID.');
+      }
+      campusId = rawCampusId.toLowerCase();
+    }
     // Matching-only inputs of the possible-duplicate check: validated strictly, never stored (doc 26 §3.5).
     const dateOfBirth =
       input.dateOfBirth === undefined ? null : parseDate(input.dateOfBirth, 'dateOfBirth');
@@ -126,13 +136,31 @@ export class StudentService {
     // no-op, by the migration 0016/0020 triggers). See shared/authorization/person-identity.ts for the lock order.
     await lockPersonIdentity(tx, ctx.tenantId, userId);
 
-    // Authorization: held at all (403), then ORGANIZATION scope (403): a student has no campus/department yet, so a
-    // scoped holder cannot create one.
+    // If campusId is provided, verify it belongs to this institution/tenant
+    if (campusId !== undefined) {
+      const cr = await tx.query(
+        'SELECT id FROM app.campuses WHERE organization_id = $1 AND id = $2',
+        [ctx.tenantId, campusId],
+      );
+      if (cr.rowCount === 0) {
+        throw new AppError(404, 'NOT_FOUND', 'Campus not found.');
+      }
+    }
+
+    // Authorization: held at all (403), then scope-specific check (403).
+    // If campusId is supplied, assert CAMPUS scope for that campus. If omitted, assert ORGANIZATION scope.
     await AuthorizationEngine.assert(tx, ctx, 'student.record.create');
     try {
-      await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
-        organization_id: ctx.tenantId,
-      });
+      if (campusId !== undefined) {
+        await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+          organization_id: ctx.tenantId,
+          campus_id: campusId,
+        });
+      } else {
+        await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+          organization_id: ctx.tenantId,
+        });
+      }
     } catch (err) {
       if (err instanceof AppError && err.statusCode === 404) {
         throw new AppError(403, 'FORBIDDEN', 'Access denied.');
@@ -159,6 +187,7 @@ export class StudentService {
           userId,
           admissionNumber,
           admissionDate,
+          campusId: campusId ?? null,
           reason,
           matching: {
             name: name !== null,
@@ -172,16 +201,25 @@ export class StudentService {
         const id = await StudentService.insertRecord(
           tx,
           ctx,
-          { userId, admissionNumber, admissionDate, reason },
+          {
+            userId,
+            admissionNumber,
+            admissionDate,
+            reason,
+            ...(campusId !== undefined ? { campusId } : {}),
+          },
           meta,
           { duplicateAcknowledgementSupplied: acknowledgement !== undefined },
         );
         // The authoritative duplicate check, AFTER the insert so every hard error (exact admission number, account state,
         // exclusivity) wins over the warning. A warning that is not acknowledged - or whose candidate set differs from the
         // acknowledged one - throws, and the whole transaction (insert, audit, idempotency claim) rolls back.
-        const [fingerprint] = await StudentDuplicateService.find(tx, ctx, [
-          { name, dateOfBirth, guardianPhone, excludeUserId: userId },
-        ]);
+        const [fingerprint] = await StudentDuplicateService.find(
+          tx,
+          ctx,
+          [{ name, dateOfBirth, guardianPhone, excludeUserId: userId }],
+          campusId !== undefined ? { campusId } : undefined,
+        );
         if (fingerprint !== null && fingerprint !== acknowledgement) {
           throw duplicateWarningError(fingerprint!);
         }
@@ -199,11 +237,17 @@ export class StudentService {
   static async insertRecord(
     tx: TenantTx,
     ctx: TrustedContext,
-    input: { userId: string; admissionNumber: string; admissionDate: string; reason: string },
+    input: {
+      userId: string;
+      admissionNumber: string;
+      admissionDate: string;
+      reason: string;
+      campusId?: string;
+    },
     meta: AuditRequestMeta,
     options: { duplicateAcknowledgementSupplied?: boolean } = {},
   ): Promise<string> {
-    const { userId, admissionNumber, admissionDate, reason } = input;
+    const { userId, admissionNumber, admissionDate, reason, campusId } = input;
     // The person lock above already serialises this create against employee creation and role grants for this
     // account; FOR UPDATE additionally keeps other writers of the account row (and FK share-lockers) out until
     // commit. Both directions are covered: docs/architecture/v3/21-students.md §6.
@@ -242,9 +286,9 @@ export class StudentService {
     try {
       await tx.query(
         `INSERT INTO app.students
-           (id, organization_id, user_id, admission_number, admission_date, status)
-         VALUES ($1, $2, $3, $4, $5::date, 'ADMITTED')`,
-        [id, ctx.tenantId, userId, admissionNumber, admissionDate],
+           (id, organization_id, user_id, campus_id, admission_number, admission_date, status)
+         VALUES ($1, $2, $3, $4, $5, $6::date, 'ADMITTED')`,
+        [id, ctx.tenantId, userId, campusId ?? null, admissionNumber, admissionDate],
       );
     } catch (err) {
       const e = err as { code?: string; constraint?: string };
@@ -276,6 +320,7 @@ export class StudentService {
         resourceType: 'student',
         resourceId: id,
         subjectStudentId: id,
+        ...(campusId ? { campusId } : {}),
         riskTier: 2,
         reasonText: reason,
         changes: {
@@ -283,6 +328,7 @@ export class StudentService {
           admissionNumber: { old: null, new: admissionNumber },
           admissionDate: { old: null, new: admissionDate },
           status: { old: null, new: 'ADMITTED' },
+          ...(campusId ? { campusId: { old: null, new: campusId } } : {}),
         },
         // Only the FACT of the acknowledgement; never the matching inputs or the candidate (doc 26 §3.5).
         ...(options.duplicateAcknowledgementSupplied
@@ -311,17 +357,16 @@ export class StudentService {
     const row = res.rows[0];
     if (!row) throw resourceNotFound();
     // student_id / user_id let a SELF holder prove the record is their own. A CAMPUS/DEPARTMENT grant is judged against
-    // the student's ACTIVE enrolment (its frozen campus and department, read here, never from the request), the same
-    // placement the directory and the identifier/guardian reads use. No ACTIVE enrolment means no campus or department:
-    // only ORGANIZATION-scoped and SELF holders can then read the record (fail closed, the same 404).
+    // the student's ACTIVE enrolment (its frozen campus and department), or falling back to the student's permanent admission campus.
+    // If no active enrolment and no admission campus exist, only ORGANIZATION-scoped and SELF holders can read the record.
     const placement = await readActiveEnrolment(tx, ctx.tenantId, row.id);
+    const effectiveCampusId = placement?.campus_id ?? row.campus_id;
     await AuthorizationEngine.assert(tx, ctx, 'student.profile.read', {
       organization_id: ctx.tenantId,
       student_id: row.id,
       user_id: row.user_id,
-      ...(placement
-        ? { campus_id: placement.campus_id, department_id: placement.department_id }
-        : {}),
+      ...(effectiveCampusId ? { campus_id: effectiveCampusId } : {}),
+      ...(placement ? { department_id: placement.department_id } : {}),
     });
     return toDto(row);
   }

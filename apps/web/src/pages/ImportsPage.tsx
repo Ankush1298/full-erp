@@ -3,6 +3,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -31,7 +32,7 @@ const KINDS: Record<
     label: 'Student records',
     permission: 'student.record.create',
     columns:
-      'email, admissionNumber, admissionDate; optional, used only to look for a possible duplicate and never stored (sent again with each step and kept in this page only): name, dateOfBirth (YYYY-MM-DD), guardianPhone',
+      'email, admissionNumber, admissionDate, optional campusId; optional, used only to look for a possible duplicate and never stored (sent again with each step and kept in this page only): name, dateOfBirth (YYYY-MM-DD), guardianPhone',
     example: 'email,admissionNumber,admissionDate\nasha@college.example,ADM-2026-001,2026-07-01',
   },
   faculty: {
@@ -66,6 +67,10 @@ const ISSUE_TEXT: Readonly<Record<string, string>> = {
   ACCOUNT_SUSPENDED: 'The account is suspended.',
   INVALID_NAME: 'The name is not valid.',
   INVALID_PHONE: 'The phone number is too long.',
+  CAMPUS_NOT_FOUND: 'Campus not found in this organization.',
+  UNAUTHORIZED_CAMPUS: 'You are not authorized to admit students to this campus.',
+  CAMPUS_REQUIRED: 'A campus ID is required for campus-scoped admission.',
+  INVALID_CAMPUS: 'Not a valid campus ID.',
   POSSIBLE_DUPLICATE_STUDENT:
     'A student with the same name, date of birth and guardian phone number may already exist.',
   POSSIBLE_DUPLICATE_IN_FILE:
@@ -245,13 +250,10 @@ export function ImportsPage() {
 
   return (
     <>
-      <h1>Imports</h1>
-      <p className="lead">
-        Import student or employee records from a CSV file in three steps: upload and validate,
-        review exactly what will change, then commit. Nothing is created until you commit. Rows name
-        an existing account by its e-mail address; accounts are created by invitation, not by
-        import.
-      </p>
+      <PageHeader
+        title="Imports"
+        subtitle="Import student or employee records from a CSV file in three steps: upload and validate, review exactly what will change, then commit. Nothing is created until you commit."
+      />
       {error && <Alert tone="error">{error}</Alert>}
       {notice && <Alert tone="success">{notice}</Alert>}
 

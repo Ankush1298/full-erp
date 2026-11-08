@@ -91,6 +91,26 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | **Course offerings & scheduling (Milestone 3, Batch 2; doc 31)** |
 | 56 | `academic.offering.manage` (course offerings - create, publish, close, cancel - their timetable slots, and elective groups of a cohort period (doc 33), by the derived department) | S | – | – | – | – | G | G | G | G |
 | 57 | `academic.faculty.assign` (assign and end teachers on an offering, and class teachers of a section (doc 32); A2, every change audited at tier 2 with a reason) | S | – | – | – | – | G | G | G | G |
+| **Attendance (Milestone 4, Slice 1; doc 41)** |
+| 58 | `attendance.session.mark` (create a class session and submit its attendance; FACULTY by an ASSIGNED faculty assignment valid on the session date, doc 03) | S | – | A | – | – | – | – | – | – |
+| 59 | `attendance.record.read` (a session's records and each record's revision history; STUDENT own records, FACULTY ASSIGNED as above, HOD department, CAMPUS_ADMIN campus, COLLEGE_ADMIN organization) | S | S | A | – | G | – | G | G | – |
+| 60 | `attendance.record.correct` (change a submitted attendance value as a new revision with a reason: directly inside the 3-calendar-day faculty window, otherwise as a request that needs independent approval; AD-1 to AD-4, doc 43 §0; FACULTY ASSIGNED only for PRIMARY and CO_INSTRUCTOR assignments, HOD department, CAMPUS_ADMIN campus, COLLEGE_ADMIN organization). The routes also answer 403 to everyone unless `ATTENDANCE_CORRECTIONS_ENABLED=true` | S | – | A | – | G | – | G | G | – |
+| 61 | `attendance.correction.approve` (approve or reject a correction request made by someone else; never one's own; AD-4) | S | – | – | – | G | – | G | G | – |
+| 62 | `attendance.session.lock` (lock a submitted session; no unlock exists in Pilot V1; AD-5, AD-6; CRITICAL: reason and step-up) | C | – | – | – | – | – | G | G | – |
+| 63 | `attendance.session.cancel` (administrative cancellation of a session that took no attendance; AD-7; separate from the faculty path, which uses `attendance.session.mark`) | S | – | – | – | – | – | G | G | – |
+| **Examinations & Results (Pilot V1; doc 47 Task 5)** |
+| 64 | `exam.manage` (create examinations and schedule exam papers for eligible course offerings) | S | – | – | – | G | G | G | G | G |
+| 65 | `exam.marks.enter` (record and save draft marks or submit student scores for scheduled exam papers) | S | – | A | – | G | G | G | G | – |
+| 66 | `result.publish` (publish exam results making them official and student-visible; maker-checker separation) | C | – | – | – | G | G | G | G | G |
+| 67 | `result.read` (view class-wise marks registers or individual student results) | S | S | A | – | G | G | G | G | G |
+| **Finance, Dues & Receipts (Pilot V1; doc 47 Task 5)** |
+| 68 | `fee.structure.read` (view fee categories and fee structure configurations) | N | – | – | – | – | – | G | G | G |
+| 69 | `fee.structure.manage` (create and configure fee categories, structures, and components) | S | – | – | – | – | – | – | G | – |
+| 70 | `fee.dues.generate` (generate term fee dues assessments for students and cohorts) | S | – | – | – | – | – | G | G | – |
+| 71 | `fee.dues.read` (view student dues registers, class balances, and outstanding dues ledgers) | S | S | – | – | – | – | G | G | G |
+| 72 | `fee.receipt.record` (record offline payments and allocate to student dues) | S | – | – | – | – | – | G | G | – |
+| 73 | `fee.receipt.read` (view payment receipts and daily collection registers) | S | S | – | – | – | – | G | G | G |
+| 74 | `fee.receipt.reverse` (reverse a posted receipt with reason and step-up authentication) | C | – | – | – | – | – | – | G | – |
 
 ¹ FACULTY `student.profile.read` is `A` (assigned). In M1 it was not seeded and only the resolver contract was tested with a stub; Milestone 3 Batch 3 (doc 33 §2, X-12) seeds it with the real resolver: an ACTIVE teacher reads a student only while one of the teacher's faculty assignments and the student's course registration on the same PUBLISHED/CLOSED offering are both valid today. Existing tenants need their roles re-seeded (runbook `m3b3-electives-registrations-rollout.md`).
 
@@ -118,7 +138,7 @@ Support access to tenant data additionally requires a tenant-approved `platform_
 
 ## 3. Reserved namespaces (not seeded in M1)
 
-`attendance.*`, `enrollment.*`, `academic.term.*`, `academic.course.*`, `service.*`, `request.*`, `ticket.*`, `exam.*`, `result.*`, `finance.*`, `report.*`, `push.*` (M2). Each milestone adds its permissions to the catalog and the matrix **in the same change** as its routes (the route-coverage test fails otherwise).
+`enrollment.*`, `academic.term.*`, `academic.course.*`, `service.*`, `request.*`, `ticket.*`, `exam.*`, `result.*`, `finance.*`, `report.*`, `push.*` (M2). Each milestone adds its permissions to the catalog and the matrix **in the same change** as its routes (the route-coverage test fails otherwise).
 
 ---
 

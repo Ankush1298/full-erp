@@ -1,5 +1,10 @@
+import { spawnSync } from 'node:child_process';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE,
+  SupportGrantsNotImplementedError,
   createSupportGrant,
   createTenant,
   EMAIL_REGEX,
@@ -8,6 +13,13 @@ import {
   SLUG_REGEX,
   suspendTenant,
 } from '../../tools/platform/platform-cli.js';
+
+function walk(dir: string): string[] {
+  return readdirSync(dir).flatMap((n) => {
+    const p = resolve(dir, n);
+    return statSync(p).isDirectory() ? walk(p) : p.endsWith('.ts') ? [p] : [];
+  });
+}
 
 describe('Platform CLI (Unit)', () => {
   describe('Argument Parsing & Validation', () => {
@@ -231,51 +243,86 @@ describe('Platform CLI (Unit)', () => {
     });
   });
 
-  describe('createSupportGrant', () => {
-    it('enforces duration between 1 and 8 hours', async () => {
-      const mockDb = { query: vi.fn() };
-
-      await expect(
-        createSupportGrant(mockDb, {
-          tenant: 'org-1',
-          adminEmail: 'secops@campusos.test',
-          durationHours: 0,
-        }),
-      ).rejects.toThrow('Support grant duration must be between 1 and 8 hours.');
-
-      await expect(
-        createSupportGrant(mockDb, {
-          tenant: 'org-1',
-          adminEmail: 'secops@campusos.test',
-          durationHours: 9,
-        }),
-      ).rejects.toThrow('Support grant duration must be between 1 and 8 hours.');
+  describe('support grants (removed, fail closed)', () => {
+    it('the CLI refuses before connecting to anything, prints no token, and exits non-zero (no database env set)', () => {
+      const r = spawnSync(
+        'npx',
+        [
+          'tsx',
+          'tools/platform/cli.ts',
+          'support:grant',
+          '--tenant',
+          'x',
+          '--admin-email',
+          'a@b.test',
+        ],
+        {
+          cwd: resolve(__dirname, '../..'),
+          env: { PATH: process.env['PATH'] ?? '' },
+          encoding: 'utf8',
+        },
+      );
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain('not implemented');
+      expect(r.stdout).toBe('');
+      expect(`${r.stdout}${r.stderr}`).not.toMatch(/[A-Za-z0-9_-]{20,}\.[0-9a-f]{64}/); // no payload.signature token
     });
 
-    it('issues signed break-glass grant token for valid tenant', async () => {
-      const mockDb = {
-        query: vi.fn().mockResolvedValueOnce({
-          rows: [{ id: 'org-123', name: 'Valley College' }],
-        }),
-      };
+    it('no insecure fallback signing key and no grant-token minting remains in the platform tooling or the application', () => {
+      const files = [
+        ...walk(resolve(__dirname, '../../tools')),
+        ...walk(resolve(__dirname, '../../src')),
+      ];
+      expect(files.length).toBeGreaterThan(50);
+      for (const f of files) {
+        const text = readFileSync(f, 'utf8');
+        expect(text, f).not.toContain('support-grant-local-key');
+        expect(text, f).not.toMatch(/grantToken/);
+      }
+    });
 
-      const grant = await createSupportGrant(mockDb, {
-        tenant: 'valley-col',
-        adminEmail: 'secops@campusos.test',
-        durationHours: 4,
-        signingSecret: 'test-secret-key-123',
-      });
+    it('the CLI refuses before connecting to anything, prints no token, and exits non-zero (no database env set)', () => {
+      const r = spawnSync(
+        'npx',
+        [
+          'tsx',
+          'tools/platform/cli.ts',
+          'support:grant',
+          '--tenant',
+          'x',
+          '--admin-email',
+          'a@b.test',
+        ],
+        {
+          cwd: resolve(__dirname, '../..'),
+          env: { PATH: process.env['PATH'] ?? '' },
+          encoding: 'utf8',
+        },
+      );
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain('not implemented');
+      expect(r.stdout).toBe('');
+      expect(`${r.stdout}${r.stderr}`).not.toMatch(/[A-Za-z0-9_-]{20,}\.[0-9a-f]{64}/); // no payload.signature token
+    });
 
-      expect(grant.tenantId).toBe('org-123');
-      expect(grant.adminEmail).toBe('secops@campusos.test');
-      expect(grant.grantToken).toContain('.');
-      const [payloadB64] = grant.grantToken.split('.');
-      const parsedPayload = JSON.parse(Buffer.from(payloadB64!, 'base64url').toString('utf8')) as {
-        tenantId: string;
-        adminEmail: string;
-      };
-      expect(parsedPayload.tenantId).toBe('org-123');
-      expect(parsedPayload.adminEmail).toBe('secops@campusos.test');
+    it('no insecure fallback signing key and no HMAC grant minting remains in the platform tooling or the application', () => {
+      const files = [
+        ...walk(resolve(__dirname, '../../tools')),
+        ...walk(resolve(__dirname, '../../src')),
+      ];
+      for (const f of files) {
+        const text = readFileSync(f, 'utf8');
+        expect(text, f).not.toContain('support-grant-local-key');
+        expect(text, f).not.toMatch(/grantToken/);
+      }
+    });
+
+    it('createSupportGrant issues nothing: it always throws, whatever it is given', () => {
+      expect(() =>
+        (createSupportGrant as (...a: unknown[]) => unknown)('org-1', 'x@campusos.test', 4),
+      ).toThrow(SupportGrantsNotImplementedError);
+      expect(() => createSupportGrant()).toThrow(/not implemented/);
+      expect(SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE).not.toMatch(/signature/i);
     });
   });
 });

@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { Alert } from '../components/ui/Alert';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { StatCard } from '../components/ui/StatCard';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { TextField } from '../components/ui/TextField';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
 import { can } from '../features/auth/identity';
 import { isApiError } from '../lib/api/errors';
+import { fetchCampuses, type CampusItem } from '../lib/api/organisation-api';
+import { fetchTerminologyDetail, type TerminologyDetail } from '../lib/api/academics-api';
 import {
   DIRECTORY_REJECTED_MESSAGE,
   directoryFailure,
@@ -17,9 +23,11 @@ import {
 } from '../lib/api/messages';
 import {
   ADMISSION_NUMBER_RE,
+  createStudent,
   fetchStudentDirectory,
   lookupStudent,
   STUDENT_STATUSES,
+  type CreateStudentPayload,
   type StudentDirectoryEntry,
   type StudentStatus,
 } from '../lib/api/students-api';
@@ -47,7 +55,7 @@ function StudentTable({ label, rows }: { label: string; rows: StudentDirectoryEn
               <td>{s.admissionNumber}</td>
               <td>{s.displayName}</td>
               <td>
-                <Badge>{statusLabel(s.status)}</Badge>
+                <StatusBadge status={s.status} label={statusLabel(s.status)} />
               </td>
               <td>
                 <Link
@@ -171,26 +179,30 @@ function DirectoryCard() {
 
       {state.kind === 'loading' ? <Spinner label="Loading students…" /> : null}
       {state.kind === 'error' ? (
-        <div>
-          <Alert tone="error">{state.message}</Alert>
-          <Button type="button" variant="secondary" onClick={() => loadFirst(status)}>
-            Retry
-          </Button>
-        </div>
+        <ErrorState
+          title="Student directory error"
+          message={state.message}
+          onRetry={() => loadFirst(status)}
+          retryLabel="Retry"
+        />
       ) : null}
       {state.kind === 'ready' && rows.length === 0 ? (
-        <p className="field-hint">No students to show.</p>
+        <EmptyState
+          title="No students found"
+          description="No students to show."
+          compact
+        />
       ) : null}
       {state.kind === 'ready' && rows.length > 0 ? (
         <StudentTable label="Student directory" rows={rows} />
       ) : null}
       {state.kind === 'ready' && moreError ? (
-        <div>
-          <Alert tone="error">{moreError}</Alert>
-          <Button type="button" variant="secondary" onClick={() => loadFirst(status)}>
-            Start again
-          </Button>
-        </div>
+        <ErrorState
+          title="Next page error"
+          message={moreError}
+          onRetry={() => loadFirst(status)}
+          retryLabel="Start again"
+        />
       ) : null}
       {state.kind === 'ready' && nextCursor && !moreError ? (
         <Button type="button" variant="secondary" onClick={loadMore} disabled={loadingMore}>
@@ -255,16 +267,288 @@ function SearchCard() {
   );
 }
 
+function AdmissionsCard({
+  institutionType,
+  onStudentCreated,
+}: {
+  institutionType: 'SCHOOL' | 'COLLEGE' | 'UNIVERSITY' | null;
+  onStudentCreated?: () => void;
+}) {
+  const { client } = useAuth();
+  const campusSelectId = useId();
+  const [campuses, setCampuses] = useState<CampusItem[]>([]);
+  const [userId, setUserId] = useState('');
+  const [admissionNumber, setAdmissionNumber] = useState('');
+  const [admissionDate, setAdmissionDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [campusId, setCampusId] = useState('');
+  const [reason, setReason] = useState('Admission registration');
+  // Matching probes
+  const [name, setName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
+
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successId, setSuccessId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchCampuses(client)
+      .then((list) => {
+        setCampuses(list);
+        if (list.length === 1 && list[0]) {
+          setCampusId(list[0].id);
+        }
+      })
+      .catch(() => {
+        // If campus list fails or user lacks org.structure.read, continue with manual or org-level
+      });
+  }, [client]);
+
+  const isSchool = institutionType === 'SCHOOL';
+  const isUniversity = institutionType === 'UNIVERSITY';
+
+  const cardTitle = isSchool ? 'New admission' : isUniversity ? 'Register student' : 'Admit student';
+  const personLabel = isSchool ? 'pupil' : 'student';
+  const submitLabel = isSchool ? 'Confirm admission' : 'Register student';
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessId(null);
+
+    if (!userId.trim()) {
+      setError('User account ID is required.');
+      return;
+    }
+    if (!ADMISSION_NUMBER_RE.test(admissionNumber.trim())) {
+      setError('Admission number must be 1 to 50 letters, digits, "-" or "_".');
+      return;
+    }
+    if (!admissionDate.trim()) {
+      setError('Admission date is required.');
+      return;
+    }
+
+    setPending(true);
+    try {
+      const payload: CreateStudentPayload = {
+        userId: userId.trim(),
+        admissionNumber: admissionNumber.trim(),
+        admissionDate: admissionDate.trim(),
+        reason: reason.trim() || 'Admission registration',
+        ...(campusId ? { campusId } : {}),
+        ...(name.trim() ? { name: name.trim() } : {}),
+        ...(dateOfBirth.trim() ? { dateOfBirth: dateOfBirth.trim() } : {}),
+        ...(guardianPhone.trim() ? { guardianPhone: guardianPhone.trim() } : {}),
+        ...(acknowledged && duplicateWarning ? { duplicateAcknowledgement: duplicateWarning } : {}),
+      };
+
+      const res = await createStudent(client, payload);
+      setSuccessId(res.id);
+      setDuplicateWarning(null);
+      setAcknowledged(false);
+      setUserId('');
+      setAdmissionNumber('');
+      onStudentCreated?.();
+    } catch (err: unknown) {
+      if (isApiError(err)) {
+        if (err.status === 409) {
+          setError(
+            `A conflict or duplicate ${personLabel} record was detected (${err.code ?? 'CONFLICT'}). Please verify applicant identity.`,
+          );
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError(err instanceof Error ? err.message : `Failed to register ${personLabel}.`);
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Card title={cardTitle}>
+      <p className="field-hint">
+        {isSchool
+          ? 'Admit a pupil to this school or campus. Enrolment into classes and login issuance remain separate steps.'
+          : isUniversity
+            ? 'Register an admitted student under your authorized campus. Academic enrolment and logins remain separate steps.'
+            : 'Register an admitted student for the selected campus. Programme enrolment and logins remain separate steps.'}
+      </p>
+      <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
+        <TextField
+          label="User account ID (UUID)"
+          name="userId"
+          value={userId}
+          onChange={(e) => setUserId(e.target.value)}
+          hint="The active user account for this person."
+          required
+        />
+        <TextField
+          label="Admission number"
+          name="admissionNumber"
+          value={admissionNumber}
+          onChange={(e) => setAdmissionNumber(e.target.value)}
+          hint='1 to 50 letters, digits, "-" or "_". Unique across the institution.'
+          required
+        />
+        <TextField
+          label="Admission date"
+          name="admissionDate"
+          type="date"
+          value={admissionDate}
+          onChange={(e) => setAdmissionDate(e.target.value)}
+          required
+        />
+        {campuses.length > 0 ? (
+          <div className="field" style={{ maxWidth: '24rem' }}>
+            <label htmlFor={campusSelectId}>
+              {isSchool ? 'School / Campus' : isUniversity ? 'University Campus / College' : 'Campus'}
+            </label>
+            <select
+              id={campusSelectId}
+              value={campusId}
+              onChange={(e) => setCampusId(e.target.value)}
+            >
+              <option value="">Institution-wide (default)</option>
+              {campuses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+        <TextField
+          label="Reason for admission"
+          name="reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          hint="Audit trail reason (1 to 500 characters)."
+          required
+        />
+
+        <details style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 500 }}>
+            Duplicate detection probes (optional)
+          </summary>
+          <p className="field-hint" style={{ marginTop: '0.5rem' }}>
+            Used strictly for duplicate detection and never persisted on the student record.
+          </p>
+          <TextField
+            label="Full name"
+            name="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <TextField
+            label="Date of birth"
+            name="dateOfBirth"
+            type="date"
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+          />
+          <TextField
+            label="Guardian phone"
+            name="guardianPhone"
+            value={guardianPhone}
+            onChange={(e) => setGuardianPhone(e.target.value)}
+          />
+        </details>
+
+        {duplicateWarning ? (
+          <div style={{ marginBottom: '1rem' }}>
+            <Alert tone="info">
+              Potential duplicate {personLabel} identified. Check the box below if you have verified
+              that this is a distinct applicant and wish to acknowledge the warning.
+            </Alert>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(e) => setAcknowledged(e.target.checked)}
+              />
+              <span>I confirm that I have reviewed the duplicate alert and authorize admission.</span>
+            </label>
+          </div>
+        ) : null}
+
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        {successId ? (
+          <Alert tone="success">
+            {isSchool ? 'Pupil' : 'Student'} successfully admitted (ID: {successId}).{' '}
+            <Link to={`/students/${encodeURIComponent(successId)}`}>Open profile</Link>
+          </Alert>
+        ) : null}
+
+        <Button type="submit" disabled={pending || (Boolean(duplicateWarning) && !acknowledged)}>
+          {pending ? 'Submitting…' : submitLabel}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 export function StudentsPage() {
-  usePageTitle('Students');
-  const { identity } = useAuth();
+  const { identity, client } = useAuth();
+  const [terminology, setTerminology] = useState<TerminologyDetail | null>(null);
+
+  useEffect(() => {
+    fetchTerminologyDetail(client)
+      .then(setTerminology)
+      .catch(() => {});
+  }, [client]);
+
+  const instType = terminology?.institutionType ?? null;
+  const isSchool = instType === 'SCHOOL';
+  const pageTitle = isSchool ? 'Pupils & Admissions' : 'Students & Admissions';
+  usePageTitle(pageTitle);
+
+  const canCreate = Boolean(identity && can(identity, 'student.record.create'));
   const canList = Boolean(identity && can(identity, 'student.directory.list'));
   const canSearch = Boolean(identity && can(identity, 'student.directory.search'));
 
+  const leadText = isSchool
+    ? 'Manage school admissions and pupil records for your assigned school or campus.'
+    : instType === 'UNIVERSITY'
+      ? 'Manage university admissions and student records within your authorized campus.'
+      : 'Manage college admissions and student records across campuses.';
+
   return (
     <>
-      <h1>Students</h1>
-      <p className="lead">Student records you are allowed to see. This view is read-only.</p>
+      <PageHeader
+        title={pageTitle}
+        subtitle={leadText}
+        badge={
+          instType ? (
+            <StatusBadge
+              status={instType}
+              tone="info"
+              label={instType.charAt(0) + instType.slice(1).toLowerCase()}
+            />
+          ) : undefined
+        }
+      />
+      {canList || canCreate ? (
+        <div className="stat-grid" style={{ marginBottom: 'var(--space-4)' }}>
+          <StatCard
+            label="Institution Model"
+            value={instType ? instType.charAt(0) + instType.slice(1).toLowerCase() : 'Standard'}
+            tone="purple"
+            helper="Configured operational model"
+          />
+          <StatCard
+            label="Admissions Rights"
+            value={canCreate ? 'Authorized' : 'Read Only'}
+            tone={canCreate ? 'emerald' : 'amber'}
+            helper={canCreate ? 'Can register new records' : 'Directory viewing access'}
+          />
+        </div>
+      ) : null}
+      {canCreate ? <AdmissionsCard institutionType={instType} /> : null}
       {canSearch ? <SearchCard /> : null}
       {canList ? <DirectoryCard /> : null}
       {!canList && !canSearch ? (

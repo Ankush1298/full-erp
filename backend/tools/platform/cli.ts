@@ -7,12 +7,18 @@
  */
 import pg from 'pg';
 import {
-  createSupportGrant,
+  SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE,
   createTenant,
   parseArgs,
   seedTenant,
   suspendTenant,
 } from './platform-cli.js';
+import {
+  assertLocalTokenOutput,
+  issueFirstAdminInvitation,
+  issueFirstAdminMfaTicket,
+  revokeFirstAdminInvitation,
+} from './first-admin.js';
 
 function requiredEnv(name: string): string {
   const v = process.env[name];
@@ -29,6 +35,12 @@ async function main(argv: readonly string[]): Promise<void> {
     parsed = parseArgs(argv);
   } catch (err) {
     console.error((err as Error).message);
+    process.exit(1);
+  }
+
+  if (parsed.command === 'support:grant') {
+    // Fail closed BEFORE any database connection or secret is read (doc 48 §2).
+    console.error(`Error: ${SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE}`);
     process.exit(1);
   }
 
@@ -62,6 +74,9 @@ async function main(argv: readonly string[]): Promise<void> {
       console.log(`  Status: ${res.status}`);
       if (res.adminUserId) {
         console.log(`  Admin User ID: ${res.adminUserId} (${adminEmail})`);
+        console.log(
+          '  Next: admin:invite --tenant <slug> (the administrator has no invitation yet).',
+        );
       }
     } else if (command === 'tenant:seed') {
       const tenant = flags['tenant'];
@@ -84,31 +99,56 @@ async function main(argv: readonly string[]): Promise<void> {
 
       const res = await suspendTenant(client, tenant, reason);
       console.log(`Tenant "${res.name}" (${res.id}) has been SUSPENDED.`);
-    } else if (command === 'support:grant') {
+    } else if (command === 'admin:invite') {
       const tenant = flags['tenant'];
-      const adminEmail = flags['admin-email'];
-      const durationHours = flags['duration-hours'] ? Number(flags['duration-hours']) : 4;
-
-      if (!tenant || !adminEmail) {
-        console.error('Error: --tenant and --admin-email are required for support:grant.');
-        process.exit(1);
-      }
-
-      const res = await createSupportGrant(client, {
+      if (!tenant) throw new Error('--tenant is required for admin:invite.');
+      assertLocalTokenOutput(connectionString, process.env); // refuse BEFORE issuing anything
+      const hours = flags['hours'] ? Number(flags['hours']) : undefined;
+      const res = await issueFirstAdminInvitation(client, {
         tenant,
-        adminEmail,
-        durationHours,
-        signingSecret: process.env['SESSION_SECRET'],
+        ...(flags['admin-email'] ? { adminEmail: flags['admin-email'] } : {}),
+        ...(hours !== undefined ? { ttlHours: hours } : {}),
+        ...(flags['reason'] ? { reason: flags['reason'] } : {}),
       });
-
-      console.log('Break-glass support grant issued:');
-      console.log(`  Tenant ID:   ${res.tenantId}`);
-      console.log(`  Admin Email: ${res.adminEmail}`);
-      console.log(`  Grant Ticket: ${res.grantToken}`);
+      console.log(
+        'First-administrator invitation issued (shown once; store nowhere, share only with the administrator):',
+      );
+      console.log(`  Tenant ID:  ${res.tenantId}`);
+      console.log(`  User ID:    ${res.userId}`);
+      console.log(
+        `  Expires:    ${res.expiresAt}${res.reissued ? '  (an earlier unused invitation was withdrawn)' : ''}`,
+      );
+      console.log(`  Invitation: ${res.token}`);
+    } else if (command === 'admin:invite-revoke') {
+      const tenant = flags['tenant'];
+      if (!tenant) throw new Error('--tenant is required for admin:invite-revoke.');
+      const res = await revokeFirstAdminInvitation(client, {
+        tenant,
+        ...(flags['reason'] ? { reason: flags['reason'] } : {}),
+      });
+      console.log(
+        `Withdrew ${res.revoked} unused first-administrator invitation(s) for ${res.tenantId}.`,
+      );
+    } else if (command === 'admin:mfa-ticket') {
+      const tenant = flags['tenant'];
+      if (!tenant) throw new Error('--tenant is required for admin:mfa-ticket.');
+      assertLocalTokenOutput(connectionString, process.env);
+      const res = await issueFirstAdminMfaTicket(client, {
+        tenant,
+        ...(flags['admin-email'] ? { adminEmail: flags['admin-email'] } : {}),
+        ...(flags['reason'] ? { reason: flags['reason'] } : {}),
+      });
+      console.log(
+        'One-time MFA enrollment ticket issued (shown once; the administrator pastes it at enrollment):',
+      );
+      console.log(`  Tenant ID:  ${res.tenantId}`);
+      console.log(`  User ID:    ${res.userId}`);
+      console.log(`  Expires:    ${res.expiresAt}`);
+      console.log(`  Ticket:     ${res.ticket}`);
     } else {
       console.error(`Unknown command: ${command}`);
       console.error(
-        'Supported commands: tenant:create, tenant:seed, tenant:suspend, support:grant',
+        'Supported commands: tenant:create, tenant:seed, tenant:suspend, support:grant, admin:invite, admin:invite-revoke, admin:mfa-ticket',
       );
       process.exit(1);
     }

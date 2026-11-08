@@ -1,0 +1,18 @@
+# 04 — Hosting and Subprocessor Disclosure outline (draft)
+
+> **DRAFT — NOT LEGALLY APPROVED.** Prepared for owner and qualified-counsel review. Not published, not offered to any school, not a promise. Every clause tagged _[Contract]_, _[Process]_ or _[Technical]_ (doc 46 §2); _[Technical]_ may be stated to a school only where the cited control exists and passes its test. Bracketed items are open decisions.
+
+**Status of facts.** No production hosting, vendor or region is chosen (doc 46 §7); this is a template. Fill in only what is deployed.
+
+| Item                                                                     | Entry                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hosting model                                                            | [Anesa-managed cloud / institution-controlled]                                                                                                                                                                                    |
+| Provider, account owner, region(s) for database, object storage, backups | [owner decision]                                                                                                                                                                                                                  |
+| Operator access: who, how approved, how logged                           | [from draft 06]                                                                                                                                                                                                                   |
+| Sub-processors (name, purpose, data categories, region, safeguards)      | Database/hosting [ ]; object storage [ ]; backups [ ]; e-mail delivery [none in code — disabled]; SMS/WhatsApp [none]; AI provider [none — disabled adapter]; monitoring/log service [ ]; error tracking [ ]; support tooling [ ] |
+| Change notice period; objection right                                    | [days]                                                                                                                                                                                                                            |
+| Encryption at rest and in transit evidence                               | [to be evidenced]                                                                                                                                                                                                                 |
+| Backup retention and rotation                                            | [≤ 35 days is the design target, unconfirmed]                                                                                                                                                                                     |
+| Disclosure review cadence                                                | [e.g. each deployment change]                                                                                                                                                                                                     |
+
+Rule: the published list must match the deployed configuration; a release check compares them _[Process → Technical when automated]_.

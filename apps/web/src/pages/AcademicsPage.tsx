@@ -4,6 +4,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { TextField } from '../components/ui/TextField';
 import { usePageTitle } from '../components/usePageTitle';
@@ -4118,37 +4119,28 @@ export function AcademicsPage() {
   return (
     <LabelsContext value={labels}>
       <PeriodLabelsContext value={byCohort}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 'var(--space-2)',
-          }}
-        >
-          <h1>Academics</h1>
-          <div
-            style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}
-            role="group"
-            aria-label="Academics sections"
-          >
-            {tabs.map(([id, label]) => (
-              <Button
-                key={id}
-                variant={tab === id ? 'primary' : 'secondary'}
-                aria-pressed={tab === id}
-                onClick={() => setTab(id)}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
-        </div>
-        <p className="lead">
-          The academic calendar, course catalogue, sections, course offerings, electives, holidays
-          and term enrolment. You see and can change only what your role allows.
-        </p>
+        <PageHeader
+          title="Academics"
+          subtitle="The academic calendar, course catalogue, sections, course offerings, electives, holidays and term enrolment. You see and can change only what your role allows."
+          actions={
+            <div
+              style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}
+              role="group"
+              aria-label="Academics sections"
+            >
+              {tabs.map(([id, label]) => (
+                <Button
+                  key={id}
+                  variant={tab === id ? 'primary' : 'secondary'}
+                  aria-pressed={tab === id}
+                  onClick={() => setTab(id)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          }
+        />
         {tab === 'calendar' && <CalendarTab client={client} canManage={canTerm} />}
         {tab === 'courses' && <CoursesTab client={client} canManage={canCourse} />}
         {tab === 'sections' && (

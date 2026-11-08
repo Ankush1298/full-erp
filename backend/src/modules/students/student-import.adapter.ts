@@ -2,6 +2,7 @@ import type { TenantTx } from '../../shared/database/index.js';
 import type { TrustedContext } from '../../shared/tenancy/trusted-context.js';
 import type { AuditRequestMeta } from '../../shared/audit/index.js';
 import { AuthorizationEngine } from '../../shared/authorization/engine.js';
+import { isUuidV7 } from '../../shared/ids/uuidv7.js';
 import { parseDate } from '../people/validation.js';
 import {
   FileDuplicates,
@@ -32,7 +33,7 @@ import {
 // `name` is an OPTIONAL, MATCHING-ONLY column (doc 26 §3.5): it feeds the possible-duplicate check and is not stored on a
 // record. The date of birth and the guardian phone are NOT columns of a stored row: the client resupplies them with every
 // validate and commit request (`parseMatching`), so they never reach the database.
-const COLUMNS = ['email', 'admissionNumber', 'admissionDate', 'name'] as const;
+const COLUMNS = ['email', 'admissionNumber', 'admissionDate', 'name', 'campusId'] as const;
 const MAX_NAME = 200;
 const MAX_PHONE = 30;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -117,6 +118,14 @@ export const studentImportAdapter: ImportAdapter = {
         errors.push(issue('INVALID_NAME', 'The name is not valid.', 'name'));
       } else match.name = name;
     }
+
+    const campusId = text('campusId').toLowerCase();
+    if (campusId !== '') {
+      if (!isUuidV7(campusId)) {
+        errors.push(issue('INVALID_CAMPUS', 'Not a valid campus ID.', 'campusId'));
+      }
+    }
+
     if (errors.length > 0) return { proposal: null, errors: sortIssues(errors) };
     return {
       proposal: {
@@ -125,6 +134,7 @@ export const studentImportAdapter: ImportAdapter = {
         admissionNumber,
         admissionDate,
         initialStatus: 'ADMITTED',
+        ...(campusId !== '' ? { campusId } : {}),
       },
       errors: [],
       match,
@@ -193,6 +203,47 @@ export const studentImportAdapter: ImportAdapter = {
     );
     const takenNumbers = new Set(taken.rows.map((r) => r.admission_number));
 
+    const campusIds = [
+      ...new Set(
+        rows
+          .map((r) => (r.proposal.campusId ? String(r.proposal.campusId) : null))
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    let validCampuses = new Set<string>();
+    if (campusIds.length > 0) {
+      const cr = await tx.query<{ id: string }>(
+        `SELECT id FROM app.campuses WHERE organization_id = $1 AND id = ANY($2::uuid[])`,
+        [ctx.tenantId, campusIds],
+      );
+      validCampuses = new Set(cr.rows.map((c) => c.id));
+    }
+    const authorizedCampuses = new Set<string>();
+    for (const cId of validCampuses) {
+      try {
+        await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+          organization_id: ctx.tenantId,
+          campus_id: cId,
+        });
+        authorizedCampuses.add(cId);
+      } catch {
+        // Not authorized for this campus
+      }
+    }
+    let holdsOrgScope = false;
+    try {
+      await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+        organization_id: ctx.tenantId,
+      });
+      holdsOrgScope = true;
+    } catch {
+      // Actor does not hold organization-wide student.record.create
+    }
+
+    const firstCampus = [...authorizedCampuses][0];
+    const duplicateCampusScope =
+      !holdsOrgScope && firstCampus !== undefined ? { campusId: firstCampus } : undefined;
+
     // Possible duplicates: one set-based, read-only, tenant-scoped check for the whole file. It runs again, unchanged, in the
     // commit-time revalidation. It sees only rows that parsed, and never an account that is itself already a student.
     const fingerprints = await StudentDuplicateService.find(
@@ -204,6 +255,7 @@ export const studentImportAdapter: ImportAdapter = {
           ? { excludeUserId: byEmail.get(String(r.proposal.email))!.id }
           : {}),
       })),
+      duplicateCampusScope,
     );
     const possibleDuplicate = new Set(
       rows.flatMap((r, i) => (fingerprints[i] !== null ? [r.rowNo] : [])),
@@ -255,6 +307,31 @@ export const studentImportAdapter: ImportAdapter = {
             'ADMISSION_NUMBER_EXISTS',
             'A student with this admission number already exists.',
             'admissionNumber',
+          ),
+        );
+      }
+
+      const rowCampusId = proposal.campusId ? String(proposal.campusId) : undefined;
+      if (rowCampusId !== undefined) {
+        if (!validCampuses.has(rowCampusId)) {
+          errors.push(
+            issue('CAMPUS_NOT_FOUND', 'Campus not found in this organization.', 'campusId'),
+          );
+        } else if (!authorizedCampuses.has(rowCampusId)) {
+          errors.push(
+            issue(
+              'UNAUTHORIZED_CAMPUS',
+              'You are not authorized to admit students to this campus.',
+              'campusId',
+            ),
+          );
+        }
+      } else if (!holdsOrgScope) {
+        errors.push(
+          issue(
+            'CAMPUS_REQUIRED',
+            'A campus ID is required for campus-scoped admission.',
+            'campusId',
           ),
         );
       }
@@ -353,6 +430,7 @@ export const studentImportAdapter: ImportAdapter = {
         admissionNumber: String(proposal.admissionNumber),
         admissionDate: String(proposal.admissionDate),
         reason,
+        ...(proposal.campusId ? { campusId: String(proposal.campusId) } : {}),
       },
       meta,
     );

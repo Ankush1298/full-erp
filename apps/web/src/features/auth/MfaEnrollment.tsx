@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { QrCode } from './QrCode';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -17,11 +18,19 @@ interface MfaEnrollmentProps {
   isMfaRequired?: boolean;
   onComplete: () => void;
   onCancel?: () => void;
+  inModal?: boolean;
+  headingId?: string;
 }
 
 type Step = 'init' | 'scan' | 'codes';
 
-export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: MfaEnrollmentProps) {
+export function MfaEnrollment({
+  isMfaRequired = false,
+  onComplete,
+  onCancel,
+  inModal = false,
+  headingId = 'mfa-title',
+}: MfaEnrollmentProps) {
   const { client } = useAuth();
   const { runWithStepUp } = useStepUp();
   const [step, setStep] = useState<Step>('init');
@@ -92,29 +101,39 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
   };
 
   if (step === 'codes' && recoveryCodes) {
-    return (
-      <Card title="Emergency Recovery Codes">
+    const body = (
+      <div className="mfa-enrollment-flow">
+        {inModal ? (
+          <div className="auth-header">
+            <div className="auth-icon-wrap auth-icon-wrap--success" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="32"
+                height="32"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <h1 id={headingId}>Emergency Recovery Codes</h1>
+          </div>
+        ) : null}
         <Alert tone="info">
           Save these one-time recovery codes in a secure password manager or offline location. They
           will never be displayed again.
         </Alert>
 
-        <div
-          style={{
-            fontFamily: 'monospace',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: 'var(--space-2)',
-            padding: 'var(--space-3)',
-            background: 'var(--color-bg)',
-            borderRadius: 'var(--radius)',
-            margin: 'var(--space-4) 0',
-          }}
-        >
+        <div className="recovery-codes-grid">
           {recoveryCodes.map((code, idx) => (
-            <span key={idx} style={{ padding: 'var(--space-1)' }}>
-              {code}
-            </span>
+            <div key={idx} className="recovery-code-pill">
+              <span className="recovery-code-num">{idx + 1}.</span>
+              <code className="recovery-code-val">{code}</code>
+            </div>
           ))}
         </div>
 
@@ -125,6 +144,7 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
         <Button
           type="button"
           variant="primary"
+          className={inModal ? 'btn-block' : undefined}
           onClick={() => {
             setRecoveryCodes(null);
             onComplete();
@@ -132,38 +152,54 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
         >
           I have saved my recovery codes
         </Button>
-      </Card>
+      </div>
     );
+
+    return inModal ? body : <Card title="Emergency Recovery Codes">{body}</Card>;
   }
 
   if (step === 'scan' && enrollData) {
-    return (
-      <Card title="Configure Authenticator App">
+    const body = (
+      <div className="mfa-enrollment-flow">
+        {inModal ? (
+          <div className="auth-header">
+            <div className="auth-icon-wrap" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="32"
+                height="32"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              </svg>
+            </div>
+            <h1 id={headingId}>Configure Authenticator App</h1>
+          </div>
+        ) : null}
         <p className="muted">
-          Scan the code or enter the secret key below into your authenticator app (such as Google
-          Authenticator, 1Password, or Bitwarden).
+          Scan this QR code with your authenticator app (such as Google Authenticator, 1Password, or
+          Bitwarden), or enter the setup key below.
         </p>
+
+        <div className="qr-code-wrapper">
+          <QrCode
+            value={enrollData.otpauthUri}
+            label="QR code for your authenticator app. If you cannot scan it, use the setup key shown below."
+          />
+        </div>
 
         {error ? <Alert tone="error">{error}</Alert> : null}
 
-        <div style={{ margin: 'var(--space-4) 0' }}>
-          <span style={{ fontWeight: 600, display: 'block', marginBottom: 'var(--space-1)' }}>
-            Manual Entry Secret Key:
-          </span>
-          <code
-            style={{
-              display: 'block',
-              padding: 'var(--space-3)',
-              background: 'var(--color-bg)',
-              borderRadius: 'var(--radius)',
-              fontSize: '1.1rem',
-              letterSpacing: '0.1em',
-              wordBreak: 'break-all',
-              userSelect: 'all',
-            }}
-          >
-            {formatSecret(enrollData.secret)}
-          </code>
+        <div className="setup-key-block">
+          <span className="setup-key-label">Can’t scan? Enter this setup key:</span>
+          <code className="setup-key-code">{formatSecret(enrollData.secret)}</code>
         </div>
 
         <form
@@ -171,6 +207,7 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
             void handleVerify(e);
           }}
           noValidate
+          className="auth-form"
         >
           <TextField
             label="6-Digit Verification Code"
@@ -188,14 +225,20 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
             disabled={busy}
           />
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-            <Button type="submit" variant="primary" disabled={busy}>
+          <div className="auth-actions-stack">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={busy}
+              className={inModal ? 'btn-block' : undefined}
+            >
               {busy ? 'Confirming…' : 'Confirm Setup'}
             </Button>
             <Button
               type="button"
               variant="secondary"
               disabled={busy}
+              className={inModal ? 'btn-block' : undefined}
               onClick={() => {
                 void handleCancel();
               }}
@@ -204,12 +247,33 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
             </Button>
           </div>
         </form>
-      </Card>
+      </div>
     );
+
+    return inModal ? body : <Card title="Configure Authenticator App">{body}</Card>;
   }
 
-  return (
-    <Card title="Set Up Two-Factor Authentication">
+  const body = (
+    <div className="mfa-enrollment-flow">
+      {inModal ? (
+        <div className="auth-header">
+          <div className="auth-icon-wrap" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="32"
+              height="32"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </div>
+          <h1 id={headingId}>Set Up Two-Factor Authentication</h1>
+        </div>
+      ) : null}
       <p className="muted">
         Two-factor authentication adds an extra layer of security to your account by requiring a
         verification code from your mobile authenticator application.
@@ -222,6 +286,7 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
           void handleStart(e);
         }}
         noValidate
+        className="auth-form"
       >
         {isMfaRequired ? (
           <TextField
@@ -236,17 +301,30 @@ export function MfaEnrollment({ isMfaRequired = false, onComplete, onCancel }: M
           />
         ) : null}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-          <Button type="submit" variant="primary" disabled={busy}>
+        <div className="auth-actions-stack">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={busy}
+            className={inModal ? 'btn-block' : undefined}
+          >
             {busy ? 'Starting…' : 'Begin Setup'}
           </Button>
           {onCancel ? (
-            <Button type="button" variant="secondary" disabled={busy} onClick={onCancel}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy}
+              className={inModal ? 'btn-block' : undefined}
+              onClick={onCancel}
+            >
               Cancel
             </Button>
           ) : null}
         </div>
       </form>
-    </Card>
+    </div>
   );
+
+  return inModal ? body : <Card title="Set Up Two-Factor Authentication">{body}</Card>;
 }

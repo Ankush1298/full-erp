@@ -87,12 +87,12 @@ export class StudentStatusService {
     if (!row) throw resourceNotFound();
 
     const enrolment = await lockActiveEnrolment(tx, ctx.tenantId, id);
-    // The scope is what the database holds: the ACTIVE enrolment's frozen campus/department, or nothing at all.
+    const effectiveCampusId = enrolment?.campus_id ?? row.campus_id;
+    // The scope is what the database holds: the ACTIVE enrolment's frozen campus/department, or the student's admission campus.
     await AuthorizationEngine.assert(tx, ctx, STATUS_CHANGE_PERMISSION, {
       organization_id: ctx.tenantId,
-      ...(enrolment
-        ? { campus_id: enrolment.campus_id, department_id: enrolment.department_id }
-        : {}),
+      ...(effectiveCampusId ? { campus_id: effectiveCampusId } : {}),
+      ...(enrolment ? { department_id: enrolment.department_id } : {}),
     });
 
     // Only now may the caller learn anything about the stored version or state.

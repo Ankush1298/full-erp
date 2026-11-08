@@ -314,6 +314,7 @@ describe('contract gate: no code path authorises a contract migration implicitly
       'tests/integration/student-atomicity.test.ts',
       'tests/security/academic-structure-static.test.ts',
       'tests/support/global-db.ts',
+      'tests/support/rehearsal-stack.ts', // browser-rehearsal stack: migrates only a throw-away PostgreSQL it creates itself (doc 47 A2)
       'tests/unit/migrate-plan.test.ts',
     ]);
   });

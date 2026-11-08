@@ -4,7 +4,11 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
 import { can } from '../features/auth/identity';
@@ -70,12 +74,12 @@ function SectionState<T>({
   if (state.kind === 'loading') return <Spinner label={`Loading ${label}…`} />;
   if (state.kind === 'error')
     return (
-      <div>
-        <Alert tone="error">{state.message}</Alert>
-        <Button type="button" variant="secondary" onClick={retry}>
-          Retry {label}
-        </Button>
-      </div>
+      <ErrorState
+        message={state.message}
+        onRetry={retry}
+        retryLabel={`Retry ${label}`}
+        compact
+      />
     );
   return <>{children(state.data)}</>;
 }
@@ -103,7 +107,11 @@ function IdentifiersCard({ client, studentId }: { client: ApiClient; studentId: 
       <SectionState state={state} retry={retry} label="identifiers">
         {(rows) =>
           rows.length === 0 ? (
-            <p className="field-hint">No identifiers are recorded for this student.</p>
+            <EmptyState
+              title="No identifiers"
+              description="No identifiers are recorded for this student."
+              compact
+            />
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table" aria-label="Identifiers">
@@ -167,12 +175,12 @@ function EnrolmentTable({
   return (
     <>
       {terms.state.kind === 'error' ? (
-        <div>
-          <Alert tone="error">{terms.state.message}</Alert>
-          <Button type="button" variant="secondary" onClick={terms.retry}>
-            Retry term details
-          </Button>
-        </div>
+        <ErrorState
+          message={terms.state.message}
+          onRetry={terms.retry}
+          retryLabel="Retry term details"
+          compact
+        />
       ) : null}
       <div style={{ overflowX: 'auto' }}>
         <table className="data-table" aria-label="Term enrolments">
@@ -191,7 +199,9 @@ function EnrolmentTable({
               <tr key={e.id}>
                 <td>{names.get(e.termId) ?? missing}</td>
                 <td>{e.periodNo}</td>
-                <td>{statusLabel(e.status)}</td>
+                <td>
+                  <StatusBadge status={e.status} label={statusLabel(e.status)} />
+                </td>
                 <td>{statusLabel(e.enrollmentType)}</td>
                 <td>{e.rollNumber ?? 'Not assigned'}</td>
                 <td>
@@ -227,7 +237,11 @@ function EnrolmentsCard({
       <SectionState state={state} retry={retry} label="term enrolments">
         {(rows) =>
           rows.length === 0 ? (
-            <p className="field-hint">No term enrolments are recorded for this student.</p>
+            <EmptyState
+              title="No term enrolments"
+              description="No term enrolments are recorded for this student."
+              compact
+            />
           ) : (
             <EnrolmentTable client={client} rows={rows} canReadTerms={canReadTerms} />
           )
@@ -566,12 +580,16 @@ export function StudentProfilePage() {
   if (record.kind === 'error')
     return (
       <>
-        <h1>Student profile</h1>
-        <Alert tone="error">{record.message}</Alert>
-        <Button type="button" variant="secondary" onClick={load}>
-          Retry
-        </Button>
-        {back}
+        <PageHeader
+          title="Student profile"
+          breadcrumbs={<Link to="/students">Back to students</Link>}
+        />
+        <ErrorState
+          title="Student record error"
+          message={record.message}
+          onRetry={load}
+          retryLabel="Retry"
+        />
       </>
     );
 
@@ -582,15 +600,18 @@ export function StudentProfilePage() {
 
   return (
     <>
-      {back}
-      <h1>Student {s.admissionNumber}</h1>
+      <PageHeader
+        title={`Student ${s.admissionNumber}`}
+        breadcrumbs={<Link to="/students">Back to students</Link>}
+        badge={<StatusBadge status={s.status} label={statusLabel(s.status)} />}
+      />
       <Card title="Record">
         <dl className="defs">
           <dt>Admission number</dt>
           <dd>{s.admissionNumber}</dd>
           <dt>Status</dt>
           <dd>
-            <Badge>{statusLabel(s.status)}</Badge>
+            <StatusBadge status={s.status} label={statusLabel(s.status)} />
           </dd>
           <dt>Status since</dt>
           <dd>{s.statusChangedAt ? s.statusChangedAt.slice(0, 10) : 'Not recorded'}</dd>

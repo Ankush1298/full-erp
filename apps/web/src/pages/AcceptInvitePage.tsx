@@ -42,16 +42,34 @@ export function AcceptInvitePage() {
 
   if (!isTokenValid) {
     return (
-      <div className="auth-page">
+      <div className="auth-page brand-state-page brand-state-page--recovery">
         <main className="auth-main" id="main">
-          <div className="auth-card">
-            <Logo />
+          <div className="auth-card brand-auth-card">
+            <div className="auth-brand-badge">
+              <Logo />
+            </div>
+            <div className="auth-icon-wrap auth-icon-wrap--error" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="36"
+                height="36"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
             <h1>Invalid invitation link</h1>
             <Alert tone="error">
               This invitation link is invalid or incomplete. Please check the link from your
               invitation email or contact your administrator.
             </Alert>
-            <div style={{ marginTop: 'var(--space-4)' }}>
+            <div style={{ marginTop: 'var(--space-4)', width: '100%' }}>
               <Link to="/login" className="btn btn-secondary btn-block">
                 Go to Sign in
               </Link>
@@ -65,10 +83,27 @@ export function AcceptInvitePage() {
 
   if (accepted) {
     return (
-      <div className="auth-page">
+      <div className="auth-page brand-state-page brand-state-page--recovery">
         <main className="auth-main" id="main">
-          <div className="auth-card">
-            <Logo />
+          <div className="auth-card brand-auth-card">
+            <div className="auth-brand-badge">
+              <Logo />
+            </div>
+            <div className="auth-icon-wrap auth-icon-wrap--success" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="36"
+                height="36"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
             <h1>Invitation accepted</h1>
             <Alert tone="success">
               Your invitation has been accepted and your account is active.
@@ -76,7 +111,7 @@ export function AcceptInvitePage() {
             <p className="muted" style={{ marginTop: 'var(--space-3)' }}>
               You can now sign in using your email address and new password.
             </p>
-            <div style={{ marginTop: 'var(--space-4)' }}>
+            <div style={{ marginTop: 'var(--space-4)', width: '100%' }}>
               <Link to="/login" className="btn btn-primary btn-block">
                 Sign in to your account
               </Link>
@@ -144,10 +179,12 @@ export function AcceptInvitePage() {
   }
 
   return (
-    <div className="auth-page">
+    <div className="auth-page brand-state-page brand-state-page--recovery">
       <main className="auth-main" id="main">
-        <div className="auth-card">
-          <Logo />
+        <div className="auth-card brand-auth-card">
+          <div className="auth-brand-badge">
+            <Logo />
+          </div>
           <h1>Accept invitation</h1>
           {emailHint ? (
             <p className="muted">
@@ -157,7 +194,7 @@ export function AcceptInvitePage() {
             <p className="muted">Create a password to activate your campus account.</p>
           )}
           {formError ? <Alert tone="error">{formError}</Alert> : null}
-          <form onSubmit={(e) => void onSubmit(e)} noValidate>
+          <form onSubmit={(e) => void onSubmit(e)} noValidate className="auth-form">
             <TextField
               label="New password"
               name="password"

@@ -49,6 +49,11 @@ export const CreateStudentBodySchema = Type.Object(
       pattern: ADMISSION_NUMBER_PATTERN,
     }),
     admissionDate: DateSchema,
+    /**
+     * Optional admission context: when specified, authorizes campus-scoped admissions staff (e.g. REGISTRAR or CAMPUS_ADMIN)
+     * for their assigned campus. When omitted, requires ORGANIZATION scope (existing organization administrator behaviour).
+     */
+    campusId: Type.Optional(UuidV7Schema),
     reason: ReasonSchema,
     /**
      * MATCHING-ONLY inputs of the possible-duplicate check (doc 26 §3.5). All optional; when any is missing or unusable the
@@ -77,6 +82,7 @@ export const StudentRecordSchema = Type.Object(
     id: UuidV7Schema,
     organizationId: UuidV7Schema,
     userId: UuidV7Schema,
+    campusId: Type.Union([UuidV7Schema, Type.Null()]),
     admissionNumber: Type.String(),
     admissionDate: Type.Union([Type.String(), Type.Null()]),
     status: StudentStatusSchema,

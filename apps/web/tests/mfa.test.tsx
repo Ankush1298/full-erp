@@ -38,6 +38,13 @@ describe('MFA frontend experience', () => {
       await screen.findByRole('heading', { name: 'Configure Authenticator App' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/JBSW Y3DP EHPK 3PXP/)).toBeInTheDocument();
+    // A scannable QR code is drawn locally as inline SVG (no image URL, no external request), the key stays as a fallback
+    const qr = screen.getByRole('img', { name: /QR code for your authenticator app/i });
+    expect(qr.tagName.toLowerCase()).toBe('svg');
+    expect(qr.querySelector('path')?.getAttribute('d')?.length ?? 0).toBeGreaterThan(200);
+    expect(document.querySelector('img')).toBeNull();
+    expect(qr.outerHTML).not.toMatch(/http|data:|href/i);
+    expect(screen.getByText(/Can.t scan\? Enter this setup key/)).toBeInTheDocument();
 
     // Step 3: Enter verification code
     const codeInput = screen.getByLabelText(/6-Digit Verification Code/);
@@ -58,6 +65,21 @@ describe('MFA frontend experience', () => {
     expect(await screen.findByText('Enabled (TOTP)')).toBeInTheDocument();
     expect(screen.getByText('Remaining Recovery Codes')).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
+  });
+
+  it('a wrong enrollment ticket (401 INVALID_TICKET) shows an error and keeps the user signed in', async () => {
+    const b = createFakeBackend({ session: true, me: ADMIN });
+    b.state.mfa.invalidTicket = true;
+    const user = userEvent.setup();
+    renderApp(b, '/account');
+    await user.click(
+      await screen.findByRole('button', { name: 'Set up two-factor authentication' }),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Begin Setup' }));
+    expect(await screen.findByText('Invalid or expired enrollment ticket.')).toBeInTheDocument();
+    expect(screen.queryByText(/session has expired/i)).not.toBeInTheDocument();
+    expect(b.state.session).toBeTruthy(); // the server session is untouched
+    expect(screen.getByRole('button', { name: 'Begin Setup' })).toBeInTheDocument(); // still on the dialog, not the landing page
   });
 
   it('regenerates recovery codes from AccountPage', async () => {

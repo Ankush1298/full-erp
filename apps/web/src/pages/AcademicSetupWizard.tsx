@@ -407,21 +407,26 @@ function StepBody(props: {
   switch (props.step) {
     case 'institution':
       return (
-        <TerminologyEditor
-          client={client}
-          canEdit={props.canEditTerminology}
-          onSaved={() => {
-            props.onLabelsChanged();
-            onChanged();
-          }}
-        />
+        <>
+          <InstitutionTypeForm client={client} canEdit={props.canEditTerminology} />
+          <TerminologyEditor
+            client={client}
+            canEdit={props.canEditTerminology}
+            onSaved={() => {
+              props.onLabelsChanged();
+              onChanged();
+            }}
+          />
+        </>
       );
     case 'campuses':
       return (
         <>
           <CampusTable w={props.w} />
           {has('org.campus.manage') && <CampusForm client={client} onDone={onChanged} />}
-          {has('org.department.manage') && <DepartmentForm client={client} onDone={onChanged} />}
+          {has('org.department.manage') && (
+            <DepartmentForm client={client} onDone={onChanged} refresh={props.w} />
+          )}
         </>
       );
     case 'programmes':
@@ -649,9 +654,18 @@ function CampusForm({ client, onDone }: { client: ApiClient; onDone: () => void 
   );
 }
 
-function DepartmentForm({ client, onDone }: { client: ApiClient; onDone: () => void }) {
+function DepartmentForm({
+  client,
+  onDone,
+  refresh,
+}: {
+  client: ApiClient;
+  onDone: () => void;
+  /** Changes whenever the wizard reloads, so a campus created just above appears in the list (found in the browser rehearsal). */
+  refresh?: unknown;
+}) {
   const [tick, setTick] = useState(0);
-  const campuses = useOptions(() => fetchCampuses(client), [client, tick]);
+  const campuses = useOptions(() => fetchCampuses(client), [client, tick, refresh]);
   return (
     <QuickCreate
       title="Add a department"
@@ -1187,6 +1201,109 @@ export function validateLabels(slots: Draft, types: Draft): Draft {
       errors[`pt:${code}`] = `Same as the ${twin[0]} label; labels must differ.`;
   }
   return errors;
+}
+
+const INSTITUTION_TYPES = [
+  ['SCHOOL', 'School'],
+  ['COLLEGE', 'College'],
+  ['UNIVERSITY', 'University'],
+] as const;
+
+/**
+ * Doc 44: the institution picks School, College or University. It changes the role names and wording shown, never what anyone
+ * may do. The server refuses a change once academic years exist.
+ */
+function InstitutionTypeForm({ client, canEdit }: { client: ApiClient; canEdit: boolean }) {
+  const { runWithStepUp } = useStepUp();
+  const [current, setCurrent] = useState<string | null | undefined>(undefined);
+  const [version, setVersion] = useState<number | null>(null);
+  const [choice, setChoice] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await fetchTerminologyDetail(client);
+      setCurrent(d.institutionType);
+      setChoice(d.institutionType ?? '');
+      if (canEdit) {
+        const row = (await fetchSettings(client)).find((x) => x.key === 'institution.type');
+        setVersion(row?.version ?? null);
+      }
+    } catch (err) {
+      setError(academicsErrorMessage(err));
+    }
+  }, [client, canEdit]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (error) return <Alert tone="error">{error}</Alert>;
+  if (current === undefined) return <Spinner label="Loading institution type…" />;
+  const name = INSTITUTION_TYPES.find(([v]) => v === current)?.[1];
+  if (!canEdit)
+    return (
+      <p className="muted">
+        Institution type: {name ?? 'not chosen yet'}. Only an organization-wide settings
+        administrator can choose it.
+      </p>
+    );
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!choice) return setMsg({ ok: false, text: 'Choose School, College or University.' });
+    if (reason.trim().length < 5)
+      return setMsg({ ok: false, text: 'Give a reason of at least 5 characters.' });
+    setPending(true);
+    setMsg(null);
+    try {
+      await runWithStepUp(() =>
+        putSetting(client, 'institution.type', choice, reason.trim(), version),
+      );
+      setMsg({
+        ok: true,
+        text: 'Institution type saved. Role names update the next time the app loads; no permission changed.',
+      });
+      setReason('');
+      await load();
+    } catch (err) {
+      setMsg({
+        ok: false,
+        text:
+          isApiError(err) && err.status === 409
+            ? 'The institution type cannot be changed once academic years exist.'
+            : academicsErrorMessage(err),
+      });
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <form onSubmit={(e) => void save(e)} noValidate aria-label="Institution type">
+      <h4>Institution type</h4>
+      <p className="muted">
+        Currently: {name ?? 'not chosen yet'}. This sets the role names and wording; it never
+        changes what anyone is allowed to do.
+      </p>
+      <label>
+        Type of institution
+        <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+          <option value="">Choose…</option>
+          {INSTITUTION_TYPES.map(([v, l]) => (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </label>
+      <TextField label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+      {msg && <Alert tone={msg.ok ? 'success' : 'error'}>{msg.text}</Alert>}
+      <Button type="submit" pending={pending}>
+        Save institution type
+      </Button>
+    </form>
+  );
 }
 
 function TerminologyEditor({

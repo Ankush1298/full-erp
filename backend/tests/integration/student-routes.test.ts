@@ -660,6 +660,7 @@ describe('GET /students/:id', () => {
       [
         'admissionDate',
         'admissionNumber',
+        'campusId',
         'createdAt',
         'id',
         'organizationId',

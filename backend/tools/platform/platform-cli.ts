@@ -1,4 +1,3 @@
-import { createHmac } from 'node:crypto';
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import {
   seedMfaPermissions,
@@ -23,13 +22,6 @@ export interface TenantRecord {
   adminUserId?: string | undefined;
 }
 
-export interface SupportGrantResult {
-  tenantId: string;
-  adminEmail: string;
-  expiresAt: string;
-  grantToken: string;
-}
-
 export function parseArgs(argv: readonly string[]): {
   command: string;
   flags: Record<string, string>;
@@ -37,7 +29,7 @@ export function parseArgs(argv: readonly string[]): {
   const command = argv[0];
   if (!command || command === '--help' || command === '-h') {
     throw new Error(
-      'Usage: tsx tools/platform/cli.ts <tenant:create|tenant:seed|tenant:suspend|support:grant> [options]',
+      'Usage: tsx tools/platform/cli.ts <tenant:create|tenant:seed|tenant:suspend|admin:invite|admin:invite-revoke|admin:mfa-ticket> [options]',
     );
   }
 
@@ -204,57 +196,21 @@ export async function suspendTenant(
 }
 
 /**
- * Issues a time-bounded, tenant-approved platform break-glass support grant token.
- * Max duration: 8 hours (ADR-002, 05-tenant-isolation-model.md).
+ * Platform support grants are NOT implemented (doc 46 P0-3; doc 48). The earlier command signed a token with a fallback
+ * key that nothing stored, audited or accepted, which looked like a control and was not one. It now fails closed: this
+ * issues no token, reads nothing, and has no signing path. A real mechanism needs the designed platform realm (stored,
+ * tenant-approved, time-boxed, audited grants; doc 05 and 06 §9) and its own owner-approved design.
  */
-export async function createSupportGrant(
-  db: SqlExecutor,
-  options: {
-    tenant: string;
-    adminEmail: string;
-    durationHours?: number | undefined;
-    signingSecret?: string | undefined;
-  },
-): Promise<SupportGrantResult> {
-  const ident = options.tenant.trim();
-  const email = options.adminEmail.trim().toLowerCase();
-  const hours = options.durationHours ?? 4;
+export const SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE =
+  'Platform support grants are not implemented. No support access token can be issued; use the documented privileged-access procedure (docs/runbooks/database-credential-separation.md) until a tenant-approved, audited grant mechanism exists.';
 
-  if (hours < 1 || hours > 8) {
-    throw new Error('Support grant duration must be between 1 and 8 hours.');
+export class SupportGrantsNotImplementedError extends Error {
+  constructor() {
+    super(SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE);
+    this.name = 'SupportGrantsNotImplementedError';
   }
+}
 
-  if (!EMAIL_REGEX.test(email)) {
-    throw new Error('Invalid administrator email format.');
-  }
-
-  const res = await db.query(
-    `SELECT id, name FROM app.organizations WHERE id::text = $1 OR slug = $1`,
-    [ident],
-  );
-
-  if (res.rows.length === 0) {
-    throw new Error(`Organization "${ident}" not found.`);
-  }
-
-  const tenantId = res.rows[0]!['id'] as string;
-  const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-  const secret = options.signingSecret || 'support-grant-local-key';
-
-  const payload = JSON.stringify({
-    tenantId,
-    adminEmail: email,
-    expiresAt,
-    grantId: uuidv7(),
-  });
-
-  const signature = createHmac('sha256', secret).update(payload).digest('hex');
-  const grantToken = `${Buffer.from(payload).toString('base64url')}.${signature}`;
-
-  return {
-    tenantId,
-    adminEmail: email,
-    expiresAt,
-    grantToken,
-  };
+export function createSupportGrant(): never {
+  throw new SupportGrantsNotImplementedError();
 }

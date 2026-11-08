@@ -186,6 +186,11 @@ describe('setup wizard: progress, resume and navigation', () => {
     await waitFor(() =>
       expect(b.callsTo('GET', '/academics/setup-wizard').length).toBeGreaterThan(before),
     );
+    // browser rehearsal finding: a campus created just above must be selectable in the department form without a page reload
+    const dept = screen.getByRole('form', { name: 'Add a department' });
+    await waitFor(() =>
+      expect(within(dept).getByRole('option', { name: 'EAST Campus (EAST)' })).toBeInTheDocument(),
+    );
   });
 });
 
@@ -260,6 +265,51 @@ describe('activation from the Calendar tab (PATCH) gets the same readiness answe
     ).toBeInTheDocument();
     expect(b.callsTo('PATCH', '/academics/terms/t1')[0]?.body).toEqual({ status: 'ACTIVE' });
     expect(screen.queryByText('server text that must never be shown')).not.toBeInTheDocument();
+  });
+});
+
+describe('institution type (doc 44)', () => {
+  it('shows nothing chosen, validates, saves with If-Match and a reason, and says no permission changed', async () => {
+    const b = createFakeBackend({ session: true, me: WIZ_ADMIN });
+    school(b);
+    renderApp(b, '/academics');
+    await openWizard();
+    await userEvent.click(stepButton(/1\. Institution and terminology/));
+    const form = await screen.findByRole('form', { name: 'Institution type' });
+    expect(within(form).getByText(/not chosen yet/)).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Save institution type' }));
+    expect(within(form).getByText('Choose School, College or University.')).toBeInTheDocument();
+    await userEvent.selectOptions(within(form).getByLabelText('Type of institution'), 'SCHOOL');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save institution type' }));
+    expect(within(form).getByText(/reason of at least 5/)).toBeInTheDocument();
+    expect(b.callsTo('PUT', '/organization/settings/institution.type')).toHaveLength(0);
+    await userEvent.type(within(form).getByLabelText('Reason'), 'Chosen at onboarding');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save institution type' }));
+    expect(await within(form).findByText(/no permission changed/)).toBeInTheDocument();
+    const put = b.callsTo('PUT', '/organization/settings/institution.type')[0]!;
+    expect(put.headers['if-match']).toBe('"0"');
+    expect(put.body).toEqual({ value: 'SCHOOL', reason: 'Chosen at onboarding' });
+    expect(await within(form).findByText(/Currently: School/)).toBeInTheDocument();
+  });
+
+  it('a server refusal after academic years exist is explained, and a non-manager sees a read-only line', async () => {
+    const b = createFakeBackend({ session: true, me: WIZ_ADMIN });
+    school(b);
+    b.state.academics.institutionType = 'COLLEGE';
+    b.state.academics.institutionTypeVersion = 1;
+    b.state.academics.failNext = { status: 409, code: 'CONFLICT' };
+    renderApp(b, '/academics');
+    await openWizard();
+    await userEvent.click(stepButton(/1\. Institution and terminology/));
+    const form = await screen.findByRole('form', { name: 'Institution type' });
+    await userEvent.selectOptions(within(form).getByLabelText('Type of institution'), 'SCHOOL');
+    await userEvent.type(within(form).getByLabelText('Reason'), 'Trying to switch');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save institution type' }));
+    expect(
+      await within(form).findByText(
+        'The institution type cannot be changed once academic years exist.',
+      ),
+    ).toBeInTheDocument();
   });
 });
 

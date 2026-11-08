@@ -142,6 +142,20 @@ export async function createIsolatedTenant(passwordHash: string): Promise<Isolat
       const k = new pg.Client({ connectionString: inject('dbAdminUrl') });
       await k.connect();
       try {
+        // Attendance history is append-only for every role (triggers reject DELETE); a disposable test tenant is the one
+        // place it is removed, as the harness superuser with triggers off for this statement batch only.
+        await k.query('SET session_replication_role = replica');
+        try {
+          for (const table of [
+            'app.attendance_record_revisions',
+            'app.attendance_records',
+            'app.class_sessions',
+          ]) {
+            await k.query(`DELETE FROM ${table} WHERE organization_id = $1`, [orgId]);
+          }
+        } finally {
+          await k.query('SET session_replication_role = DEFAULT');
+        }
         for (const table of [
           'app.idempotency_keys',
           // import rows reference jobs, students and employees (RESTRICT); identifiers reference students (RESTRICT)

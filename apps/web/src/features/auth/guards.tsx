@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { LandingPage } from '../landing/LandingPage';
 import { Spinner } from '../../components/ui/Spinner';
 import { ErrorPage, ForbiddenPage, NoAccessPage } from '../../pages/StatePages';
 import { useAuth } from './AuthProvider';
@@ -21,6 +22,8 @@ export function RequireAuth() {
     case 'no_access':
       return <NoAccessPage />;
     case 'unauthenticated':
+      // The root is the public landing page; any other protected URL goes to the sign-in dialog and remembers where to return.
+      if (location.pathname === '/' && !auth.notice) return <LandingPage />;
       return <Navigate to="/login" replace state={{ from: location.pathname }} />;
     case 'authenticated':
       if (auth.mfaRequired) {

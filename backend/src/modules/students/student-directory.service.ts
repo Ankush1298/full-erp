@@ -73,10 +73,13 @@ export class StudentDirectoryService {
          JOIN app.users u ON u.organization_id = s.organization_id AND u.id = s.user_id
         WHERE s.organization_id = $1 AND s.admission_number = $2
           AND (
-            NOT EXISTS (SELECT 1 FROM app.student_programs sp
-                         WHERE sp.organization_id = s.organization_id AND sp.student_id = s.id
-                           AND sp.status = 'ACTIVE')
-            OR $3::boolean
+            $3::boolean
+            OR (
+              NOT EXISTS (SELECT 1 FROM app.student_programs sp
+                           WHERE sp.organization_id = s.organization_id AND sp.student_id = s.id
+                             AND sp.status = 'ACTIVE')
+              AND (s.campus_id IS NULL OR s.campus_id = ANY($4::uuid[]))
+            )
             OR EXISTS (SELECT 1 FROM app.student_programs sp
                         WHERE sp.organization_id = s.organization_id AND sp.student_id = s.id
                           AND sp.status = 'ACTIVE'

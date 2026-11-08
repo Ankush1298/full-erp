@@ -1,7 +1,21 @@
 import { z } from 'zod';
 import type { ApiClient } from './client';
 
-export const CampusItemSchema = z.object({
+export const CampusItemSchema = z.preprocess((val: unknown) => {
+  if (typeof val === 'object' && val !== null) {
+    const raw = val as Record<string, unknown>;
+    return {
+      id: raw.id,
+      name: raw.name,
+      code: raw.code,
+      timezone: raw.timezone,
+      status: raw.status,
+      version: raw.version,
+      created_at: raw.created_at ?? raw.createdAt,
+    };
+  }
+  return val;
+}, z.object({
   id: z.string(),
   name: z.string(),
   code: z.string(),
@@ -9,31 +23,54 @@ export const CampusItemSchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE']),
   version: z.number().optional(),
   created_at: z.string().optional(),
-});
+}));
 
 export type CampusItem = z.infer<typeof CampusItemSchema>;
 
-export const ListCampusesResponseSchema = z.object({
-  success: z.boolean(),
+export const ListCampusesResponseSchema = z.preprocess((val: unknown) => {
+  if (Array.isArray(val)) return { success: true, data: val };
+  return val;
+}, z.object({
+  success: z.boolean().optional().default(true),
   data: z.array(CampusItemSchema),
-});
+}));
 
-export const DepartmentItemSchema = z.object({
+export const DepartmentItemSchema = z.preprocess((val: unknown) => {
+  if (typeof val === 'object' && val !== null) {
+    const raw = val as Record<string, unknown>;
+    const campusId = (raw.campus_id ?? raw.campusId) as string;
+    return {
+      id: raw.id,
+      campus_id: campusId,
+      campusId,
+      name: raw.name,
+      code: raw.code,
+      status: raw.status,
+      version: raw.version,
+      created_at: raw.created_at ?? raw.createdAt,
+    };
+  }
+  return val;
+}, z.object({
   id: z.string(),
   campus_id: z.string(),
+  campusId: z.string().optional(),
   name: z.string(),
   code: z.string(),
   status: z.enum(['ACTIVE', 'INACTIVE']),
   version: z.number().optional(),
   created_at: z.string().optional(),
-});
+}));
 
 export type DepartmentItem = z.infer<typeof DepartmentItemSchema>;
 
-export const ListDepartmentsResponseSchema = z.object({
-  success: z.boolean(),
+export const ListDepartmentsResponseSchema = z.preprocess((val: unknown) => {
+  if (Array.isArray(val)) return { success: true, data: val };
+  return val;
+}, z.object({
+  success: z.boolean().optional().default(true),
   data: z.array(DepartmentItemSchema),
-});
+}));
 
 export function fetchCampuses(client: ApiClient): Promise<CampusItem[]> {
   return client
@@ -53,23 +90,41 @@ export function fetchDepartments(client: ApiClient): Promise<DepartmentItem[]> {
 
 // Canonical room (docs 01 Room, 02 §4.2): code and kind required; name and capacity optional. No status, building or
 // floor. `kind` is free text: the specification defines no values.
-export const RoomItemSchema = z.object({
+export const RoomItemSchema = z.preprocess((val: unknown) => {
+  if (typeof val === 'object' && val !== null) {
+    const raw = val as Record<string, unknown>;
+    return {
+      id: raw.id,
+      organizationId: raw.organizationId ?? raw.organization_id,
+      campusId: raw.campusId ?? raw.campus_id,
+      code: raw.code,
+      kind: raw.kind,
+      name: raw.name ?? null,
+      capacity: raw.capacity ?? null,
+      version: raw.version,
+    };
+  }
+  return val;
+}, z.object({
   id: z.string(),
   organizationId: z.string().optional(),
   campusId: z.string().optional(),
   code: z.string(),
   kind: z.string(),
-  name: z.string().nullable(),
-  capacity: z.number().nullable(),
+  name: z.string().nullable().optional(),
+  capacity: z.number().nullable().optional(),
   version: z.number().optional(),
-});
+}));
 
 export type RoomItem = z.infer<typeof RoomItemSchema>;
 
-export const ListRoomsResponseSchema = z.object({
-  success: z.boolean(),
+export const ListRoomsResponseSchema = z.preprocess((val: unknown) => {
+  if (Array.isArray(val)) return { success: true, data: val };
+  return val;
+}, z.object({
+  success: z.boolean().optional().default(true),
   data: z.array(RoomItemSchema),
-});
+}));
 
 export const CreateRoomResponseSchema = z.object({
   success: z.boolean(),

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-base-to-string */
 import { vi } from 'vitest';
 
 export interface Call {
@@ -121,6 +122,40 @@ export const IMPORT_ADMIN: MeData = {
   capabilities: [...IMPORT_REGISTRAR.capabilities, 'employee.record.create'],
 };
 
+export const FACULTY_TEACHER: MeData = {
+  tenant_id: 't1',
+  user_id: 'u-teacher',
+  actor_kind: 'STAFF',
+  display_name: 'Fiona Faculty',
+  roles: ['FACULTY'],
+  capabilities: [
+    'session.read',
+    'session.revoke',
+    'attendance.session.mark',
+    'attendance.record.read',
+    'attendance.record.correct',
+    'attendance.session.cancel',
+  ],
+};
+
+export const HOD_APPROVER: MeData = {
+  tenant_id: 't1',
+  user_id: 'u-hod',
+  actor_kind: 'STAFF',
+  display_name: 'Hari HOD',
+  roles: ['HOD'],
+  capabilities: [
+    'session.read',
+    'session.revoke',
+    'attendance.session.mark',
+    'attendance.record.read',
+    'attendance.record.correct',
+    'attendance.correction.approve',
+    'attendance.session.lock',
+    'attendance.session.cancel',
+  ],
+};
+
 export interface StudentRow {
   id: string;
   admissionNumber: string;
@@ -234,7 +269,18 @@ export function createFakeBackend(
       byCohort: {} as Record<string, string>,
       /** the stored terminology setting's version (null = no row: If-Match "0") */
       terminologyVersion: null as null | number,
+      institutionType: null as null | string,
+      institutionTypeVersion: null as null | number,
       campusCodes: ['MAIN'] as string[],
+      campuses: [
+        {
+          id: 'camp-1',
+          name: 'Main Campus',
+          code: 'MAIN',
+          timezone: 'Asia/Kolkata',
+          status: 'ACTIVE',
+        },
+      ] as Array<Record<string, unknown>>,
     },
     mfa: {
       enrolled: false,
@@ -246,6 +292,7 @@ export function createFakeBackend(
       unusedRecoveryCodes: 0,
       failChallenge: false,
       failVerify: false,
+      invalidTicket: false,
     },
     /** Role administration (/access): users, roles and assignments of one tenant, with the real routes' error behaviour. */
     access: {
@@ -446,6 +493,205 @@ export function createFakeBackend(
       challengeMode: 'ok' as 'ok' | 'server' | 'expired',
       /** the challenge answers 200 but reports only PASSWORD_REAUTH (a weak grant that must not be accepted). */
       weakChallenge: false,
+    },
+    examinations: {
+      items: [] as Array<Record<string, unknown>>,
+      schedules: [] as Array<Record<string, unknown>>,
+      marks: [] as Array<Record<string, unknown>>,
+      policies: {} as Record<string, Record<string, unknown>>,
+      candidateLists: {} as Record<string, any>,
+    },
+    attendance: {
+      myOfferings: [] as Array<Record<string, unknown>>,
+      sessions: [] as Array<Record<string, unknown>>,
+      rosters: {} as Record<string, Array<Record<string, unknown>>>,
+      records: {} as Record<string, Array<Record<string, unknown>>>,
+      revisions: {} as Record<string, Array<Record<string, unknown>>>,
+      correctionRequests: [] as Array<Record<string, unknown>>,
+      campuses: [] as Array<Record<string, unknown>>,
+      correctionsEnabled: true,
+      createError: null as string | null,
+      correctionError: null as string | null,
+      failNext: null as null | { status: number; code: string },
+    },
+    finance: {
+      categories: [
+        {
+          id: 'cat-1',
+          code: 'TUIT',
+          name: 'Tuition Fee',
+          description: 'Regular academic tuition',
+          is_active: true,
+          version: 1,
+        },
+        {
+          id: 'cat-2',
+          code: 'LAB',
+          name: 'Laboratory Fee',
+          description: 'Science and computing lab equipment',
+          is_active: true,
+          version: 1,
+        },
+      ] as Array<Record<string, unknown>>,
+      structures: [] as Array<Record<string, unknown>>,
+      dues: [] as Array<Record<string, unknown>>,
+      receipts: [] as Array<Record<string, unknown>>,
+    },
+    reports: {
+      enrolmentRoster: {
+        institution_type: 'SCHOOL',
+        labels: {
+          institution: 'School',
+          academic_program: 'Class Level',
+          academic_cohort: 'Grade / Cohort',
+          academic_term: 'Academic Term',
+          student_id_label: 'Admission Number',
+        },
+        summary: {
+          total_students: 1,
+          active_students: 1,
+          campuses_count: 1,
+        },
+        students: [
+          {
+            student_id: '01900000-0000-7000-8000-000000000001',
+            student_name: 'Aarav Sharma',
+            admission_number: 'ADM-001',
+            campus_id: 'camp-1',
+            campus_name: 'Main Campus',
+            program_id: 'prog-1',
+            program_name: 'Senior Secondary',
+            cohort_id: 'per-1',
+            cohort_name: 'Grade 10',
+            term_id: 'term-1',
+            term_name: 'Term 1 2026',
+            roll_number: '101',
+            enrolment_status: 'ACTIVE',
+            enrolled_date: '2026-06-01',
+            guardian_count: 1,
+            primary_guardian_name: 'Rajesh Sharma',
+            primary_guardian_phone: '+91 98765 43210',
+          },
+        ],
+      },
+      attendanceSummary: {
+        date: '2026-07-15',
+        institution_type: 'SCHOOL',
+        labels: {
+          institution: 'School',
+          academic_program: 'Class Level',
+        },
+        summary: {
+          total_sessions_scheduled: 2,
+          total_sessions_conducted: 1,
+          missing_registers_count: 1,
+          total_attendance_records: 1,
+          present_count: 1,
+          absent_count: 0,
+          late_count: 0,
+          excused_count: 0,
+          attendance_rate: 100,
+        },
+        sessions: [
+          {
+            session_id: 'sess-1',
+            campus_id: 'camp-1',
+            campus_name: 'Main Campus',
+            course_name: 'Mathematics',
+            course_code: 'MATH101',
+            teacher_name: 'Vikram Teacher',
+            session_date: '2026-07-15',
+            starts_at: '09:00:00',
+            ends_at: '10:00:00',
+            attendance_state: 'SUBMITTED',
+            present_count: 1,
+            absent_count: 0,
+            late_count: 0,
+            excused_count: 0,
+            total_marked: 1,
+            attendance_percentage: 100,
+          },
+        ],
+      },
+      examPerformance: {
+        institution_type: 'SCHOOL',
+        labels: {
+          institution: 'School',
+          academic_program: 'Class Level',
+        },
+        summary: {
+          total_published_exams: 1,
+          total_candidates_appeared: 1,
+          total_passed: 1,
+          total_failed: 0,
+          overall_pass_percentage: 100,
+          average_score: 85,
+        },
+        schedules: [
+          {
+            schedule_id: 'sched-1',
+            examination_id: 'exam-1',
+            examination_name: 'Mid-Term 2026',
+            exam_type: 'MID_TERM',
+            campus_id: 'camp-1',
+            campus_name: 'Main Campus',
+            term_name: 'Term 1 2026',
+            course_name: 'Mathematics',
+            course_code: 'MATH101',
+            exam_date: '2026-07-10',
+            max_marks: 100,
+            pass_marks: 40,
+            appeared_count: 1,
+            passed_count: 1,
+            failed_count: 0,
+            pass_percentage: 100,
+            highest_marks: 85,
+            lowest_marks: 85,
+            average_marks: 85,
+            published_at: '2026-07-12T10:00:00.000Z',
+          },
+        ],
+      },
+      feeSummary: {
+        currency: 'INR',
+        summary: {
+          confirmed_collections: 2500000,
+          unverified_collections: 500000,
+          total_outstanding_dues: 2500000,
+          total_gross_billed: 5500000,
+          total_concessions: 500000,
+          total_net_billed: 5000000,
+          confirmed_receipt_count: 1,
+          unverified_receipt_count: 1,
+          defaulters_count: 1,
+          collection_efficiency_percentage: 50,
+        },
+        collections_by_method: {
+          CASH: 2500000,
+        },
+        collections_by_status: {
+          CONFIRMED: 2500000,
+          PENDING_VERIFICATION: 500000,
+          RECORDED: 0,
+        },
+        defaulters: [
+          {
+            student_id: 'st-1',
+            student_name: 'Aarav Sharma',
+            admission_number: 'ADM-001',
+            campus_id: 'camp-1',
+            campus_name: 'Main Campus',
+            due_number: 'DUE-2026-10001',
+            fee_structure_name: 'Class 10 Annual Fee',
+            due_date: '2026-07-31',
+            net_amount: 5000000,
+            paid_amount: 2500000,
+            balance_amount: 2500000,
+            due_status: 'PARTIAL',
+            has_unverified_receipt: false,
+          },
+        ],
+      },
     },
   };
 
@@ -812,6 +1058,7 @@ export function createFakeBackend(
     if (path === '/me/mfa/totp/enroll' && method === 'POST') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (headers['x-csrf-token'] !== state.csrf) return err(403, 'CSRF_REJECTED');
+      if (state.mfa.invalidTicket) return err(401, 'INVALID_TICKET');
       const refused = stepUpRefusal('PASSWORD_REAUTH');
       if (refused) return refused;
       state.mfa.pendingEnrollment = true;
@@ -990,7 +1237,38 @@ export function createFakeBackend(
             version: a.terminologyVersion,
             updatedAt: null,
           },
+          {
+            key: 'institution.type',
+            value: a.institutionType,
+            isDefault: a.institutionTypeVersion === null,
+            version: a.institutionTypeVersion,
+            updatedAt: null,
+          },
         ],
+      });
+    }
+    if (path === '/organization/settings/institution.type' && method === 'PUT') {
+      const a = state.academics;
+      const refused = stepUpRefusal('PASSWORD_MFA');
+      if (refused) return refused;
+      if (headers['if-match'] !== `"${a.institutionTypeVersion ?? 0}"`) return err(409, 'CONFLICT');
+      if (state.academics.failNext) {
+        const f = state.academics.failNext;
+        state.academics.failNext = null;
+        return err(f.status, f.code);
+      }
+      const body = (state.calls.at(-1)?.body ?? {}) as { value: string };
+      a.institutionType = body.value;
+      a.institutionTypeVersion = (a.institutionTypeVersion ?? 0) + 1;
+      return json(200, {
+        success: true,
+        data: {
+          key: 'institution.type',
+          value: body.value,
+          isDefault: false,
+          version: a.institutionTypeVersion,
+          updatedAt: new Date().toISOString(),
+        },
       });
     }
     if (path === '/organization/settings/terminology' && method === 'PUT') {
@@ -1018,27 +1296,28 @@ export function createFakeBackend(
       });
     }
     if (path === '/organization/campuses' && method === 'POST') {
-      const code = String((state.calls.at(-1)?.body as { code?: string } | undefined)?.code);
+      const b = (state.calls.at(-1)?.body as { code?: string; name?: string; timezone?: string } | undefined);
+      const code = String(b?.code ?? '');
       if (state.academics.campusCodes.includes(code)) return err(409, 'CONFLICT');
       state.academics.campusCodes.push(code);
+      const newCamp = {
+        id: `camp-${state.academics.campuses.length + 1}`,
+        name: `${code} Campus`,
+        code,
+        timezone: b?.timezone ?? 'Asia/Kolkata',
+        status: 'ACTIVE',
+      };
+      state.academics.campuses.push(newCamp);
       return json(201, {
         success: true,
-        data: { id: `camp-${state.academics.campusCodes.length}` },
+        data: { id: newCamp.id },
       });
     }
     if (path === '/organization/campuses' && method === 'GET') {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       return json(200, {
         success: true,
-        data: [
-          {
-            id: 'camp-1',
-            name: 'Main Campus',
-            code: 'MAIN',
-            timezone: 'Asia/Kolkata',
-            status: 'ACTIVE',
-          },
-        ],
+        data: state.academics.campuses,
       });
     }
     if (path === '/organization/departments' && method === 'GET') {
@@ -1368,6 +1647,860 @@ export function createFakeBackend(
       if (!mine.some((x) => x.id === id)) return err(404, 'RESOURCE_NOT_FOUND');
       return json(200, { success: true, data: st.identifiers[id] ?? [] });
     }
+    if (path.startsWith('/examinations')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      const exState = state.examinations;
+      const reqBody =
+        typeof reqInit?.body === 'string'
+          ? (JSON.parse(reqInit.body) as Record<string, unknown>)
+          : {};
+
+      const polMatch = /^\/examinations\/schedules\/([^/?]+)\/eligibility-policy$/.exec(path);
+      if (polMatch && method === 'GET') {
+        const schedId = polMatch[1]!;
+        const p = exState.policies[schedId] ?? {
+          id: 'pol-default',
+          exam_schedule_id: schedId,
+          name: 'Default Eligibility Policy',
+          min_attendance_percentage: 75,
+          check_attendance: true,
+          check_fees: false,
+          attendance_cutoff_days_prior: 0,
+          allow_late_enrolment_review: true,
+          version: 1,
+        };
+        return json(200, { data: p });
+      }
+
+      if (polMatch && method === 'PUT') {
+        const schedId = polMatch[1]!;
+        const b = reqBody;
+        const p = {
+          id: `pol-${Date.now()}`,
+          exam_schedule_id: schedId,
+          ...b,
+          version: 1,
+        };
+        exState.policies[schedId] = p;
+        return json(200, { data: p });
+      }
+
+      const genMatch = /^\/examinations\/schedules\/([^/?]+)\/candidates\/generate$/.exec(path);
+      if (genMatch && method === 'POST') {
+        const schedId = genMatch[1]!;
+        const candidates = exState.marks.filter((m: any) => m.schedule_id === schedId).map((m: any) => ({
+          candidate_id: `cand-${m.student_id}`,
+          student_id: m.student_id,
+          admission_number: m.admission_number,
+          student_name: m.student_name,
+          roll_number: m.roll_number ?? null,
+          evaluation_status: m.student_id === 'st-1' ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+          override_status: 'NONE',
+          final_status: m.student_id === 'st-1' ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+          reasons: m.student_id === 'st-1' ? [] : ['Attendance below threshold (75%)'],
+          evidence_summary: {
+            total_sessions: 20,
+            attended_sessions: m.student_id === 'st-1' ? 18 : 10,
+            absent_sessions: m.student_id === 'st-1' ? 2 : 10,
+            excused_sessions: 0,
+            attendance_percentage: m.student_id === 'st-1' ? 90 : 50,
+            required_percentage: 75,
+            enrolled_date: '2026-08-01',
+            cutoff_date: '2026-10-14',
+            reasons: m.student_id === 'st-1' ? [] : ['Attendance 50% < 75% required'],
+          },
+          override_reason: null,
+          overridden_by_user_id: null,
+          overridden_at: null,
+        }));
+
+        const pol = exState.policies[schedId] ?? {
+          id: 'pol-1',
+          exam_schedule_id: schedId,
+          name: 'Default Eligibility Policy',
+          min_attendance_percentage: 75,
+          check_attendance: true,
+          check_fees: false,
+          attendance_cutoff_days_prior: 0,
+          allow_late_enrolment_review: true,
+          version: 1,
+        };
+
+        const cl = {
+          list: {
+            id: `cl-${schedId}`,
+            exam_schedule_id: schedId,
+            policy_id: pol.id,
+            policy_version: 1,
+            snapshot_version: 1,
+            status: 'DRAFT',
+            evidence_cutoff_date: '2026-10-14',
+            total_candidates: candidates.length,
+            eligible_count: candidates.filter((c: any) => c.evaluation_status === 'ELIGIBLE').length,
+            not_eligible_count: candidates.filter((c: any) => c.evaluation_status !== 'ELIGIBLE').length,
+            needs_review_count: 0,
+            policy_snapshot: {},
+            generated_at: new Date().toISOString(),
+          },
+          policy: pol,
+          candidates,
+          recalculation_available: true,
+        };
+        exState.candidateLists[schedId] = cl;
+        return json(200, { data: cl });
+      }
+
+      const candListMatch = /^\/examinations\/schedules\/([^/?]+)\/candidates$/.exec(path);
+      if (candListMatch && method === 'GET') {
+        const schedId = candListMatch[1]!;
+        const cl = exState.candidateLists[schedId];
+        return json(200, { data: cl ?? null });
+      }
+
+      const overrideMatch =
+        /^\/examinations\/schedules\/([^/?]+)\/candidates\/([^/?]+)\/override$/.exec(path);
+      if (overrideMatch && (method === 'PATCH' || method === 'POST')) {
+        const schedId = overrideMatch[1]!;
+        const candidateId = overrideMatch[2]!;
+        const cl = exState.candidateLists[schedId];
+        if (!cl) return err(404, 'RESOURCE_NOT_FOUND');
+        const cand = cl.candidates.find((c: any) => c.candidate_id === candidateId || c.student_id === candidateId);
+        if (!cand) return err(404, 'RESOURCE_NOT_FOUND');
+        cand.override_status = reqBody.override_status;
+        cand.final_status = (reqBody.override_status === 'DISQUALIFIED') ? 'NOT_ELIGIBLE' : 'ELIGIBLE';
+        cand.override_reason = reqBody.override_reason ?? reqBody.reason ?? null;
+        cand.overridden_by_user_id = state.me.user_id;
+        cand.overridden_at = new Date().toISOString();
+        cl.list.eligible_count = cl.candidates.filter((c: any) => c.final_status === 'ELIGIBLE').length;
+        cl.list.not_eligible_count = cl.candidates.filter((c: any) => c.final_status !== 'ELIGIBLE').length;
+        return json(200, { data: cand });
+      }
+
+      const appMatch =
+        /^\/examinations\/schedules\/([^/?]+)\/candidates\/([^/?]+)\/approve$/.exec(path);
+      if (appMatch && method === 'POST') {
+        const schedId = appMatch[1]!;
+        const listId = appMatch[2]!;
+        const cl = exState.candidateLists[schedId];
+        if (!cl) return err(404, 'RESOURCE_NOT_FOUND');
+        cl.list.status = reqBody.freeze ? 'FROZEN' : 'APPROVED';
+        cl.list.approved_by_user_id = state.me.user_id;
+        cl.list.approved_at = new Date().toISOString();
+        return json(200, { data: { id: listId, status: cl.list.status } });
+      }
+
+      const rosterMatch = /^\/examinations\/schedules\/([^/?]+)\/roster$/.exec(path);
+      if (rosterMatch && method === 'GET') {
+        const schedId = rosterMatch[1]!;
+        const sched = exState.schedules.find((s: any) => s.id === schedId);
+        const marks = exState.marks.filter((m: any) => m.schedule_id === schedId);
+        const clObj = exState.candidateLists[schedId];
+        const students = marks.map((m: any) => {
+          const cand = clObj?.candidates?.find((c: any) => c.student_id === m.student_id);
+          return {
+            student_id: m.student_id,
+            admission_number: m.admission_number,
+            student_name: m.student_name,
+            roll_number: m.roll_number ?? null,
+            mark_id: m.mark_id ?? null,
+            marks_obtained: m.marks_obtained ?? null,
+            mark_status: m.status ?? 'ENTERED',
+            is_passing: m.is_passing ?? null,
+            remarks: m.remarks ?? null,
+            evaluation_status: cand?.evaluation_status ?? 'ELIGIBLE',
+            override_status: cand?.override_status ?? 'NONE',
+            final_status: cand?.final_status ?? 'ELIGIBLE',
+            eligibility_reasons: cand?.reasons ?? [],
+          };
+        });
+        return json(200, {
+          data: {
+            schedule: sched,
+            candidate_list: clObj ? {
+              id: clObj.list.id,
+              status: clObj.list.status,
+              snapshot_version: clObj.list.snapshot_version,
+            } : null,
+            students,
+          },
+        });
+      }
+
+      const marksMatch = /^\/examinations\/schedules\/([^/?]+)\/marks$/.exec(path);
+      if (marksMatch && method === 'POST') {
+        const schedId = marksMatch[1]!;
+        const entries = Array.isArray(reqBody.entries) ? reqBody.entries : [];
+        for (const input of entries) {
+          const m = exState.marks.find(
+            (row: any) => row.schedule_id === schedId && row.student_id === input.student_id,
+          );
+          if (m) {
+            m.marks_obtained = input.marks_obtained;
+            m.status = input.status ?? 'ENTERED';
+          }
+        }
+        if (reqBody.action === 'SUBMIT') {
+          const sched = exState.schedules.find((s: any) => s.id === schedId);
+          if (sched) sched.status = 'SUBMITTED';
+        }
+        return json(200, { data: { success: true, status: reqBody.action === 'SUBMIT' ? 'SUBMITTED' : 'DRAFT', entries_updated: entries.length } });
+      }
+
+      const pubMatch = /^\/examinations\/schedules\/([^/?]+)\/publish$/.exec(path);
+      if (pubMatch && method === 'POST') {
+        const schedId = pubMatch[1]!;
+        const sched = exState.schedules.find((s: any) => s.id === schedId);
+        if (sched) sched.status = 'PUBLISHED';
+        for (const m of exState.marks.filter((row: any) => row.schedule_id === schedId)) {
+          m.published = true;
+          m.is_passing = (m.marks_obtained ?? 0) >= (sched?.pass_marks ?? 40);
+        }
+        return json(200, { data: { success: true, status: 'PUBLISHED', published_at: new Date().toISOString() } });
+      }
+
+      const regMatch = /^\/examinations\/schedules\/([^/?]+)\/register$/.exec(path);
+      if (regMatch && method === 'GET') {
+        const schedId = regMatch[1]!;
+        const sched = exState.schedules.find((s: any) => s.id === schedId);
+        const marks = exState.marks.filter((m: any) => m.schedule_id === schedId);
+        const appeared = marks.filter((m: any) => m.marks_obtained !== null);
+        const passed = marks.filter((m: any) => m.is_passing);
+        return json(200, {
+          data: {
+            schedule: sched,
+            marks: marks.map((m: any) => ({
+              id: m.mark_id,
+              student_id: m.student_id,
+              admission_number: m.admission_number,
+              student_name: m.student_name,
+              roll_number: m.roll_number,
+              marks_obtained: m.marks_obtained,
+              status: m.status,
+              is_passing: m.is_passing,
+              remarks: m.remarks ?? null,
+            })),
+            statistics: {
+              total_students: marks.length,
+              appeared: appeared.length,
+              absent: 0,
+              exempt: 0,
+              withheld: 0,
+              passed: passed.length,
+              failed: appeared.length - passed.length,
+              average_marks: 60,
+              pass_percentage: appeared.length ? Math.round((passed.length / appeared.length) * 100) : 0,
+            },
+          },
+        });
+      }
+
+      const resMatch = /^\/examinations\/students\/([^/?]+)\/results/.exec(path);
+      if (resMatch && method === 'GET') {
+        const studentId = resMatch[1]!;
+        const marks = exState.marks.filter(
+          (m: any) => m.student_id === studentId && m.published,
+        );
+        const results = marks.map((m: any) => {
+          const s = exState.schedules.find((sch: any) => sch.id === m.schedule_id);
+          const e = s ? exState.items.find((item: any) => item.id === s.examination_id) : null;
+          return {
+            mark_id: m.mark_id,
+            marks_obtained: m.marks_obtained,
+            is_passing: m.is_passing ?? true,
+            mark_status: m.status ?? 'ENTERED',
+            remarks: null,
+            schedule_id: s?.id ?? 'sched-1',
+            exam_date: s?.exam_date ?? '2026-10-18',
+            max_marks: s?.max_marks ?? 100,
+            pass_marks: s?.pass_marks ?? 40,
+            published_at: '2026-10-26T10:00:00.000Z',
+            examination_id: e?.id ?? 'ex-1',
+            exam_name: e?.name ?? 'Autumn Mid-Term 2026',
+            exam_type: e?.exam_type ?? 'MID_TERM',
+            course_code: s?.course_code ?? 'CS101',
+            course_title: s?.course_title ?? 'Introduction to Computer Science',
+          };
+        });
+        return json(200, { data: results });
+      }
+
+      const schedListMatch = /^\/examinations\/([^/?]+)\/schedules/.exec(path);
+      if (schedListMatch && method === 'GET') {
+        const examId = schedListMatch[1]!;
+        const scheds = exState.schedules.filter((s: any) => s.examination_id === examId);
+        return json(200, { data: scheds });
+      }
+
+      if (schedListMatch && method === 'POST') {
+        const examId = schedListMatch[1]!;
+        const b = reqBody;
+        const newSched = {
+          id: `sched-${Date.now()}`,
+          examination_id: examId,
+          status: 'SCHEDULED',
+          ...b,
+        };
+        exState.schedules.push(newSched);
+        return json(201, { data: newSched });
+      }
+
+      if ((path === '/examinations' || path.startsWith('/examinations?')) && method === 'GET') {
+        return json(200, { data: exState.items });
+      }
+
+      if (path === '/examinations' && method === 'POST') {
+        const b = reqBody;
+        const newExam = {
+          id: `exam-${Date.now()}`,
+          status: 'SCHEDULED',
+          ...b,
+        };
+        exState.items.push(newExam);
+        return json(201, { data: newExam });
+      }
+    }
+    if (path.startsWith('/attendance')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      const attState = state.attendance;
+      const reqBody =
+        typeof reqInit?.body === 'string'
+          ? (JSON.parse(reqInit.body) as Record<string, unknown>)
+          : {};
+
+      if (path === '/attendance/campuses' && method === 'GET') {
+        const data = attState.campuses.length
+          ? attState.campuses
+          : [
+              {
+                id: 'camp-1',
+                name: 'Main Campus',
+                timezone: 'Asia/Kolkata',
+                today: '2026-11-08',
+              },
+            ];
+        return json(200, { success: true, data });
+      }
+
+      if (path === '/attendance/my-offerings' && method === 'GET') {
+        return json(200, { success: true, data: attState.myOfferings });
+      }
+
+      const rosterMatch = /^\/attendance\/sessions\/([^/?]+)\/roster$/.exec(path);
+      if (rosterMatch && method === 'GET') {
+        const sId = rosterMatch[1]!;
+        const roster = attState.rosters[sId] ?? [];
+        return json(200, { success: true, data: roster });
+      }
+
+      const recMatch = /^\/attendance\/sessions\/([^/?]+)\/records$/.exec(path);
+      if (recMatch && method === 'GET') {
+        const sId = recMatch[1]!;
+        const records = attState.records[sId] ?? [];
+        return json(200, { success: true, data: records });
+      }
+
+      const revMatch = /^\/attendance\/records\/([^/?]+)\/revisions$/.exec(path);
+      if (revMatch && method === 'GET') {
+        const rId = revMatch[1]!;
+        const revs = attState.revisions[rId] ?? [];
+        return json(200, { success: true, data: revs });
+      }
+
+      const markMatch = /^\/attendance\/sessions\/([^/?]+)\/attendance$/.exec(path);
+      if (markMatch && method === 'POST') {
+        const sId = markMatch[1]!;
+        const sess = attState.sessions.find((s) => s['id'] === sId);
+        const recs = Array.isArray(reqBody['records']) ? reqBody['records'] : [];
+        let pres = 0;
+        let abs = 0;
+        let late = 0;
+        let exc = 0;
+        for (const r of recs) {
+          if (r.status === 'PRESENT') pres++;
+          else if (r.status === 'ABSENT') abs++;
+          else if (r.status === 'LATE') late++;
+          else if (r.status === 'EXCUSED') exc++;
+        }
+        if (sess) {
+          sess['status'] = 'CONDUCTED';
+          sess['attendanceState'] = 'SUBMITTED';
+          sess['attendanceSubmittedAt'] = new Date().toISOString();
+          sess['counts'] = { present: pres, absent: abs, late, excused: exc, total: recs.length };
+        }
+        attState.records[sId] = recs.map((r: any, idx: number) => ({
+          id: `rec-${idx + 1}`,
+          classSessionId: sId,
+          studentId: r.studentId,
+          status: r.status,
+          source: 'MANUAL',
+          markedByUserId: state.me.user_id,
+          markedAt: new Date().toISOString(),
+          revisionNo: 1,
+          remarks: r.remarks ?? null,
+        }));
+        return json(200, {
+          success: true,
+          data: {
+            sessionId: sId,
+            recordCount: recs.length,
+            counts: {
+              PRESENT: pres,
+              ABSENT: abs,
+              LATE: late,
+              EXCUSED: exc,
+            },
+          },
+        });
+      }
+
+      const cancelMatch = /^\/attendance\/sessions\/([^/?]+)\/cancel$/.exec(path);
+      if (cancelMatch && method === 'POST') {
+        const sId = cancelMatch[1]!;
+        const sess = attState.sessions.find((s) => s['id'] === sId);
+        if (sess) {
+          sess['status'] = 'CANCELLED';
+          sess['cancelReason'] = reqBody['reason'] ?? 'Cancelled';
+        }
+        return json(200, { success: true, data: sess ?? { id: sId, status: 'CANCELLED' } });
+      }
+
+      const lockMatch = /^\/attendance\/sessions\/([^/?]+)\/lock$/.exec(path);
+      if (lockMatch && method === 'POST') {
+        const sId = lockMatch[1]!;
+        const sess = attState.sessions.find((s) => s['id'] === sId);
+        if (sess) {
+          sess['locked'] = true;
+        }
+        return json(200, { success: true, data: sess ?? { id: sId, locked: true } });
+      }
+
+      const sessDetailMatch = /^\/attendance\/sessions\/([^/?]+)$/.exec(path);
+      if (sessDetailMatch && method === 'GET') {
+        const sId = sessDetailMatch[1]!;
+        const sess = attState.sessions.find((s) => s['id'] === sId);
+        if (!sess) return err(404, 'RESOURCE_NOT_FOUND');
+        return json(200, { success: true, data: sess });
+      }
+
+      if ((path === '/attendance/sessions' || path.startsWith('/attendance/sessions?')) && method === 'GET') {
+        let results = [...attState.sessions];
+        const urlObj = new URL(url, 'http://localhost');
+        const offeringId = urlObj.searchParams.get('courseOfferingId');
+        const sDate = urlObj.searchParams.get('sessionDate');
+        if (offeringId) {
+          results = results.filter((s) => s['courseOfferingId'] === offeringId);
+        }
+        if (sDate) {
+          results = results.filter((s) => s['sessionDate'] === sDate);
+        }
+        return json(200, { success: true, data: results });
+      }
+
+      if (path === '/attendance/sessions' && method === 'POST') {
+        if (attState.createError) {
+          const code = attState.createError;
+          return err(400, code);
+        }
+        const newSession = {
+          id: `sess-${attState.sessions.length + 1}`,
+          courseOfferingId: reqBody['courseOfferingId'],
+          campusId: 'camp-1',
+          timetableSlotId: reqBody['timetableSlotId'] ?? null,
+          conductedByEmployeeId: 'emp-1',
+          sessionDate: reqBody['sessionDate'],
+          startsAt: reqBody['startsAt'],
+          endsAt: reqBody['endsAt'],
+          kind: reqBody['kind'] ?? 'REGULAR',
+          topic: reqBody['topic'] ?? null,
+          status: 'SCHEDULED',
+          attendanceState: 'NOT_STARTED',
+          attendanceSubmittedAt: null,
+          version: 1,
+          courseCode: 'CS101',
+          courseTitle: 'Introduction to Computer Science',
+          insideCorrectionWindow: true,
+        };
+        attState.sessions.push(newSession);
+        return json(201, { success: true, data: { id: newSession.id } });
+      }
+
+      const corrMatch = /^\/attendance\/records\/([^/?]+)\/corrections$/.exec(path);
+      if (corrMatch && method === 'POST') {
+        if (!attState.correctionsEnabled) {
+          return err(400, 'ATTENDANCE_CORRECTIONS_DISABLED');
+        }
+        if (attState.correctionError) {
+          const code = attState.correctionError;
+          attState.correctionError = null;
+          return err(400, code);
+        }
+        const rId = corrMatch[1]!;
+        const status = reqBody['status'] as string;
+        for (const [, recList] of Object.entries(attState.records)) {
+          const rec = recList.find((r) => r['id'] === rId);
+          if (rec) {
+            rec['status'] = status;
+            rec['revisionNo'] = Number(rec['revisionNo'] ?? 1) + 1;
+            return json(200, { success: true, data: rec });
+          }
+        }
+        return json(200, {
+          success: true,
+          data: {
+            id: rId,
+            status,
+            revisionNo: 2,
+            classSessionId: 'sess-1',
+            studentId: 'st-1',
+            source: 'MANUAL',
+            markedByUserId: state.me.user_id,
+            markedAt: new Date().toISOString(),
+          },
+        });
+      }
+
+      const reqMatch = /^\/attendance\/records\/([^/?]+)\/correction-requests$/.exec(path);
+      if (reqMatch && method === 'POST') {
+        if (!attState.correctionsEnabled) {
+          return err(400, 'ATTENDANCE_CORRECTIONS_DISABLED');
+        }
+        if (attState.correctionError) {
+          const code = attState.correctionError;
+          attState.correctionError = null;
+          return err(400, code);
+        }
+        const rId = reqMatch[1]!;
+        const newReq = {
+          id: `cr-${attState.correctionRequests.length + 1}`,
+          attendanceRecordId: rId,
+          classSessionId: 'sess-1',
+          studentId: 'st-1',
+          statusBefore: 'ABSENT',
+          requestedStatus: reqBody['status'],
+          expectedRevisionNo: reqBody['expectedRevisionNo'] ?? 1,
+          reasonCode: reqBody['reasonCode'] ?? 'OTHER',
+          reasonText: reqBody['reasonText'] ?? null,
+          status: 'PENDING',
+          requestedByUserId: state.me.user_id,
+          requestedAt: new Date().toISOString(),
+          decidedByUserId: null,
+          decidedAt: null,
+          decisionNote: null,
+          appliedRevisionNo: null,
+        };
+        attState.correctionRequests.push(newReq);
+        return json(201, { success: true, data: newReq });
+      }
+
+      if (
+        (path === '/attendance/correction-requests' ||
+          path.startsWith('/attendance/correction-requests?')) &&
+        method === 'GET'
+      ) {
+        return json(200, { success: true, data: attState.correctionRequests });
+      }
+
+      const decideMatch = /^\/attendance\/correction-requests\/([^/?]+)\/(approve|reject)$/.exec(path);
+      if (decideMatch && method === 'POST') {
+        const crId = decideMatch[1]!;
+        const action = decideMatch[2]!;
+        const cr = attState.correctionRequests.find((r) => r['id'] === crId);
+        if (!cr) return err(404, 'RESOURCE_NOT_FOUND');
+        cr['status'] = action === 'approve' ? 'APPROVED' : 'REJECTED';
+        cr['decidedByUserId'] = state.me.user_id;
+        cr['decidedAt'] = new Date().toISOString();
+        cr['decisionNote'] = reqBody['note'] ?? null;
+        return json(200, { success: true, data: cr });
+      }
+    }
+    if (path.startsWith('/finance')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      const fState = state.finance;
+      const reqBody =
+        typeof reqInit?.body === 'string'
+          ? (JSON.parse(reqInit.body) as Record<string, unknown>)
+          : {};
+
+      if (path === '/finance/reports/collection-summary' || path.startsWith('/finance/reports/collection-summary?')) {
+        const posted = fState.receipts.filter((r) => r['status'] === 'POSTED');
+        const reversed = fState.receipts.filter((r) => r['status'] === 'REVERSED');
+        const total = posted.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0);
+        const cashReceipts = posted.filter((r) => r['payment_method'] === 'CASH');
+        const bankReceipts = posted.filter((r) => r['payment_method'] === 'BANK_TRANSFER');
+        const confirmedReceipts = posted.filter((r) => r['reconciliation_status'] === 'CONFIRMED');
+        const pendingReceipts = posted.filter((r) => r['reconciliation_status'] === 'PENDING_VERIFICATION');
+
+        return json(200, {
+          data: {
+            total_collected: total,
+            currency: 'INR',
+            receipt_count: posted.length,
+            reversed_count: reversed.length,
+            by_payment_method: [
+              {
+                payment_method: 'CASH',
+                count: cashReceipts.length,
+                total_amount: cashReceipts.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0),
+              },
+              {
+                payment_method: 'BANK_TRANSFER',
+                count: bankReceipts.length,
+                total_amount: bankReceipts.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0),
+              },
+            ],
+            by_reconciliation_status: [
+              {
+                reconciliation_status: 'CONFIRMED',
+                count: confirmedReceipts.length,
+                total_amount: confirmedReceipts.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0),
+              },
+              {
+                reconciliation_status: 'PENDING_VERIFICATION',
+                count: pendingReceipts.length,
+                total_amount: pendingReceipts.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0),
+              },
+            ],
+          },
+        });
+      }
+
+      if ((path === '/finance/categories' || path.startsWith('/finance/categories?')) && method === 'GET') {
+        return json(200, { data: fState.categories });
+      }
+
+      if (path === '/finance/categories' && method === 'POST') {
+        const newCat = {
+          id: `cat-${fState.categories.length + 1}`,
+          code: String(reqBody.code ?? ''),
+          name: String(reqBody.name ?? ''),
+          description: reqBody.description ? String(reqBody.description) : null,
+          is_active: reqBody.is_active ?? true,
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        fState.categories.push(newCat);
+        return json(201, { data: newCat });
+      }
+
+      if ((path === '/finance/structures' || path.startsWith('/finance/structures?')) && method === 'GET') {
+        return json(200, { data: fState.structures });
+      }
+
+      if (path === '/finance/structures' && method === 'POST') {
+        const components = Array.isArray(reqBody.components) ? reqBody.components : [];
+        const total = components.reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
+        const newStruct = {
+          id: `struct-${fState.structures.length + 1}`,
+          campus_id: reqBody.campus_id || 'camp-1',
+          academic_year_id: reqBody.academic_year_id || 'y1',
+          term_id: reqBody.term_id ?? null,
+          program_id: reqBody.program_id ?? null,
+          code: String(reqBody.code ?? ''),
+          name: String(reqBody.name ?? ''),
+          currency: 'INR',
+          status: reqBody.status || 'ACTIVE',
+          due_date: String(reqBody.due_date ?? '2026-07-31'),
+          total_amount: total,
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          components: components.map((c: any, idx: number) => ({
+            id: `comp-${idx + 1}`,
+            fee_category_id: c.fee_category_id,
+            category_code: fState.categories.find((cat) => cat['id'] === c.fee_category_id)?.['code'] ?? 'GEN',
+            category_name: fState.categories.find((cat) => cat['id'] === c.fee_category_id)?.['name'] ?? 'General Fee',
+            amount: Number(c.amount),
+            description: c.description ?? null,
+          })),
+        };
+        fState.structures.push(newStruct);
+        return json(201, { data: newStruct });
+      }
+
+      if ((path === '/finance/dues' || path.startsWith('/finance/dues?')) && method === 'GET') {
+        return json(200, { data: fState.dues });
+      }
+
+      if (path === '/finance/dues/generate' && method === 'POST') {
+        const studentIds = Array.isArray(reqBody.student_ids) ? reqBody.student_ids : [];
+        const struct = fState.structures.find((s) => s['id'] === reqBody.fee_structure_id);
+        const gross = struct ? Number(struct['total_amount']) : 5000000;
+        const disc = Number(reqBody.concession_amount ?? 0);
+        const net = gross - disc;
+        const generated = [];
+        for (const sid of studentIds) {
+          const due = {
+            id: `due-${fState.dues.length + 1}`,
+            campus_id: struct ? String(struct['campus_id']) : 'camp-1',
+            student_id: String(sid),
+            student_name: sid === 'st-1' ? 'Asha Student' : `Student ${sid}`,
+            admission_number: `ADM-${sid}`,
+            fee_structure_id: String(reqBody.fee_structure_id),
+            fee_structure_name: struct ? String(struct['name']) : 'Semester Fee',
+            academic_year_id: struct ? String(struct['academic_year_id']) : 'y1',
+            term_id: struct ? (struct['term_id'] as string | null) : null,
+            due_number: `DUE-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+            gross_amount: gross,
+            discount_amount: disc,
+            net_amount: net,
+            paid_amount: 0,
+            balance_amount: net,
+            status: 'PENDING',
+            due_date: String(reqBody.due_date ?? '2026-07-31'),
+            concession_reason: reqBody.concession_reason ? String(reqBody.concession_reason) : null,
+            version: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          fState.dues.push(due);
+          generated.push(due);
+        }
+        return json(201, { data: { generated_count: generated.length, skipped_count: 0, dues: generated } });
+      }
+
+      const reverseMatch = /^\/finance\/receipts\/([^/?]+)\/reverse$/.exec(path);
+      if (reverseMatch && method === 'POST') {
+        const recId = reverseMatch[1]!;
+        const rec = fState.receipts.find((r) => r['id'] === recId);
+        if (!rec) return err(404, 'RESOURCE_NOT_FOUND');
+        rec['status'] = 'REVERSED';
+        rec['reversal_reason'] = String(reqBody.reason ?? 'Test reversal');
+        rec['reversed_at'] = new Date().toISOString();
+        rec['reversed_by_user_id'] = state.me.user_id;
+
+        for (const alloc of (rec['allocations'] as any[] | undefined) ?? []) {
+          const due = fState.dues.find((d) => d['id'] === alloc.student_due_id);
+          if (due) {
+            due['paid_amount'] = Math.max(0, Number(due['paid_amount']) - Number(alloc.allocated_amount));
+            due['balance_amount'] = Number(due['net_amount']) - Number(due['paid_amount']);
+            due['status'] = Number(due['paid_amount']) === 0 ? 'PENDING' : 'PARTIAL';
+          }
+        }
+        return json(200, { data: rec });
+      }
+
+      const recDetailsMatch = /^\/finance\/receipts\/([^/?]+)$/.exec(path);
+      if (recDetailsMatch && method === 'GET') {
+        const recId = recDetailsMatch[1]!;
+        const rec = fState.receipts.find((r) => r['id'] === recId);
+        if (!rec) return err(404, 'RESOURCE_NOT_FOUND');
+        return json(200, { data: rec });
+      }
+
+      if ((path === '/finance/receipts' || path.startsWith('/finance/receipts?')) && method === 'GET') {
+        return json(200, { data: fState.receipts });
+      }
+
+      if (path === '/finance/receipts' && method === 'POST') {
+        const amount = Number(reqBody.amount ?? 0);
+        const paymentMethod = String(reqBody.payment_method ?? 'CASH');
+        const reconStatus = paymentMethod === 'BANK_TRANSFER' ? 'PENDING_VERIFICATION' : 'CONFIRMED';
+        const allocs: any[] = Array.isArray(reqBody.allocations) && reqBody.allocations.length > 0
+          ? reqBody.allocations.map((a: any, idx: number) => ({
+              id: `alloc-${idx + 1}`,
+              student_due_id: a.student_due_id,
+              allocated_amount: Number(a.allocated_amount),
+            }))
+          : [];
+
+        if (allocs.length === 0) {
+          let rem = amount;
+          for (const due of fState.dues.filter((d) => d['student_id'] === reqBody.student_id && Number(d['balance_amount']) > 0)) {
+            if (rem <= 0) break;
+            const allocAmt = Math.min(rem, Number(due['balance_amount']));
+            due['paid_amount'] = Number(due['paid_amount']) + allocAmt;
+            due['balance_amount'] = Number(due['net_amount']) - Number(due['paid_amount']);
+            due['status'] = Number(due['balance_amount']) === 0 ? 'PAID' : 'PARTIAL';
+            allocs.push({
+              id: `alloc-${allocs.length + 1}`,
+              student_due_id: due['id'],
+              due_number: due['due_number'],
+              allocated_amount: allocAmt,
+            });
+            rem -= allocAmt;
+          }
+        }
+
+        const sid = String(reqBody.student_id);
+        const newReceipt = {
+          id: `rec-${fState.receipts.length + 1}`,
+          campus_id: reqBody.campus_id || 'camp-1',
+          student_id: sid,
+          student_name: sid === 'st-1' ? 'Asha Student' : `Student ${sid}`,
+          admission_number: `ADM-${sid}`,
+          receipt_number: `REC-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+          payment_date: String(reqBody.payment_date ?? '2026-06-15'),
+          payment_method: paymentMethod,
+          amount,
+          currency: 'INR',
+          reference_number: reqBody.reference_number ? String(reqBody.reference_number) : null,
+          reconciliation_status: reconStatus,
+          status: 'POSTED',
+          received_by_user_id: state.me.user_id,
+          received_by_name: state.me.display_name,
+          remarks: reqBody.remarks ? String(reqBody.remarks) : null,
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          allocations: allocs,
+        };
+        fState.receipts.push(newReceipt);
+        return json(201, { data: newReceipt });
+      }
+
+      const ledgerMatch = /^\/finance\/students\/([^/?]+)\/ledger$/.exec(path);
+      if (ledgerMatch && method === 'GET') {
+        const studentId = ledgerMatch[1]!;
+        const studentDues = fState.dues.filter((d) => d['student_id'] === studentId);
+        const studentRecs = fState.receipts.filter((r) => r['student_id'] === studentId);
+        const totalGross = studentDues.reduce((s, d) => s + Number(d['gross_amount'] || 0), 0);
+        const totalDisc = studentDues.reduce((s, d) => s + Number(d['discount_amount'] || 0), 0);
+        const totalNet = studentDues.reduce((s, d) => s + Number(d['net_amount'] || 0), 0);
+        const totalPaid = studentDues.reduce((s, d) => s + Number(d['paid_amount'] || 0), 0);
+        const totalBal = studentDues.reduce((s, d) => s + Number(d['balance_amount'] || 0), 0);
+        return json(200, {
+          data: {
+            student_id: studentId,
+            student_name: studentId === 'st-1' ? 'Asha Student' : `Student ${studentId}`,
+            admission_number: `ADM-${studentId}`,
+            campus_name: 'Main Campus',
+            total_gross: totalGross,
+            total_discount: totalDisc,
+            total_net: totalNet,
+            total_paid: totalPaid,
+            total_balance: totalBal,
+            currency: 'INR',
+            dues: studentDues,
+            receipts: studentRecs,
+          },
+        });
+      }
+    }
+    if (path.startsWith('/reports/')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (url.includes('format=csv')) {
+        return new Response('Mock,CSV,Data\nRow1,123,456', {
+          status: 200,
+          headers: {
+            'content-type': 'text/csv',
+            'content-disposition': 'attachment; filename="report.csv"',
+          },
+        });
+      }
+      if (path.startsWith('/reports/enrolment-roster')) {
+        return json(200, { data: state.reports.enrolmentRoster });
+      }
+      if (path.startsWith('/reports/attendance-summary')) {
+        return json(200, { data: state.reports.attendanceSummary });
+      }
+      if (path.startsWith('/reports/exam-performance')) {
+        return json(200, { data: state.reports.examPerformance });
+      }
+      if (path.startsWith('/reports/fee-summary')) {
+        return json(200, { data: state.reports.feeSummary });
+      }
+    }
     if (path.startsWith('/academics/') || /^\/students\/[^/]+\/term-enrollments/.test(path)) {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       const a = state.academics;
@@ -1412,6 +2545,7 @@ export function createFakeBackend(
         return json(200, {
           success: true,
           data: {
+            institutionType: a.institutionType,
             labels: Object.fromEntries(Object.entries(labels).filter(([k]) => k !== 'periodTypes')),
             customised: Object.keys(own).filter((k) => k !== 'periodTypes'),
             periodTypes: a.periodTypes.map((t) => ({

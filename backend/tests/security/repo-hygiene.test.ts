@@ -16,6 +16,15 @@ describe('secrets hygiene (S-14)', () => {
     expect(findings.map((f) => `${f.file}:${f.line} ${f.rule}`)).toEqual([]);
   });
 
+  it('a quoted literal assigned to a password-prefixed identifier is caught (passwordPlain: ...), unless explicitly allowed', () => {
+    const literal = ['password', 'Plain: ', "'", 'Abcdef123456', "'"].join('');
+    expect(scanText('x.ts', literal).map((f) => f.rule)).toEqual(['password-literal']);
+    expect(scanText('x.ts', `${literal} // secret-scan:allow local-dev seed`)).toEqual([]);
+    // identifiers and short or placeholder values stay quiet
+    expect(scanText('x.ts', 'const passwordHash = await hash(input);')).toEqual([]);
+    expect(scanText('x.ts', "passwordPlain: 'change_me'")).toEqual([]);
+  });
+
   it('no real env files or key material are present outside .gitignore', () => {
     expect(forbiddenFiles(listCandidateFiles(root))).toEqual([]);
   });

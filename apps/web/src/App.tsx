@@ -8,6 +8,10 @@ import { InformationalShell } from './features/shell/InformationalShell';
 import { ROUTE_REQUIREMENTS } from './features/shell/navigation';
 import { AccountPage } from './pages/AccountPage';
 import { AcademicsPage } from './pages/AcademicsPage';
+import { AttendancePage } from './pages/AttendancePage';
+import { ExaminationsPage } from './pages/ExaminationsPage';
+import { FeesPage } from './pages/FeesPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { ComingSoonPage } from './pages/ComingSoon';
 import { ConsentsPage } from './pages/ConsentsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
@@ -129,6 +133,38 @@ export function AppRoutes() {
             element={
               <RequireCapability anyOf={ROUTE_REQUIREMENTS['/academics'] ?? []}>
                 <AcademicsPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="attendance"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/attendance'] ?? []}>
+                <AttendancePage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="examinations"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/examinations'] ?? []}>
+                <ExaminationsPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="fees"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/fees'] ?? []}>
+                <FeesPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/reports'] ?? []}>
+                <ReportsPage />
               </RequireCapability>
             }
           />

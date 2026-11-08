@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -10,15 +10,27 @@ import { useAuth } from './AuthProvider';
 interface MfaChallengeProps {
   onSuccess: () => void;
   onCancel?: () => void;
+  inModal?: boolean;
+  headingId?: string;
 }
 
-export function MfaChallenge({ onSuccess, onCancel }: MfaChallengeProps) {
+export function MfaChallenge({
+  onSuccess,
+  onCancel,
+  inModal = true,
+  headingId = 'mfa-title',
+}: MfaChallengeProps) {
   const { client } = useAuth();
   const [useRecovery, setUseRecovery] = useState(false);
   const [code, setCode] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [useRecovery]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,8 +63,27 @@ export function MfaChallenge({ onSuccess, onCancel }: MfaChallengeProps) {
     }
   };
 
-  return (
-    <Card title="Two-Factor Authentication">
+  const content = (
+    <div className="mfa-challenge-flow">
+      {inModal ? (
+        <div className="auth-header">
+          <div className="auth-icon-wrap" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="32"
+              height="32"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </div>
+          <h1 id={headingId}>Two-factor authentication</h1>
+        </div>
+      ) : null}
       <p className="muted">
         {useRecovery
           ? 'Enter one of your 10-character emergency recovery codes.'
@@ -61,7 +92,7 @@ export function MfaChallenge({ onSuccess, onCancel }: MfaChallengeProps) {
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
-      <form onSubmit={(e) => void handleSubmit(e)} noValidate>
+      <form onSubmit={(e) => void handleSubmit(e)} noValidate className="auth-form">
         {useRecovery ? (
           <TextField
             label="Recovery code"
@@ -73,6 +104,7 @@ export function MfaChallenge({ onSuccess, onCancel }: MfaChallengeProps) {
             spellCheck="false"
             required
             disabled={busy}
+            inputRef={inputRef}
           />
         ) : (
           <TextField
@@ -88,11 +120,12 @@ export function MfaChallenge({ onSuccess, onCancel }: MfaChallengeProps) {
             autoComplete="one-time-code"
             required
             disabled={busy}
+            inputRef={inputRef}
           />
         )}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-          <Button type="submit" variant="primary" disabled={busy}>
+        <div className="auth-actions-stack">
+          <Button type="submit" variant="primary" disabled={busy} className="btn-block">
             {busy ? 'Verifying…' : 'Verify'}
           </Button>
 
@@ -100,6 +133,7 @@ export function MfaChallenge({ onSuccess, onCancel }: MfaChallengeProps) {
             type="button"
             variant="secondary"
             disabled={busy}
+            className="btn-block"
             onClick={() => {
               setError(null);
               setUseRecovery((prev) => !prev);
@@ -109,12 +143,28 @@ export function MfaChallenge({ onSuccess, onCancel }: MfaChallengeProps) {
           </Button>
 
           {onCancel ? (
-            <Button type="button" variant="secondary" disabled={busy} onClick={onCancel}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy}
+              className="btn-block"
+              onClick={onCancel}
+            >
               Cancel
             </Button>
           ) : null}
         </div>
       </form>
-    </Card>
+      <p className="fineprint">
+        Two-factor authentication adds an extra layer of security. If you lost your device, use an
+        emergency recovery code.
+      </p>
+    </div>
   );
+
+  if (inModal) {
+    return content;
+  }
+
+  return <Card title="Two-Factor Authentication">{content}</Card>;
 }

@@ -60,6 +60,7 @@ const EnvSchema = z.object({
   // never switch the route on. It does NOT detect or guarantee a single-instance deployment (the route's rate limiter is
   // per process); setting it is the operator's statement that this limitation is acceptable.
   STUDENT_DIRECTORY_LIST_ENABLED: booleanString,
+  ATTENDANCE_CORRECTIONS_ENABLED: booleanString,
   // Dedicated keyring for TOTP secrets at rest (docs/architecture/v3/23-mfa.md §3), same format as the cursor keys but a
   // separate ring: material may never be shared with CURSOR_KEYS. Both or neither; REQUIRED in production, because MFA is
   // mandatory for the HOD-and-above and REGISTRAR roles and no MFA can be enrolled or verified without it.
@@ -318,6 +319,12 @@ export interface AppConfig {
   readonly cursor?: CursorConfig;
   /** STUDENT_DIRECTORY_LIST_ENABLED (default false). The directory route needs this AND `cursor`. */
   readonly studentDirectoryListEnabled: boolean;
+  /**
+   * ATTENDANCE_CORRECTIONS_ENABLED (default false). Containment (doc 41 §9): the correction route answers 403 to everyone
+   * while this is off, whatever grants a tenant holds, because who may correct, within what window and with what approval
+   * are owner decisions AD-1 to AD-4 (doc 43) that are still PENDING. Turn on only on a disposable or synthetic tenant.
+   */
+  readonly attendanceCorrectionsEnabled: boolean;
   /** MFA_ENCRYPTION_KEYS + MFA_ENCRYPTION_ACTIVE_KEY_ID. Always present in production; absent elsewhere = MFA unavailable. */
   readonly mfa?: MfaConfig;
   /** IMPORT_MATCHING_KEYS + IMPORT_MATCHING_ACTIVE_KEY_ID. Always present in production; absent elsewhere = an import commit
@@ -450,6 +457,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     ...(cursor ? { cursor } : {}),
     studentDirectoryListEnabled: e.STUDENT_DIRECTORY_LIST_ENABLED,
+    attendanceCorrectionsEnabled: e.ATTENDANCE_CORRECTIONS_ENABLED,
     ...(mfa ? { mfa } : {}),
     ...(importMatching ? { importMatching } : {}),
     ...(storage ? { storage } : {}),

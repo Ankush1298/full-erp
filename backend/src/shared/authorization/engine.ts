@@ -17,6 +17,10 @@ export interface ResourceScope {
   employee_id?: string;
   campus_id?: string;
   department_id?: string;
+  /** Attendance (X-12): the offering and campus-local date a session belongs to; read from the session row, never trusted input. */
+  course_offering_id?: string;
+  session_date?: string;
+  exam_date?: string;
 }
 
 /**
@@ -174,6 +178,33 @@ export class AuthorizationEngine {
     };
   }
 
+  /**
+   * Active users whose institutional (GRANTED) grant of `permission` covers a campus/department right now. For addressing
+   * in-app notices to people who could act, never for deciding access: `assert` stays the only decision point.
+   */
+  static async usersGrantedOver(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    permission: string,
+    target: { campusId: string; departmentId: string },
+  ): Promise<string[]> {
+    requireKnownPermission(permission);
+    const r = await tx.query<{ user_id: string }>(
+      `SELECT DISTINCT ra.user_id
+         FROM app.role_assignments ra
+         JOIN app.role_permissions rp ON rp.organization_id = ra.organization_id AND rp.role_id = ra.role_id
+         JOIN app.users u ON u.organization_id = ra.organization_id AND u.id = ra.user_id
+        WHERE ra.organization_id = $1 AND rp.permission_code = $2 AND rp.scope_mode = 'GRANTED'
+          AND u.status = 'ACTIVE' AND ra.status = 'ACTIVE' AND ra.valid_from <= now()
+          AND (ra.valid_until IS NULL OR ra.valid_until > now())
+          AND (ra.scope_type = 'ORGANIZATION'
+               OR (ra.scope_type = 'CAMPUS' AND ra.scope_id = $3)
+               OR (ra.scope_type = 'DEPARTMENT' AND ra.scope_id = $4))`,
+      [ctx.tenantId, permission, target.campusId, target.departmentId],
+    );
+    return r.rows.map((x) => x.user_id);
+  }
+
   /** Does the actor hold the permission in any scope? (route-level / capability check) */
   static async hasPermission(
     tx: TenantTx,
@@ -196,6 +227,25 @@ export class AuthorizationEngine {
       throw new AppError(500, 'UNTRUSTED_CONTEXT', 'Database access requires a trusted context.');
     }
     if (ctx.actorKind !== 'STAFF') throw new AppError(403, 'FORBIDDEN', 'Access denied.');
+  }
+
+  /**
+   * Student-only gate for the "my own records" routes: a staff account is never a stand-in for a student, so anything but
+   * STUDENT, including a kind added to ActorKind later, is a 403. Fail closed; no query, not a permission check and not a
+   * substitute for `assert` (the caller still proves the SELF scope).
+   */
+  static assertStudentActor(ctx: TrustedContext): void {
+    if (!isTrustedContext(ctx)) {
+      throw new AppError(500, 'UNTRUSTED_CONTEXT', 'Database access requires a trusted context.');
+    }
+    if (ctx.actorKind !== 'STUDENT') throw new AppError(403, 'FORBIDDEN', 'Access denied.');
+  }
+
+  static isStudentActor(ctx: TrustedContext): boolean {
+    if (!isTrustedContext(ctx)) {
+      return false;
+    }
+    return ctx.actorKind === 'STUDENT';
   }
 
   /**

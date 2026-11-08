@@ -801,6 +801,7 @@ describe('POST /api/v1/students/:id/status over HTTP', () => {
       [
         'admissionDate',
         'admissionNumber',
+        'campusId',
         'createdAt',
         'id',
         'organizationId',

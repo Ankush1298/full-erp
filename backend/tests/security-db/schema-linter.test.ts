@@ -10,6 +10,11 @@ const STUDENT_BEARING = [
   'term_enrollments',
   'section_memberships',
   'course_registrations',
+  'attendance_records',
+  'exam_marks',
+  'exam_candidates',
+  'student_dues',
+  'fee_receipts',
 ];
 
 describe('schema linter (S-2)', () => {
@@ -209,8 +214,11 @@ describe('schema linter (S-2)', () => {
     );
     expect(rows.map((r) => r.relname).sort()).toEqual([
       'academic_years',
+      'attendance_record_revisions',
+      'attendance_records',
       'audit_events',
       'campuses',
+      'class_sessions',
       'cohort_periods',
       'cohorts',
       'consents',
@@ -223,6 +231,12 @@ describe('schema linter (S-2)', () => {
       'elective_groups',
       'employee_postings',
       'employees',
+      'exam_candidate_lists',
+      'exam_candidates',
+      'exam_eligibility_policies',
+      'exam_marks',
+      'exam_schedules',
+      'examinations',
       'faculty_assignments',
       'file_links',
       'files',

@@ -2,7 +2,14 @@ import { Type, type Static } from '@sinclair/typebox';
 import type { TenantTx } from '../../shared/database/index.js';
 import type { TrustedContext } from '../../shared/tenancy/trusted-context.js';
 import { AuthorizationEngine } from '../../shared/authorization/engine.js';
-import { TERMINOLOGY_DEFAULTS, TERMINOLOGY_SLOTS } from '../../shared/settings/index.js';
+import {
+  INSTITUTION_TYPE_KEY,
+  TERMINOLOGY_DEFAULTS,
+  TERMINOLOGY_SLOTS,
+  isInstitutionType,
+  roleLabelsFor,
+  type InstitutionType,
+} from '../../shared/settings/index.js';
 import { CohortService, ProgramService } from './academic.service.js';
 import { assertOrgWide, ensureTrusted } from './common.js';
 
@@ -42,6 +49,14 @@ export const TerminologyResponseSchema = Type.Object(
         ),
         // Cohort id -> period label, only for cohorts the caller may list whose period type has its own label.
         byCohort: Type.Record(Type.String(), Type.String()),
+        // Doc 44: the chosen institution type (null until onboarding sets it) and the role names shown for it. Display only.
+        institutionType: Type.Union([
+          Type.Literal('SCHOOL'),
+          Type.Literal('COLLEGE'),
+          Type.Literal('UNIVERSITY'),
+          Type.Null(),
+        ]),
+        roleLabels: Type.Record(Type.String(), Type.String()),
       },
       strict,
     ),
@@ -198,6 +213,8 @@ export class SetupService {
       customised: boolean;
     }>;
     byCohort: Record<string, string>;
+    institutionType: InstitutionType | null;
+    roleLabels: Record<string, string>;
   }> {
     ensureTrusted(ctx);
     await AuthorizationEngine.assert(tx, ctx, 'academic.program.read');
@@ -247,7 +264,20 @@ export class SetupService {
         if (l !== undefined) byCohort[c.id] = l;
       }
     }
-    return { labels, customised, periodTypes, byCohort };
+    const t = await tx.query<{ value: unknown }>(
+      `SELECT value FROM app.organization_settings WHERE organization_id = $1 AND key = $2`,
+      [ctx.tenantId, INSTITUTION_TYPE_KEY],
+    );
+    const storedType = t.rows[0]?.value;
+    const institutionType = isInstitutionType(storedType) ? storedType : null;
+    return {
+      labels,
+      customised,
+      periodTypes,
+      byCohort,
+      institutionType,
+      roleLabels: roleLabelsFor(institutionType),
+    };
   }
 
   /**

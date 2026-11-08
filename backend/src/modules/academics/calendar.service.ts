@@ -37,6 +37,7 @@ import type {
   UpdateTermBody,
 } from './calendar.schemas.js';
 import { setupIncomplete, termReadiness } from './term-readiness.js';
+import { lockTermSessions } from '../attendance/attendance.lock.js';
 
 type Meta = AuditRequestMeta | undefined;
 export interface UpdateOptions {
@@ -486,6 +487,16 @@ export class TermService {
     if (status !== row.status) changes.status = { old: row.status, new: status };
     if (Object.keys(changes).length === 0) return toTerm(row);
 
+    // AD-5: the term's submitted attendance sessions lock first, in this transaction (the term guard refuses them afterwards).
+    if (locking) {
+      await lockTermSessions(
+        tx,
+        ctx,
+        { id: row.id, campusId: row.campus_id },
+        options.meta ?? {},
+        reason ?? '',
+      );
+    }
     let updated: TermRow | undefined;
     try {
       const u = await tx.query<TermRow>(
@@ -519,7 +530,7 @@ export class TermService {
         resourceType: 'term',
         resourceId: row.id,
         campusId: row.campus_id,
-        riskTier: changes.status ? 2 : 1,
+        riskTier: locking ? 3 : changes.status ? 2 : 1, // AD-9: lock-related operations are tier 3
         changes,
         ...(reason !== undefined ? { reasonText: reason } : {}),
       },

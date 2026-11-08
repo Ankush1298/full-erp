@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import pg from 'pg';
 import {
+  SupportGrantsNotImplementedError,
   createSupportGrant,
   createTenant,
   seedTenant,
@@ -185,23 +186,18 @@ describe('Platform CLI (Integration, ADR-002 & Doc 05/11)', () => {
     expect(checkRes.rows[0]!.status).toBe('SUSPENDED');
   });
 
-  it('generates a time-bounded support grant token (support:grant)', async () => {
+  it('support:grant is gone: nothing is issued, stored or audited for a real tenant', async () => {
     const slug = `granttest-${Date.now().toString(36)}`;
-    const tenant = await createTenant(client, {
-      name: 'Support Grant College',
-      slug,
-    });
-
-    const grant = await createSupportGrant(client, {
-      tenant: slug,
-      adminEmail: 'ops@smartcampus.test',
-      durationHours: 6,
-      signingSecret: 'test-signing-secret',
-    });
-
-    expect(grant.tenantId).toBe(tenant.id);
-    expect(grant.adminEmail).toBe('ops@smartcampus.test');
-    expect(new Date(grant.expiresAt).getTime()).toBeGreaterThan(Date.now());
-    expect(grant.grantToken).toBeDefined();
+    const tenant = await createTenant(client, { name: 'Support Grant College', slug });
+    const before = await client.query(
+      'SELECT count(*)::int AS n FROM app.audit_events WHERE organization_id = $1',
+      [tenant.id],
+    );
+    expect(() => createSupportGrant()).toThrow(SupportGrantsNotImplementedError);
+    const after = await client.query(
+      'SELECT count(*)::int AS n FROM app.audit_events WHERE organization_id = $1',
+      [tenant.id],
+    );
+    expect(after.rows[0]).toEqual(before.rows[0]);
   });
 });

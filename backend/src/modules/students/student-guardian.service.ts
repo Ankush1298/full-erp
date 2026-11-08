@@ -265,14 +265,20 @@ export class StudentGuardianService {
     tx: TenantTx,
     ctx: TrustedContext,
     studentIds: readonly string[],
+    scope?: { campusId?: string },
   ): Promise<Map<string, string[]>> {
     ensureTrusted(ctx);
     AuthorizationEngine.assertStaffActor(ctx);
     await AuthorizationEngine.assert(tx, ctx, 'student.record.create');
     try {
-      await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
-        organization_id: ctx.tenantId,
-      });
+      if (scope?.campusId) {
+        await AuthorizationEngine.assert(tx, ctx, 'student.record.create', {
+          organization_id: ctx.tenantId,
+          campus_id: scope.campusId,
+        });
+      } else {
+        await AuthorizationEngine.assert(tx, ctx, 'student.record.create');
+      }
     } catch (err) {
       if (err instanceof AppError && err.statusCode === 404) {
         throw new AppError(403, 'FORBIDDEN', 'Access denied.');
@@ -308,20 +314,20 @@ export class StudentGuardianService {
     const { sid } = parseIds(studentId);
     await AuthorizationEngine.assert(tx, ctx, GUARDIAN_READ_PERMISSION);
 
-    const student = await tx.query<{ id: string; user_id: string }>(
-      'SELECT id, user_id FROM app.students WHERE organization_id = $1 AND id = $2',
+    const student = await tx.query<{ id: string; user_id: string; campus_id: string | null }>(
+      'SELECT id, user_id, campus_id FROM app.students WHERE organization_id = $1 AND id = $2',
       [ctx.tenantId, sid],
     );
     const row = student.rows[0];
     if (!row) throw resourceNotFound();
-    // SELF needs no placement; a staff grant is judged against the active enrolment. Read for every actor: row security
+    // SELF needs no placement; a staff grant is judged against the active enrolment, or admission campus. Read for every actor: row security
     // shows a student only their own enrolment, and no actor-kind comparison belongs in a service.
     const placement = await readActiveEnrolment(tx, ctx.tenantId, sid);
     await AuthorizationEngine.assert(tx, ctx, GUARDIAN_READ_PERMISSION, {
       organization_id: ctx.tenantId,
       student_id: row.id,
       user_id: row.user_id,
-      ...placementScope(placement),
+      ...placementScope(placement, row.campus_id),
     });
 
     const res = await tx.query<GuardianRow>(
@@ -718,8 +724,12 @@ export class StudentGuardianService {
 
 // ---- shared steps ----------------------------------------------------------------------------------------------------
 
-function placementScope(p: Placement | null): ResourceScope {
-  return p ? { campus_id: p.campus_id, department_id: p.department_id } : {};
+function placementScope(p: Placement | null, admissionCampusId?: string | null): ResourceScope {
+  const campus_id = p?.campus_id ?? admissionCampusId;
+  return {
+    ...(campus_id ? { campus_id } : {}),
+    ...(p ? { department_id: p.department_id } : {}),
+  };
 }
 
 function auditPlacement(p: Placement | null): { campusId?: string; departmentId?: string } {
@@ -728,17 +738,18 @@ function auditPlacement(p: Placement | null): { campusId?: string; departmentId?
 
 /**
  * Proves the caller's `student.guardian.manage` grant reaches this student from `placement`: the ACTIVE enrolment's frozen
- * campus/department, or null. The scope is what the database holds, never anything the caller supplied. Out of scope is
+ * campus/department, or the student's admission campus, or null. The scope is what the database holds, never anything the caller supplied. Out of scope is
  * the same 404 as a missing student.
  */
 async function assertManageScope(
   tx: TenantTx,
   ctx: TrustedContext,
   placement: Placement | null,
+  admissionCampusId?: string | null,
 ): Promise<void> {
   await AuthorizationEngine.assert(tx, ctx, GUARDIAN_MANAGE_PERMISSION, {
     organization_id: ctx.tenantId,
-    ...placementScope(placement),
+    ...placementScope(placement, admissionCampusId),
   });
 }
 
@@ -759,9 +770,18 @@ async function lockStudentAndProveScope(
     `SELECT id FROM app.students WHERE organization_id = $1 AND id = $2 FOR NO KEY UPDATE`,
     [ctx.tenantId, studentId],
   );
-  if (!student.rows[0]) throw resourceNotFound();
+  const row = student.rows[0];
+  if (!row) throw resourceNotFound();
   const placement = await lockActiveEnrolment(tx, ctx.tenantId, studentId);
-  await assertManageScope(tx, ctx, placement);
+  const admCampus = placement
+    ? null
+    : (
+        await tx.query<{ campus_id: string | null }>(
+          `SELECT campus_id FROM app.students WHERE organization_id = $1 AND id = $2`,
+          [ctx.tenantId, studentId],
+        )
+      ).rows[0]?.campus_id;
+  await assertManageScope(tx, ctx, placement, admCampus);
   return placement;
 }
 

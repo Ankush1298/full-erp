@@ -20,7 +20,7 @@ export interface PermissionDef {
 
 /**
  * The Milestone-1 permissions that Slice 3 needs (subset of docs/architecture/v3/10; a test keeps
- * code ≡ doc). Reserved namespaces (attendance.*, …) are added by the milestone that ships their routes.
+ * code ≡ doc). Reserved namespaces (exam.*, …) are added by the milestone that ships their routes.
  */
 export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'session.read', sensitivity: 'NORMAL' },
@@ -58,6 +58,12 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'academic.section.manage', sensitivity: 'SENSITIVE' },
   { code: 'academic.offering.manage', sensitivity: 'SENSITIVE' },
   { code: 'academic.faculty.assign', sensitivity: 'SENSITIVE' },
+  { code: 'attendance.session.mark', sensitivity: 'SENSITIVE' },
+  { code: 'attendance.record.read', sensitivity: 'SENSITIVE' },
+  { code: 'attendance.record.correct', sensitivity: 'SENSITIVE' },
+  { code: 'attendance.correction.approve', sensitivity: 'SENSITIVE' },
+  { code: 'attendance.session.lock', sensitivity: 'CRITICAL' },
+  { code: 'attendance.session.cancel', sensitivity: 'SENSITIVE' },
   { code: 'enrollment.term.read', sensitivity: 'SENSITIVE' },
   { code: 'enrollment.term.manage', sensitivity: 'SENSITIVE' },
 
@@ -84,6 +90,18 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'role.assignment.revoke', sensitivity: 'CRITICAL' },
 
   { code: 'import.job.manage', sensitivity: 'SENSITIVE' },
+  { code: 'exam.manage', sensitivity: 'SENSITIVE' },
+  { code: 'exam.marks.enter', sensitivity: 'SENSITIVE' },
+  { code: 'result.publish', sensitivity: 'CRITICAL' },
+  { code: 'result.read', sensitivity: 'SENSITIVE' },
+
+  { code: 'fee.structure.read', sensitivity: 'NORMAL' },
+  { code: 'fee.structure.manage', sensitivity: 'SENSITIVE' },
+  { code: 'fee.dues.generate', sensitivity: 'SENSITIVE' },
+  { code: 'fee.dues.read', sensitivity: 'SENSITIVE' },
+  { code: 'fee.receipt.record', sensitivity: 'SENSITIVE' },
+  { code: 'fee.receipt.read', sensitivity: 'SENSITIVE' },
+  { code: 'fee.receipt.reverse', sensitivity: 'CRITICAL' },
 ];
 
 export const PERMISSION_CODES: ReadonlySet<string> = new Set(PERMISSION_CATALOG.map((p) => p.code));

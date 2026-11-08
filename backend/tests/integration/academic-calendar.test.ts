@@ -538,7 +538,7 @@ describe('TermService', () => {
       [T.orgId, t],
     );
     expect(audit).toHaveLength(1);
-    expect(audit[0]).toMatchObject({ risk_tier: 2, reason_text: 'Results published for the term' });
+    expect(audit[0]).toMatchObject({ risk_tier: 3, reason_text: 'Results published for the term' });
   });
 
   it('a term can only become ACTIVE inside an ACTIVE year, and cannot be added to a CLOSED year', async () => {

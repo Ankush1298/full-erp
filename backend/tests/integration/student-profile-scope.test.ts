@@ -380,6 +380,7 @@ describe('sensitive data stays separately gated', () => {
       [
         'admissionDate',
         'admissionNumber',
+        'campusId',
         'createdAt',
         'id',
         'organizationId',

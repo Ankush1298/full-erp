@@ -92,7 +92,7 @@ describe('migration plan: contract gate', () => {
     const plan = planMigrations(all, new Map());
     expect(versions(plan.deferred)).toEqual(all.slice(8).map((m) => m.version));
     expect(versions(plan.deferred)[0]).toBe('0009');
-    expect(versions(plan.deferred).at(-1)).toBe('0039');
+    expect(versions(plan.deferred).at(-1)).toBe('0047');
     expect(versions(plan.run)).toEqual(all.slice(0, 8).map((m) => m.version));
   });
 
@@ -220,6 +220,14 @@ describe('migration plan: phase boundary', () => {
         '0037',
         '0038',
         '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
       ]);
       const ordinary = planMigrations(all, upTo(8));
       expect(ordinary.run).toEqual([]);
@@ -259,6 +267,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
       }
     });
@@ -289,6 +305,14 @@ describe('migration plan: phase boundary', () => {
         '0037',
         '0038',
         '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
       ]);
       expect(planMigrations(all, at18, ['0019']).deferred).toEqual([]);
       expect(versions(planMigrations(all, at18, ['0019']).run)).toEqual([
@@ -313,6 +337,14 @@ describe('migration plan: phase boundary', () => {
         '0037',
         '0038',
         '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
       ]);
       expect(() => planMigrations(all, upTo(9), ['0019'])).toThrow(REFUSED);
       expect(() => planMigrations(all, upTo(9), ['0019'])).toThrow(/pending 0010, /);
@@ -342,6 +374,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(plan.deferred).toEqual([]);
         const at20 = planMigrations(all, upTo(20), allow);
@@ -365,6 +405,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at20.deferred).toEqual([]);
         const at21 = planMigrations(all, upTo(21), allow);
@@ -387,6 +435,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at21.deferred).toEqual([]);
         const at22 = planMigrations(all, upTo(22), allow);
@@ -408,6 +464,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at22.deferred).toEqual([]);
         const at23 = planMigrations(all, upTo(23), allow);
@@ -428,6 +492,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at23.deferred).toEqual([]);
         const at24 = planMigrations(all, upTo(24), allow);
@@ -447,6 +519,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at24.deferred).toEqual([]);
         const at25 = planMigrations(all, upTo(25), allow);
@@ -465,6 +545,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at25.deferred).toEqual([]);
         const at26 = planMigrations(all, upTo(26), allow);
@@ -482,6 +570,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at26.deferred).toEqual([]);
         const at27 = planMigrations(all, upTo(27), allow);
@@ -498,6 +594,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at27.deferred).toEqual([]);
         const at28 = planMigrations(all, upTo(28), allow);
@@ -513,6 +617,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at28.deferred).toEqual([]);
         const at29 = planMigrations(all, upTo(29), allow);
@@ -527,6 +639,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at29.deferred).toEqual([]);
         const at30 = planMigrations(all, upTo(30), allow);
@@ -540,6 +660,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at30.deferred).toEqual([]);
         const at31 = planMigrations(all, upTo(31), allow);
@@ -552,6 +680,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at31.deferred).toEqual([]);
         const at32 = planMigrations(all, upTo(32), allow);
@@ -563,27 +699,59 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(at32.deferred).toEqual([]);
         const at33 = planMigrations(all, upTo(33), allow);
-        expect(versions(at33.run)).toEqual(['0034', '0035', '0036', '0037', '0038', '0039']);
+        expect(versions(at33.run)).toEqual(['0034', '0035', '0036', '0037', '0038', '0039', '0040', '0041', '0042', '0043', '0044', '0045', '0046', '0047']);
         expect(at33.deferred).toEqual([]);
         const at34 = planMigrations(all, upTo(34), allow);
-        expect(versions(at34.run)).toEqual(['0035', '0036', '0037', '0038', '0039']);
+        expect(versions(at34.run)).toEqual(['0035', '0036', '0037', '0038', '0039', '0040', '0041', '0042', '0043', '0044', '0045', '0046', '0047']);
         expect(at34.deferred).toEqual([]);
         const at35 = planMigrations(all, upTo(35), allow);
-        expect(versions(at35.run)).toEqual(['0036', '0037', '0038', '0039']);
+        expect(versions(at35.run)).toEqual(['0036', '0037', '0038', '0039', '0040', '0041', '0042', '0043', '0044', '0045', '0046', '0047']);
         expect(at35.deferred).toEqual([]);
         const at36 = planMigrations(all, upTo(36), allow);
-        expect(versions(at36.run)).toEqual(['0037', '0038', '0039']);
+        expect(versions(at36.run)).toEqual(['0037', '0038', '0039', '0040', '0041', '0042', '0043', '0044', '0045', '0046', '0047']);
         expect(at36.deferred).toEqual([]);
         const at37 = planMigrations(all, upTo(37), allow);
-        expect(versions(at37.run)).toEqual(['0038', '0039']);
+        expect(versions(at37.run)).toEqual(['0038', '0039', '0040', '0041', '0042', '0043', '0044', '0045', '0046', '0047']);
         expect(at37.deferred).toEqual([]);
         const at38 = planMigrations(all, upTo(38), allow);
-        expect(versions(at38.run)).toEqual(['0039']);
+        expect(versions(at38.run)).toEqual(['0039', '0040', '0041', '0042', '0043', '0044', '0045', '0046', '0047']);
         expect(at38.deferred).toEqual([]);
-        const done = planMigrations(all, upTo(39), allow);
+        const at39 = planMigrations(all, upTo(39), allow);
+        expect(versions(at39.run)).toEqual(['0040', '0041', '0042', '0043', '0044', '0045', '0046', '0047']);
+        expect(at39.deferred).toEqual([]);
+        const at40 = planMigrations(all, upTo(40), allow);
+        expect(versions(at40.run)).toEqual(['0041', '0042', '0043', '0044', '0045', '0046', '0047']);
+        expect(at40.deferred).toEqual([]);
+        const at41 = planMigrations(all, upTo(41), allow);
+        expect(versions(at41.run)).toEqual(['0042', '0043', '0044', '0045', '0046', '0047']);
+        expect(at41.deferred).toEqual([]);
+        const at42 = planMigrations(all, upTo(42), allow);
+        expect(versions(at42.run)).toEqual(['0043', '0044', '0045', '0046', '0047']);
+        expect(at42.deferred).toEqual([]);
+        const at43 = planMigrations(all, upTo(43), allow);
+        expect(versions(at43.run)).toEqual(['0044', '0045', '0046', '0047']);
+        expect(at43.deferred).toEqual([]);
+        const at44 = planMigrations(all, upTo(44), allow);
+        expect(versions(at44.run)).toEqual(['0045', '0046', '0047']);
+        expect(at44.deferred).toEqual([]);
+        const at45 = planMigrations(all, upTo(45), allow);
+        expect(versions(at45.run)).toEqual(['0046', '0047']);
+        expect(at45.deferred).toEqual([]);
+        const at46 = planMigrations(all, upTo(46), allow);
+        expect(versions(at46.run)).toEqual(['0047']);
+        expect(at46.deferred).toEqual([]);
+        const done = planMigrations(all, upTo(47), allow);
         expect(done.run).toEqual([]);
         expect(done.deferred).toEqual([]);
       }
@@ -626,6 +794,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(versions(plan.run)).not.toContain('0020');
         expect(versions(plan.run)).not.toContain('0021');
@@ -661,6 +837,14 @@ describe('migration plan: phase boundary', () => {
         '0037',
         '0038',
         '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
       ]) {
         expect(() => planMigrations(all, upTo(18), [v])).toThrow(
           /no contract migration with that exact version/,
@@ -693,6 +877,14 @@ describe('migration plan: phase boundary', () => {
         '0037',
         '0038',
         '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
       ]);
       expect(versions(planMigrations(all, new Map(), ['0009', '0019']).run)).toEqual(
         all.map((m) => m.version),
@@ -706,7 +898,7 @@ describe('migration plan: phase boundary', () => {
       const gap = upTo(7);
       gap.delete('0004');
       expect(() => planMigrations(all, gap)).toThrow(/not a contiguous prefix/);
-      expect(() => planMigrations(all, new Map([...upTo(39), ['0040', 'x']]))).toThrow(
+      expect(() => planMigrations(all, new Map([...upTo(47), ['0048', 'x']]))).toThrow(
         /missing from source control/,
       );
     });
@@ -732,7 +924,7 @@ describe('migration plan: phase boundary', () => {
     });
 
     it('rejects unknown migration versions in through', () => {
-      for (const unknown of ['0000', '0040', '0099', '9999']) {
+      for (const unknown of ['0000', '0048', '0099', '9999']) {
         expect(() => planMigrations(all, new Map(), [], unknown)).toThrow(
           /no migration with that exact version/,
         );
@@ -841,6 +1033,14 @@ describe('migration plan: phase boundary', () => {
           '0037',
           '0038',
           '0039',
+        '0040',
+        '0041',
+        '0042',
+        '0043',
+        '0044',
+        '0045',
+        '0046',
+        '0047',
         ]);
         expect(plan.deferredByThrough).toBe('0026');
       });

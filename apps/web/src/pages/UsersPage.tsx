@@ -8,10 +8,14 @@ import {
   type ReactNode,
 } from 'react';
 import { Alert } from '../components/ui/Alert';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { StatCard } from '../components/ui/StatCard';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { TextField } from '../components/ui/TextField';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -346,29 +350,43 @@ export function UsersPage() {
 
   return (
     <>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          flexWrap: 'wrap',
-          gap: 'var(--space-3)',
-        }}
-      >
-        <div>
-          <h1>Users</h1>
-          <p className="lead">
-            Manage user directory accounts, send invitations, and manage account status. Critical
-            changes require step-up verification and are recorded in the audit log.
-          </p>
-        </div>
-        {canInvite ? (
-          <div>
+      <PageHeader
+        title="Users"
+        subtitle="Manage user directory accounts, send invitations, and manage account status. Critical changes require step-up verification and are recorded in the audit log."
+        actions={
+          canInvite ? (
             <Button type="button" variant="primary" onClick={openInviteModal} disabled={pending}>
               Invite user
             </Button>
-          </div>
-        ) : null}
+          ) : null
+        }
+      />
+
+      <div className="stat-grid" style={{ marginBottom: 'var(--space-4)' }}>
+        <StatCard
+          label="Total Users"
+          value={users.length}
+          tone="purple"
+          helper="Loaded directory accounts"
+        />
+        <StatCard
+          label="Active Accounts"
+          value={users.filter((u) => u.status === 'ACTIVE').length}
+          tone="emerald"
+          helper="Full access active users"
+        />
+        <StatCard
+          label="Pending Invitations"
+          value={users.filter((u) => u.status === 'INVITED').length}
+          tone="amber"
+          helper="Awaiting account setup"
+        />
+        <StatCard
+          label="Suspended Accounts"
+          value={users.filter((u) => u.status === 'SUSPENDED').length}
+          tone="coral"
+          helper="Access revoked"
+        />
       </div>
 
       {notice ? <Alert tone={notice.tone}>{notice.message}</Alert> : null}
@@ -544,22 +562,20 @@ export function UsersPage() {
         {usersState === 'loading' ? <Spinner label="Loading users…" /> : null}
 
         {usersState === 'error' ? (
-          <div>
-            <Alert tone="error">{usersError ?? 'Failed to load users.'}</Alert>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => loadUsers(undefined, statusFilter)}
-            >
-              Retry
-            </Button>
-          </div>
+          <ErrorState
+            title="User directory error"
+            message={usersError ?? 'Failed to load users.'}
+            onRetry={() => loadUsers(undefined, statusFilter)}
+            retryLabel="Retry"
+          />
         ) : null}
 
         {usersState === 'ready' && filteredUsers.length === 0 ? (
-          <p className="field-hint">
-            {users.length === 0 ? 'No users found.' : 'No users match your filter.'}
-          </p>
+          <EmptyState
+            title="No users found"
+            description={users.length === 0 ? 'No users found.' : 'No users match your filter.'}
+            compact
+          />
         ) : null}
 
         {usersState === 'ready' && filteredUsers.length > 0 ? (
@@ -599,7 +615,7 @@ export function UsersPage() {
                       </td>
                       <td>{u.email}</td>
                       <td>
-                        <Badge>{u.status}</Badge>
+                        <StatusBadge status={u.status} />
                       </td>
                       <td>{formatWhen(u.createdAt)}</td>
                       <td>
@@ -680,7 +696,7 @@ export function UsersPage() {
             <dd>{selectedUser.displayName}</dd>
             <dt style={{ fontWeight: 600 }}>Status:</dt>
             <dd>
-              <Badge>{selectedUser.status}</Badge>
+              <StatusBadge status={selectedUser.status} />
             </dd>
             <dt style={{ fontWeight: 600 }}>Created at:</dt>
             <dd>{formatWhen(selectedUser.createdAt)}</dd>

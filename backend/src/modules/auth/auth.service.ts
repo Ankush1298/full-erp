@@ -1,4 +1,9 @@
 import { AppError } from '../../shared/errors/http-errors.js';
+import {
+  INSTITUTION_TYPE_KEY,
+  isInstitutionType,
+  roleLabelsFor,
+} from '../../shared/settings/index.js';
 import type { Database } from '../../shared/database/index.js';
 import { uuidv7 } from '../../shared/ids/uuidv7.js';
 import {
@@ -226,10 +231,22 @@ export class AuthService {
         [ctx.tenantId, ctx.userId],
       );
       const who = await AuthorizationEngine.describeActor(tx, ctx);
+      // Doc 44: the institution's display names for the caller's OWN roles. Labels only; capabilities come from the grants above.
+      const chosen = await tx.query<{ value: unknown }>(
+        `SELECT value FROM app.organization_settings WHERE organization_id = $1 AND key = $2`,
+        [ctx.tenantId, INSTITUTION_TYPE_KEY],
+      );
+      const stored = chosen.rows[0]?.value;
+      const institutionType = isInstitutionType(stored) ? stored : null;
+      const all = roleLabelsFor(institutionType);
       return {
         display_name: user.rows[0]?.display_name ?? '',
         roles: who.roleCodes,
         capabilities: who.capabilities,
+        institution_type: institutionType,
+        role_labels: Object.fromEntries(
+          who.roleCodes.flatMap((c) => (all[c] !== undefined ? [[c, all[c]]] : [])),
+        ),
       };
     });
   }

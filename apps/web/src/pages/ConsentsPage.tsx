@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '../components/ui/Alert';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
 import { fetchMyConsents, withdrawConsent, type ConsentItem } from '../lib/api/consents-api';
@@ -25,8 +28,12 @@ export function ConsentsPage() {
         setConsents(res.data);
         setLoading(false);
       })
-      .catch((err: Error) => {
-        setError(err.message || 'Failed to load privacy and consent records.');
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error && err.message && !err.message.startsWith('API ')
+            ? err.message
+            : 'Failed to load privacy and consent records.',
+        );
         setLoading(false);
       });
   }, [client]);
@@ -56,27 +63,35 @@ export function ConsentsPage() {
 
   return (
     <>
-      <h1>Privacy & Consents</h1>
-      <p className="lead">
-        Review and manage the consent you have granted for data processing and institutional
-        communications.
-      </p>
+      <PageHeader
+        title="Privacy & Consents"
+        subtitle="Review and manage the consent you have granted for data processing and institutional communications."
+      />
 
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && (
+        <ErrorState
+          title="Consent error"
+          message={error}
+          onRetry={loadConsents}
+          retryLabel="Retry"
+        />
+      )}
       {success && <Alert tone="info">{success}</Alert>}
 
       {loading ? (
         <Spinner label="Loading consent records…" />
       ) : consents.length === 0 ? (
-        <Card title="No consent records">
-          <p className="muted">No point-in-time consent records were found for your account.</p>
-        </Card>
+        <EmptyState
+          title="No consent records"
+          description="No point-in-time consent records were found for your account."
+          compact
+        />
       ) : (
         <div className="grid">
           {consents.map((item) => (
             <Card key={item.id} title={item.consent_type.replace(/_/g, ' ')}>
               <div style={{ marginBottom: 'var(--space-2)' }}>
-                <Badge>{item.status}</Badge>
+                <StatusBadge status={item.status} />
               </div>
               <dl className="defs">
                 <dt>Policy Version</dt>
