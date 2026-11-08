@@ -3,7 +3,10 @@ import { z } from 'zod';
 export const FeeCategoryCodeSchema = z
   .string()
   .trim()
-  .regex(/^[A-Z0-9_]{2,30}$/, 'Fee category code must be 2-30 uppercase letters, numbers, or underscores.');
+  .regex(
+    /^[A-Z0-9_]{2,30}$/,
+    'Fee category code must be 2-30 uppercase letters, numbers, or underscores.',
+  );
 
 export const CreateFeeCategorySchema = z.object({
   code: FeeCategoryCodeSchema,
@@ -24,7 +27,10 @@ export const FeeCategoryDtoSchema = z.object({
 
 export const FeeComponentInputSchema = z.object({
   fee_category_id: z.string().uuid(),
-  amount: z.number().int().positive('Fee component amount must be a positive integer in minor units.'),
+  amount: z
+    .number()
+    .int()
+    .positive('Fee component amount must be a positive integer in minor units.'),
   description: z.string().trim().max(500).optional(),
 });
 
@@ -36,9 +42,16 @@ export const CreateFeeStructureSchema = z.object({
   code: z
     .string()
     .trim()
-    .regex(/^[A-Z0-9_-]{2,40}$/, 'Fee structure code must be 2-40 alphanumeric/hyphen/underscore characters.'),
+    .regex(
+      /^[A-Z0-9_-]{2,40}$/,
+      'Fee structure code must be 2-40 alphanumeric/hyphen/underscore characters.',
+    ),
   name: z.string().trim().min(1).max(150),
-  currency: z.string().trim().regex(/^[A-Z]{3}$/, 'Currency must be 3-letter ISO code.').default('INR'),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Z]{3}$/, 'Currency must be 3-letter ISO code.')
+    .default('INR'),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Due date must be YYYY-MM-DD.'),
   components: z.array(FeeComponentInputSchema).min(1, 'At least one fee component is required.'),
 });
@@ -117,11 +130,7 @@ export const PaymentMethodSchema = z.enum([
   'OTHER_OFFLINE',
 ]);
 
-export const ReconciliationStatusSchema = z.enum([
-  'RECORDED',
-  'PENDING_VERIFICATION',
-  'CONFIRMED',
-]);
+export const ReconciliationStatusSchema = z.enum(['RECORDED', 'PENDING_VERIFICATION', 'CONFIRMED']);
 
 export const AllocationInputSchema = z.object({
   student_due_id: z.string().uuid(),
@@ -134,7 +143,11 @@ export const RecordOfflineReceiptSchema = z.object({
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Payment date must be YYYY-MM-DD.'),
   payment_method: PaymentMethodSchema,
   amount: z.number().int().positive('Payment amount must be positive minor units.'),
-  currency: z.string().trim().regex(/^[A-Z]{3}$/).default('INR'),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Z]{3}$/)
+    .default('INR'),
   reference_number: z.string().trim().max(100).optional(),
   reconciliation_status: ReconciliationStatusSchema.default('RECORDED'),
   allocations: z.array(AllocationInputSchema).optional(),
@@ -198,8 +211,14 @@ export const StudentFeeLedgerDtoSchema = z.object({
 
 export const CollectionSummaryQuerySchema = z.object({
   campus_id: z.string().uuid().optional(),
-  from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  from_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 export const ListFeeStructuresQuerySchema = z.object({
@@ -221,8 +240,14 @@ export const ListFeeReceiptsQuerySchema = z.object({
   student_id: z.string().uuid().optional(),
   payment_method: PaymentMethodSchema.optional(),
   status: ReceiptStatusSchema.optional(),
-  from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  from_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 export const CollectionSummaryDtoSchema = z.object({
@@ -243,4 +268,3 @@ export type CollectionSummaryQuery = z.infer<typeof CollectionSummaryQuerySchema
 export type ListFeeStructuresQuery = z.infer<typeof ListFeeStructuresQuerySchema>;
 export type ListStudentDuesQuery = z.infer<typeof ListStudentDuesQuerySchema>;
 export type ListFeeReceiptsQuery = z.infer<typeof ListFeeReceiptsQuerySchema>;
-

@@ -47,9 +47,7 @@ export const registerExamRoutes: FastifyPluginAsync<{
     async (req, reply) => {
       const ctx = requireContext(req);
       const query = ListExaminationsQuerySchema.parse(req.query);
-      const items = await db.withTenant(ctx, (tx) =>
-        ExamService.listExaminations(tx, ctx, query),
-      );
+      const items = await db.withTenant(ctx, (tx) => ExamService.listExaminations(tx, ctx, query));
       reply.send({ data: items });
     },
   );

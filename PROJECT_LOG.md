@@ -55,19 +55,19 @@
 - **Governing Objective**: Reconcile remaining security, privacy, and regression-testing gaps identified across Agent A and Agent C reports before formally marking Step 1 accepted under the 45–75-day Pilot V1 master roadmap.
 - **Decision**: `STEP 1 ACCEPTED`
 - **Reconciliation of Agent C's 4 Findings**:
-  1. *Unsafe scope/query handling in `finance.routes.ts`*:
+  1. _Unsafe scope/query handling in `finance.routes.ts`_:
      - **Disposition**: Fully Resolved.
      - **Action**: Extracted `ListFeeStructuresQuerySchema`, `ListStudentDuesQuerySchema`, and `ListFeeReceiptsQuerySchema` into `finance.schemas.ts`. All query parameters are validated with `.parse(req.query)`. Route `/students/:studentId/ledger` was normalized to `/students/:id/ledger` reading `req.params as { id: string }`, eliminating all raw query/param assignments matching static guardrail regex.
      - **Verification**: `tests/security/static-architecture.test.ts` passed 27/27 tests.
-  2. *Ad hoc `STUDENT` role checks in `finance.service.ts`*:
+  2. _Ad hoc `STUDENT` role checks in `finance.service.ts`_:
      - **Disposition**: Fully Resolved.
      - **Action**: Added central `AuthorizationEngine.isStudentActor(ctx)` in `src/shared/authorization/engine.ts`. Removed all occurrences of `ctx.actorKind === 'STUDENT'` and quoted `'STUDENT'` from `finance.service.ts`.
      - **Verification**: `tests/security/static-architecture.test.ts` passed 27/27 tests.
-  3. *Unregistered direct `app.student_programs` reader*:
+  3. _Unregistered direct `app.student_programs` reader_:
      - **Disposition**: Fully Resolved.
      - **Action**: Removed all queries to `app.student_programs` from `finance.service.ts` and `reporting.service.ts`. Program relationships are resolved by traversing academic relational models: `term_enrollments` $\to$ `cohort_periods` $\to$ `cohorts` $\to$ `programs`.
      - **Verification**: `tests/security/student-program-static.test.ts` passed 16/16 tests.
-  4. *Migration-plan fixtures rejecting migration 0046*:
+  4. _Migration-plan fixtures rejecting migration 0046_:
      - **Disposition**: Fully Resolved.
      - **Action**: Extended `tests/unit/migrate-plan.test.ts` fixtures through current migrations 0046 and 0047, asserting contract boundaries at 0009 and 0019, sequential runs up to 0047, and rejecting uncommitted version 0048.
      - **Verification**: `tests/unit/migrate-plan.test.ts` passed 62/62 tests.
@@ -377,7 +377,6 @@
   - Typecheck passed: `pnpm --filter @campusos/web typecheck` (0 errors).
   - Web unit tests passed: `tests/security-static.test.ts`, `tests/auth-flow.test.tsx`, `tests/students-timeline.test.tsx`, `tests/users-page.test.tsx`, `tests/navigation.test.tsx`.
   - Automated browser route sweep across all routes (`/`, `/notifications`, `/documents`, `/consents`, `/students`, `/academics`, `/imports`, `/organisation`, `/users`, `/access`, `/account`): Confirmed 0 protocol errors across all pages (`hasProtocol: false`).
-
 
 - **Actor**: Antigravity Assistant (Pair Programming)
 - **Verified Starting State**:
@@ -2933,23 +2932,23 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
 
 - **Actor**: Antigravity Assistant (Pair Programming). State at start: HEAD `bd05759`, branch `main`, index empty; B6 fix, college regression suite, routing corrections, and M3 migrations (0037, 0038, 0039) present and preserved. No Git write operations performed; no migration, seed, `pnpm dev:db` or persistent database (`TEST_DATABASE_URL` unset, disposable test database harness only). Milestone 4 not started.
 - **Implemented Workflows**:
-  1. *Course Offerings*:
+  1. _Course Offerings_:
      - Implemented creation form supporting course selection, offering kinds (`CORE`, `ELECTIVE`, `OPTIONAL`, `AUDIT`, `BACKLOG`), registration policies (`AUTO_FROM_SECTION`, `MANUAL`, `ELECTIVE_CHOICE`, `ADMIN_ASSIGNED`), cohort period, section, elective group assignment, group label, and numeric capacity validation (1–10,000 or blank for unlimited).
      - Respects locked-term rules: creation form is hidden/disabled with an explicit informative badge when the selected term is `LOCKED` or `CLOSED`.
      - Offering details and management panel displaying status badge, course snapshot, term, audience (section/cohort), kind, credits, capacity, and elective group.
      - Lifecycle controls: `Publish offering` (`DRAFT` → `PUBLISHED`), `Close offering` (`PUBLISHED` → `CLOSED`), and `Cancel offering` (`PUBLISHED` → `CANCELLED` requiring >= 5 characters cancellation reason), with optimistic concurrency locking (`If-Match: "{version}"`).
      - Real-time capacity editor with integer validation and optimistic locking.
-  2. *Faculty Assignments*:
+  2. _Faculty Assignments_:
      - Faculty and teacher assignments panel for staff with `academic.faculty.assign` or `academic.offering.manage`.
      - Assign faculty form capturing Employee ID, teaching role (`PRIMARY`, `CO_INSTRUCTOR`, `LAB_INSTRUCTOR`, `SUBSTITUTE`), effective start date, and assignment reason (minimum 5 characters).
      - Prevents duplicate primary teacher assignments and enforces active employee and campus-posting eligibility.
      - End assignment workflow with effective date and required reason (>= 5 chars) submitted with `If-Match`.
-  3. *Timetable Slots*:
+  3. _Timetable Slots_:
      - Timetable slots management panel displaying weekday, time window, room code (with fallback to "booked" when room list is unprivileged), effective span, and cancellation/ended status.
      - Add timetable slot form enforcing start time strictly before end time (HH:MM format), day-of-week selection (1–7), room booking, and teacher assignment linkage.
      - Conflict handling: Explains room clashes, section audience overlaps, and teacher booking conflicts clearly.
      - End slot workflow capturing effective end date and submitting with `If-Match`.
-  4. *Student Registration Workflows*:
+  4. _Student Registration Workflows_:
      - Offering student registrations panel displaying student ID, registration status badge, source, and effective dates.
      - Explicit, re-runnable from-section registration action (`POST /v1/academics/course-offerings/:id/registrations/from-section`) with effective date and optional reason, displaying newly registered vs. already registered counts.
      - Drop registration workflow capturing effective end date and required reason with `If-Match`.
@@ -3251,9 +3250,6 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
     - No changes to backend logic, database schema, migrations, authentication, permissions, or dashboard KPI data.
     - Zero Git write operations executed (no commits, no staging, no branch changes).
 
-
-
-
 ## [2026-11-07] Public landing page redesign (frontend only, uncommitted)
 
 - **Actor**: Claude Code. No Git writes, no backend, database, migration, authentication, MFA or tenant change. Persistent dev database untouched (no login performed against it).
@@ -3295,7 +3291,6 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
     - `mfa_modal_error.png`: Invalid code shows inline error alert inside the modal without kicking user out.
     - `mfa_success_dashboard.png`: Valid TOTP code immediately transitions into the authenticated dashboard.
   - Accessibility: 0 axe violations, focus trapping and keyboard navigation verified.
-
 
 ## [2026-11-07] Public site creative redirection: navigation, hero and one immersive showcase (frontend only, uncommitted)
 
@@ -3427,15 +3422,14 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
 - **Findings recorded, not fixed**: the platform CLI silently falls back from `PLATFORM_DATABASE_URL` to `DATABASE_ADMIN_URL` to `MIGRATION_DATABASE_URL`, and provisioning needs a BYPASSRLS connection (a superuser) for small bounded writes; proposal for a dedicated non-superuser `app_provisioner` role with SECURITY DEFINER functions needs an owner-approved design. `platform.permissions` has no RLS in the live schema (read-only global catalogue; now an explicit exception).
 - **Validation (final code, sequential, from `backend/`)**: `npx vitest run --project integration` 1,647/1,647 (84 files); `npx vitest run --project unit --project security --project security-db` 1,681/1,681 (95 files; the guardrail file passed twice in a row after being sped up and given longer timeouts; one earlier run had a timeout-style failure under load); `tsc` 0 errors; eslint exit 0; Prettier clean on `src`, `tests`, `tools` and the new docs; `check:secrets` no findings (the scanner flagged a regex in my own test once; the test was reworded, the scanner was not changed); `tsc -p tsconfig.build.json` to a scratch directory exit 0. One further run of the final code had a single transient failure in `permission-seed.test.ts` (MFA permission seeding); that file passed alone (5/5) and the full integration suite then passed 1,647/1,647. Cause not investigated; no code of this slice touches seeding. Not changed or skipped.
 
-
 ## [2026-11-07] Master roadmap reconciliation and privileged-access containment verification (synthetic data only, uncommitted)
 
 - **Actor**: Antigravity Assistant (Pair Programming).
 - **Status**: Complete & Verified. All existing uncommitted files strictly preserved; no Git mutations (no add, commit, push, stash, or clean).
 - **Roadmap Verification & Reconciliation (`docs/architecture/v3/47-pilot-v1-master-roadmap.md`)**:
-  1. *Attendance Slice 4*: Confirmed that Slices 1 to 4 backend policies (AD-1 to AD-9 approved by owner on 2026-11-07) are **completely implemented and verified** (`backend/src/modules/attendance/`, migrations `0040`–`0042`, all 25 integration tests in `tests/integration/m4-attendance-slice4.test.ts` pass: 3-calendar-day faculty correction window, HOD/admin correction authority within scope, independent second approver without self-approval, term-lock cascade, unscheduled cancellation permissions, audit tiers). Confirmed fail-closed containment switch: `ATTENDANCE_CORRECTIONS_ENABLED=false` by default, throwing 403 on correction endpoints unless explicitly enabled. Corrected roadmap status: Backend is COMPLETE AND VERIFIED; Frontend UI (Teacher Daily Attendance Marking Screen, Correction Request/Approval UI, Registers & Reports) is the remaining scope for A6.
-  2. *First-Administrator Activation*: Confirmed that `backend/tools/platform/first-admin.ts` provides complete, secure invitation issuance/revocation and MFA bootstrap mechanisms (verified by 10/10 tests in `tests/integration/first-admin-onboarding.test.ts`). Status in roadmap reconciled to IMPLEMENTED AND VERIFIED (CLI), with live transactional mailer and browser onboarding rehearsal remaining.
-  3. *Privileged-Access Containment & Migration 0043*: Confirmed that `support:grant` stub in `tools/platform/platform-cli.ts` is safely retired (`createSupportGrant()` fails closed and throws `SupportGrantsNotImplementedError` before reading secrets or connecting; verified by 18/18 tests in `tests/unit/platform-cli.test.ts`). Confirmed migration `0043_platform_identity_session_least_privilege.sql` revokes table-wide DML on `platform.identities` and `platform.auth_sessions` from `app_runtime`; restricts writable columns to lockout counters and session assurance markers. Verified by 19/19 tests in `tests/security-db/privilege-guardrails.test.ts`.
+  1. _Attendance Slice 4_: Confirmed that Slices 1 to 4 backend policies (AD-1 to AD-9 approved by owner on 2026-11-07) are **completely implemented and verified** (`backend/src/modules/attendance/`, migrations `0040`–`0042`, all 25 integration tests in `tests/integration/m4-attendance-slice4.test.ts` pass: 3-calendar-day faculty correction window, HOD/admin correction authority within scope, independent second approver without self-approval, term-lock cascade, unscheduled cancellation permissions, audit tiers). Confirmed fail-closed containment switch: `ATTENDANCE_CORRECTIONS_ENABLED=false` by default, throwing 403 on correction endpoints unless explicitly enabled. Corrected roadmap status: Backend is COMPLETE AND VERIFIED; Frontend UI (Teacher Daily Attendance Marking Screen, Correction Request/Approval UI, Registers & Reports) is the remaining scope for A6.
+  2. _First-Administrator Activation_: Confirmed that `backend/tools/platform/first-admin.ts` provides complete, secure invitation issuance/revocation and MFA bootstrap mechanisms (verified by 10/10 tests in `tests/integration/first-admin-onboarding.test.ts`). Status in roadmap reconciled to IMPLEMENTED AND VERIFIED (CLI), with live transactional mailer and browser onboarding rehearsal remaining.
+  3. _Privileged-Access Containment & Migration 0043_: Confirmed that `support:grant` stub in `tools/platform/platform-cli.ts` is safely retired (`createSupportGrant()` fails closed and throws `SupportGrantsNotImplementedError` before reading secrets or connecting; verified by 18/18 tests in `tests/unit/platform-cli.test.ts`). Confirmed migration `0043_platform_identity_session_least_privilege.sql` revokes table-wide DML on `platform.identities` and `platform.auth_sessions` from `app_runtime`; restricts writable columns to lockout counters and session assurance markers. Verified by 19/19 tests in `tests/security-db/privilege-guardrails.test.ts`.
 - **Validation Run Results**:
   - `pnpm test:integration`: 1,647 passed / 1,647 total (84 test files, duration 333s).
   - `pnpm test:unit`: 928 passed / 928 total (47 test files).
@@ -3472,7 +3466,6 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
 - **Tests added**: backend `m4-attendance-timezone.test.ts` (10: India 09:00 round trip and evening class, midnight and UTC-misreading refusals, four other zones, campus today vs UTC, duplicates, window boundary in four zones with enforcement agreement, policy row, distinguishable refusals, campus clock scope incl. cross-campus and cross-tenant); web `campus-time.test.ts` (7), `attendance-timezone.test.tsx` (16); fake backend and `attendance-page.test.tsx` updated for the new code/wording. The real-Chrome rehearsal now asserts campus-time storage and display with the browser in America/Los_Angeles.
 - **Results (final code)**: attendance backend suites 87/87; backend integration 1,657/1,657 (85 files); unit, security and security-db 1,696/1,696 (95 files); backend `tsc` 0, eslint 0, Prettier clean (src, tests, tools), `check:secrets` no findings, build to scratch directory exit 0; web `npx vitest run --no-file-parallelism` 401/401 (25 files), `tsc` 0, eslint 0, `vite build` and `check:bundle` pass; real-Chrome rehearsal 37/37. Web Prettier still flags 7 files I did not edit (`Logo.tsx`, `navigation.ts`, `consents-api.ts`, `documents-api.ts`, `notifications-api.ts`, `organisation-api.ts`, `app.css`); `AttendancePage.tsx` was reformatted by Prettier as part of this work. Earlier-noted intermittent `auth-flow` logout failures appear only in parallel web runs; not re-investigated.
 - **Doc 47/49 updated**: ATT-1/2/3 resolved and verified; ATT-4 student attendance page deferred (priority follows PR-1); next tasks stay institutional data export and lightweight examinations/results.
-
 
 ## [2026-11-08] Finance Integrity Check & Essential Administrative Reporting (Track A — Slice 1) (uncommitted, synthetic data only)
 

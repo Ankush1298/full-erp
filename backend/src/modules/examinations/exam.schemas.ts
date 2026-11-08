@@ -25,12 +25,7 @@ export const ScheduleStatusSchema = z.enum([
   'CANCELLED',
 ]);
 
-export const MarkStatusSchema = z.enum([
-  'ENTERED',
-  'ABSENT',
-  'EXEMPT',
-  'WITHHELD',
-]);
+export const MarkStatusSchema = z.enum(['ENTERED', 'ABSENT', 'EXEMPT', 'WITHHELD']);
 
 export const CreateExaminationSchema = z
   .object({
@@ -51,8 +46,14 @@ export const UpdateExaminationSchema = z
     name: z.string().trim().min(1).max(100).optional(),
     exam_type: ExamTypeSchema.optional(),
     status: ExamStatusSchema.optional(),
-    starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional(),
-    ends_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional(),
+    starts_on: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
+      .optional(),
+    ends_on: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
+      .optional(),
   })
   .refine(
     (data) => {
@@ -71,8 +72,16 @@ export const CreateScheduleSchema = z
   .object({
     course_offering_id: z.string().uuid(),
     exam_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
-    start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/).optional().nullable(),
-    end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/).optional().nullable(),
+    start_time: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+      .optional()
+      .nullable(),
+    end_time: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+      .optional()
+      .nullable(),
     max_marks: z.coerce.number().positive().max(10000),
     pass_marks: z.coerce.number().min(0).max(10000),
   })
@@ -125,4 +134,3 @@ export type StudentMarkEntry = z.infer<typeof StudentMarkEntrySchema>;
 export type SaveMarksInput = z.infer<typeof SaveMarksSchema>;
 export type ListExaminationsQuery = z.infer<typeof ListExaminationsQuerySchema>;
 export type ListSchedulesQuery = z.infer<typeof ListSchedulesQuerySchema>;
-

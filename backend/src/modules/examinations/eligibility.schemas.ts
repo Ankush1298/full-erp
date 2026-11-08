@@ -43,7 +43,10 @@ export const SaveEligibilityPolicyInputSchema = z.object({
 export type SaveEligibilityPolicyInput = z.infer<typeof SaveEligibilityPolicyInputSchema>;
 
 export const GenerateCandidatesInputSchema = z.object({
-  cutoff_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional(),
+  cutoff_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
+    .optional(),
   override_policy: SaveEligibilityPolicyInputSchema.optional(),
 });
 export type GenerateCandidatesInput = z.infer<typeof GenerateCandidatesInputSchema>;
@@ -114,4 +117,3 @@ export const CandidateListResponseSchema = z.object({
   recalculation_available: z.boolean(),
 });
 export type CandidateListResponse = z.infer<typeof CandidateListResponseSchema>;
-

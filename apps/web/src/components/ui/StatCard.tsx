@@ -28,7 +28,11 @@ export function StatCard({
     <div className={`stat-card stat-card--${tone} ${className}`.trim()}>
       <div className="stat-card-header">
         <span className="stat-card-label">{label}</span>
-        {icon && <span className="stat-card-icon" aria-hidden="true">{icon}</span>}
+        {icon && (
+          <span className="stat-card-icon" aria-hidden="true">
+            {icon}
+          </span>
+        )}
       </div>
       <div className="stat-card-body">
         <span className="stat-card-value">{value}</span>
@@ -45,4 +49,3 @@ export function StatCard({
     </div>
   );
 }
-

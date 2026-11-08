@@ -202,7 +202,9 @@ describe('logout', () => {
   it('calls the backend with the CSRF header, clears client state and returns to /login', async () => {
     const { b, user, client } = await signedIn();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 4000 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 4000 }),
+    ).toBeInTheDocument();
     const call = b.callsTo('POST', '/auth/logout')[0]!;
     expect(call.headers['x-csrf-token']).toBe(b.state.csrf);
     expect(b.state.session).toBe(false);
@@ -217,7 +219,9 @@ describe('logout', () => {
     b.state.logoutMode = 'network';
     const { user, client } = await signedIn(b);
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 4000 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 4000 }),
+    ).toBeInTheDocument();
     expect(client.hasCsrfToken()).toBe(false);
   });
 });

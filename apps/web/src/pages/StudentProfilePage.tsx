@@ -74,12 +74,7 @@ function SectionState<T>({
   if (state.kind === 'loading') return <Spinner label={`Loading ${label}…`} />;
   if (state.kind === 'error')
     return (
-      <ErrorState
-        message={state.message}
-        onRetry={retry}
-        retryLabel={`Retry ${label}`}
-        compact
-      />
+      <ErrorState message={state.message} onRetry={retry} retryLabel={`Retry ${label}`} compact />
     );
   return <>{children(state.data)}</>;
 }

@@ -27,12 +27,7 @@ const EXAM_TEACHER: MeData = {
   actor_kind: 'STAFF',
   display_name: 'Tara Teacher',
   roles: ['FACULTY'],
-  capabilities: [
-    'session.read',
-    'session.revoke',
-    'exam.marks.enter',
-    'result.read',
-  ],
+  capabilities: ['session.read', 'session.revoke', 'exam.marks.enter', 'result.read'],
 };
 
 function setupExamWithCandidateState(backend: ReturnType<typeof createFakeBackend>) {
@@ -106,7 +101,11 @@ describe('Examinations Eligibility & Candidate Lists (Slice 2)', () => {
     const user = userEvent.setup();
     await user.click(candTab);
 
-    expect(await screen.findByRole('heading', { name: 'Candidate Eligibility & Automatic Verification' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Candidate Eligibility & Automatic Verification',
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Configure Policy' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Generate Candidate List' })).toBeInTheDocument();
 
@@ -127,7 +126,9 @@ describe('Examinations Eligibility & Candidate Lists (Slice 2)', () => {
     await user.click(configBtn);
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Configure Eligibility Policy' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Configure Eligibility Policy' }),
+    ).toBeInTheDocument();
 
     const minAttInput = screen.getByLabelText(/Min Attendance %/);
     await user.clear(minAttInput);
@@ -174,7 +175,9 @@ describe('Examinations Eligibility & Candidate Lists (Slice 2)', () => {
     await user.click(evidenceBtns[0]!);
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Candidate Evidence — Alice Johnson/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /Candidate Evidence — Alice Johnson/ }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Sessions Held')).toBeInTheDocument();
 
     // Close modal
@@ -209,7 +212,9 @@ describe('Examinations Eligibility & Candidate Lists (Slice 2)', () => {
     await user.click(overrideBtns[1]!);
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Override Candidate Eligibility — Bob Smith/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /Override Candidate Eligibility — Bob Smith/ }),
+    ).toBeInTheDocument();
 
     const reasonInput = screen.getByLabelText(/Override Justification \/ Reason/);
     await user.type(reasonInput, 'Medical leave approved by Academic Dean #402');
@@ -270,7 +275,9 @@ describe('Examinations Eligibility & Candidate Lists (Slice 2)', () => {
     const marksTab = screen.getByRole('button', { name: 'Marks Entry' });
     await user.click(marksTab);
 
-    expect(await screen.findByRole('table', { name: 'Student Marks Entry Table' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('table', { name: 'Student Marks Entry Table' }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Candidate List Status:/)).toBeInTheDocument();
 
     // Alice should be eligible
@@ -342,12 +349,18 @@ describe('Examinations Eligibility & Candidate Lists (Slice 2)', () => {
     const candTab = await screen.findByRole('button', { name: 'Eligibility & Candidates' });
     await user.click(candTab);
 
-    expect(await screen.findByRole('heading', { name: 'Candidate Eligibility & Automatic Verification' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Candidate Eligibility & Automatic Verification',
+      }),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Alice Johnson')).toBeInTheDocument();
 
     // Teacher cannot configure policy, approve or override
     expect(screen.queryByRole('button', { name: 'Configure Policy' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Approve Candidate List' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Approve Candidate List' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Override' })).not.toBeInTheDocument();
 
     // Teacher CAN view evidence

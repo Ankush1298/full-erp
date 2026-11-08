@@ -1296,7 +1296,8 @@ export function createFakeBackend(
       });
     }
     if (path === '/organization/campuses' && method === 'POST') {
-      const b = (state.calls.at(-1)?.body as { code?: string; name?: string; timezone?: string } | undefined);
+      const b = state.calls.at(-1)?.body as
+        { code?: string; name?: string; timezone?: string } | undefined;
       const code = String(b?.code ?? '');
       if (state.academics.campusCodes.includes(code)) return err(409, 'CONFLICT');
       state.academics.campusCodes.push(code);
@@ -1688,31 +1689,33 @@ export function createFakeBackend(
       const genMatch = /^\/examinations\/schedules\/([^/?]+)\/candidates\/generate$/.exec(path);
       if (genMatch && method === 'POST') {
         const schedId = genMatch[1]!;
-        const candidates = exState.marks.filter((m: any) => m.schedule_id === schedId).map((m: any) => ({
-          candidate_id: `cand-${m.student_id}`,
-          student_id: m.student_id,
-          admission_number: m.admission_number,
-          student_name: m.student_name,
-          roll_number: m.roll_number ?? null,
-          evaluation_status: m.student_id === 'st-1' ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
-          override_status: 'NONE',
-          final_status: m.student_id === 'st-1' ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
-          reasons: m.student_id === 'st-1' ? [] : ['Attendance below threshold (75%)'],
-          evidence_summary: {
-            total_sessions: 20,
-            attended_sessions: m.student_id === 'st-1' ? 18 : 10,
-            absent_sessions: m.student_id === 'st-1' ? 2 : 10,
-            excused_sessions: 0,
-            attendance_percentage: m.student_id === 'st-1' ? 90 : 50,
-            required_percentage: 75,
-            enrolled_date: '2026-08-01',
-            cutoff_date: '2026-10-14',
-            reasons: m.student_id === 'st-1' ? [] : ['Attendance 50% < 75% required'],
-          },
-          override_reason: null,
-          overridden_by_user_id: null,
-          overridden_at: null,
-        }));
+        const candidates = exState.marks
+          .filter((m: any) => m.schedule_id === schedId)
+          .map((m: any) => ({
+            candidate_id: `cand-${m.student_id}`,
+            student_id: m.student_id,
+            admission_number: m.admission_number,
+            student_name: m.student_name,
+            roll_number: m.roll_number ?? null,
+            evaluation_status: m.student_id === 'st-1' ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+            override_status: 'NONE',
+            final_status: m.student_id === 'st-1' ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+            reasons: m.student_id === 'st-1' ? [] : ['Attendance below threshold (75%)'],
+            evidence_summary: {
+              total_sessions: 20,
+              attended_sessions: m.student_id === 'st-1' ? 18 : 10,
+              absent_sessions: m.student_id === 'st-1' ? 2 : 10,
+              excused_sessions: 0,
+              attendance_percentage: m.student_id === 'st-1' ? 90 : 50,
+              required_percentage: 75,
+              enrolled_date: '2026-08-01',
+              cutoff_date: '2026-10-14',
+              reasons: m.student_id === 'st-1' ? [] : ['Attendance 50% < 75% required'],
+            },
+            override_reason: null,
+            overridden_by_user_id: null,
+            overridden_at: null,
+          }));
 
         const pol = exState.policies[schedId] ?? {
           id: 'pol-1',
@@ -1736,8 +1739,10 @@ export function createFakeBackend(
             status: 'DRAFT',
             evidence_cutoff_date: '2026-10-14',
             total_candidates: candidates.length,
-            eligible_count: candidates.filter((c: any) => c.evaluation_status === 'ELIGIBLE').length,
-            not_eligible_count: candidates.filter((c: any) => c.evaluation_status !== 'ELIGIBLE').length,
+            eligible_count: candidates.filter((c: any) => c.evaluation_status === 'ELIGIBLE')
+              .length,
+            not_eligible_count: candidates.filter((c: any) => c.evaluation_status !== 'ELIGIBLE')
+              .length,
             needs_review_count: 0,
             policy_snapshot: {},
             generated_at: new Date().toISOString(),
@@ -1764,20 +1769,28 @@ export function createFakeBackend(
         const candidateId = overrideMatch[2]!;
         const cl = exState.candidateLists[schedId];
         if (!cl) return err(404, 'RESOURCE_NOT_FOUND');
-        const cand = cl.candidates.find((c: any) => c.candidate_id === candidateId || c.student_id === candidateId);
+        const cand = cl.candidates.find(
+          (c: any) => c.candidate_id === candidateId || c.student_id === candidateId,
+        );
         if (!cand) return err(404, 'RESOURCE_NOT_FOUND');
         cand.override_status = reqBody.override_status;
-        cand.final_status = (reqBody.override_status === 'DISQUALIFIED') ? 'NOT_ELIGIBLE' : 'ELIGIBLE';
+        cand.final_status =
+          reqBody.override_status === 'DISQUALIFIED' ? 'NOT_ELIGIBLE' : 'ELIGIBLE';
         cand.override_reason = reqBody.override_reason ?? reqBody.reason ?? null;
         cand.overridden_by_user_id = state.me.user_id;
         cand.overridden_at = new Date().toISOString();
-        cl.list.eligible_count = cl.candidates.filter((c: any) => c.final_status === 'ELIGIBLE').length;
-        cl.list.not_eligible_count = cl.candidates.filter((c: any) => c.final_status !== 'ELIGIBLE').length;
+        cl.list.eligible_count = cl.candidates.filter(
+          (c: any) => c.final_status === 'ELIGIBLE',
+        ).length;
+        cl.list.not_eligible_count = cl.candidates.filter(
+          (c: any) => c.final_status !== 'ELIGIBLE',
+        ).length;
         return json(200, { data: cand });
       }
 
-      const appMatch =
-        /^\/examinations\/schedules\/([^/?]+)\/candidates\/([^/?]+)\/approve$/.exec(path);
+      const appMatch = /^\/examinations\/schedules\/([^/?]+)\/candidates\/([^/?]+)\/approve$/.exec(
+        path,
+      );
       if (appMatch && method === 'POST') {
         const schedId = appMatch[1]!;
         const listId = appMatch[2]!;
@@ -1816,11 +1829,13 @@ export function createFakeBackend(
         return json(200, {
           data: {
             schedule: sched,
-            candidate_list: clObj ? {
-              id: clObj.list.id,
-              status: clObj.list.status,
-              snapshot_version: clObj.list.snapshot_version,
-            } : null,
+            candidate_list: clObj
+              ? {
+                  id: clObj.list.id,
+                  status: clObj.list.status,
+                  snapshot_version: clObj.list.snapshot_version,
+                }
+              : null,
             students,
           },
         });
@@ -1843,7 +1858,13 @@ export function createFakeBackend(
           const sched = exState.schedules.find((s: any) => s.id === schedId);
           if (sched) sched.status = 'SUBMITTED';
         }
-        return json(200, { data: { success: true, status: reqBody.action === 'SUBMIT' ? 'SUBMITTED' : 'DRAFT', entries_updated: entries.length } });
+        return json(200, {
+          data: {
+            success: true,
+            status: reqBody.action === 'SUBMIT' ? 'SUBMITTED' : 'DRAFT',
+            entries_updated: entries.length,
+          },
+        });
       }
 
       const pubMatch = /^\/examinations\/schedules\/([^/?]+)\/publish$/.exec(path);
@@ -1855,7 +1876,9 @@ export function createFakeBackend(
           m.published = true;
           m.is_passing = (m.marks_obtained ?? 0) >= (sched?.pass_marks ?? 40);
         }
-        return json(200, { data: { success: true, status: 'PUBLISHED', published_at: new Date().toISOString() } });
+        return json(200, {
+          data: { success: true, status: 'PUBLISHED', published_at: new Date().toISOString() },
+        });
       }
 
       const regMatch = /^\/examinations\/schedules\/([^/?]+)\/register$/.exec(path);
@@ -1888,7 +1911,9 @@ export function createFakeBackend(
               passed: passed.length,
               failed: appeared.length - passed.length,
               average_marks: 60,
-              pass_percentage: appeared.length ? Math.round((passed.length / appeared.length) * 100) : 0,
+              pass_percentage: appeared.length
+                ? Math.round((passed.length / appeared.length) * 100)
+                : 0,
             },
           },
         });
@@ -1897,9 +1922,7 @@ export function createFakeBackend(
       const resMatch = /^\/examinations\/students\/([^/?]+)\/results/.exec(path);
       if (resMatch && method === 'GET') {
         const studentId = resMatch[1]!;
-        const marks = exState.marks.filter(
-          (m: any) => m.student_id === studentId && m.published,
-        );
+        const marks = exState.marks.filter((m: any) => m.student_id === studentId && m.published);
         const results = marks.map((m: any) => {
           const s = exState.schedules.find((sch: any) => sch.id === m.schedule_id);
           const e = s ? exState.items.find((item: any) => item.id === s.examination_id) : null;
@@ -2082,7 +2105,10 @@ export function createFakeBackend(
         return json(200, { success: true, data: sess });
       }
 
-      if ((path === '/attendance/sessions' || path.startsWith('/attendance/sessions?')) && method === 'GET') {
+      if (
+        (path === '/attendance/sessions' || path.startsWith('/attendance/sessions?')) &&
+        method === 'GET'
+      ) {
         let results = [...attState.sessions];
         const urlObj = new URL(url, 'http://localhost');
         const offeringId = urlObj.searchParams.get('courseOfferingId');
@@ -2200,7 +2226,9 @@ export function createFakeBackend(
         return json(200, { success: true, data: attState.correctionRequests });
       }
 
-      const decideMatch = /^\/attendance\/correction-requests\/([^/?]+)\/(approve|reject)$/.exec(path);
+      const decideMatch = /^\/attendance\/correction-requests\/([^/?]+)\/(approve|reject)$/.exec(
+        path,
+      );
       if (decideMatch && method === 'POST') {
         const crId = decideMatch[1]!;
         const action = decideMatch[2]!;
@@ -2221,14 +2249,19 @@ export function createFakeBackend(
           ? (JSON.parse(reqInit.body) as Record<string, unknown>)
           : {};
 
-      if (path === '/finance/reports/collection-summary' || path.startsWith('/finance/reports/collection-summary?')) {
+      if (
+        path === '/finance/reports/collection-summary' ||
+        path.startsWith('/finance/reports/collection-summary?')
+      ) {
         const posted = fState.receipts.filter((r) => r['status'] === 'POSTED');
         const reversed = fState.receipts.filter((r) => r['status'] === 'REVERSED');
         const total = posted.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0);
         const cashReceipts = posted.filter((r) => r['payment_method'] === 'CASH');
         const bankReceipts = posted.filter((r) => r['payment_method'] === 'BANK_TRANSFER');
         const confirmedReceipts = posted.filter((r) => r['reconciliation_status'] === 'CONFIRMED');
-        const pendingReceipts = posted.filter((r) => r['reconciliation_status'] === 'PENDING_VERIFICATION');
+        const pendingReceipts = posted.filter(
+          (r) => r['reconciliation_status'] === 'PENDING_VERIFICATION',
+        );
 
         return json(200, {
           data: {
@@ -2252,19 +2285,28 @@ export function createFakeBackend(
               {
                 reconciliation_status: 'CONFIRMED',
                 count: confirmedReceipts.length,
-                total_amount: confirmedReceipts.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0),
+                total_amount: confirmedReceipts.reduce(
+                  (sum, r) => sum + (Number(r['amount']) || 0),
+                  0,
+                ),
               },
               {
                 reconciliation_status: 'PENDING_VERIFICATION',
                 count: pendingReceipts.length,
-                total_amount: pendingReceipts.reduce((sum, r) => sum + (Number(r['amount']) || 0), 0),
+                total_amount: pendingReceipts.reduce(
+                  (sum, r) => sum + (Number(r['amount']) || 0),
+                  0,
+                ),
               },
             ],
           },
         });
       }
 
-      if ((path === '/finance/categories' || path.startsWith('/finance/categories?')) && method === 'GET') {
+      if (
+        (path === '/finance/categories' || path.startsWith('/finance/categories?')) &&
+        method === 'GET'
+      ) {
         return json(200, { data: fState.categories });
       }
 
@@ -2283,7 +2325,10 @@ export function createFakeBackend(
         return json(201, { data: newCat });
       }
 
-      if ((path === '/finance/structures' || path.startsWith('/finance/structures?')) && method === 'GET') {
+      if (
+        (path === '/finance/structures' || path.startsWith('/finance/structures?')) &&
+        method === 'GET'
+      ) {
         return json(200, { data: fState.structures });
       }
 
@@ -2308,8 +2353,11 @@ export function createFakeBackend(
           components: components.map((c: any, idx: number) => ({
             id: `comp-${idx + 1}`,
             fee_category_id: c.fee_category_id,
-            category_code: fState.categories.find((cat) => cat['id'] === c.fee_category_id)?.['code'] ?? 'GEN',
-            category_name: fState.categories.find((cat) => cat['id'] === c.fee_category_id)?.['name'] ?? 'General Fee',
+            category_code:
+              fState.categories.find((cat) => cat['id'] === c.fee_category_id)?.['code'] ?? 'GEN',
+            category_name:
+              fState.categories.find((cat) => cat['id'] === c.fee_category_id)?.['name'] ??
+              'General Fee',
             amount: Number(c.amount),
             description: c.description ?? null,
           })),
@@ -2356,7 +2404,9 @@ export function createFakeBackend(
           fState.dues.push(due);
           generated.push(due);
         }
-        return json(201, { data: { generated_count: generated.length, skipped_count: 0, dues: generated } });
+        return json(201, {
+          data: { generated_count: generated.length, skipped_count: 0, dues: generated },
+        });
       }
 
       const reverseMatch = /^\/finance\/receipts\/([^/?]+)\/reverse$/.exec(path);
@@ -2372,7 +2422,10 @@ export function createFakeBackend(
         for (const alloc of (rec['allocations'] as any[] | undefined) ?? []) {
           const due = fState.dues.find((d) => d['id'] === alloc.student_due_id);
           if (due) {
-            due['paid_amount'] = Math.max(0, Number(due['paid_amount']) - Number(alloc.allocated_amount));
+            due['paid_amount'] = Math.max(
+              0,
+              Number(due['paid_amount']) - Number(alloc.allocated_amount),
+            );
             due['balance_amount'] = Number(due['net_amount']) - Number(due['paid_amount']);
             due['status'] = Number(due['paid_amount']) === 0 ? 'PENDING' : 'PARTIAL';
           }
@@ -2388,25 +2441,32 @@ export function createFakeBackend(
         return json(200, { data: rec });
       }
 
-      if ((path === '/finance/receipts' || path.startsWith('/finance/receipts?')) && method === 'GET') {
+      if (
+        (path === '/finance/receipts' || path.startsWith('/finance/receipts?')) &&
+        method === 'GET'
+      ) {
         return json(200, { data: fState.receipts });
       }
 
       if (path === '/finance/receipts' && method === 'POST') {
         const amount = Number(reqBody.amount ?? 0);
         const paymentMethod = String(reqBody.payment_method ?? 'CASH');
-        const reconStatus = paymentMethod === 'BANK_TRANSFER' ? 'PENDING_VERIFICATION' : 'CONFIRMED';
-        const allocs: any[] = Array.isArray(reqBody.allocations) && reqBody.allocations.length > 0
-          ? reqBody.allocations.map((a: any, idx: number) => ({
-              id: `alloc-${idx + 1}`,
-              student_due_id: a.student_due_id,
-              allocated_amount: Number(a.allocated_amount),
-            }))
-          : [];
+        const reconStatus =
+          paymentMethod === 'BANK_TRANSFER' ? 'PENDING_VERIFICATION' : 'CONFIRMED';
+        const allocs: any[] =
+          Array.isArray(reqBody.allocations) && reqBody.allocations.length > 0
+            ? reqBody.allocations.map((a: any, idx: number) => ({
+                id: `alloc-${idx + 1}`,
+                student_due_id: a.student_due_id,
+                allocated_amount: Number(a.allocated_amount),
+              }))
+            : [];
 
         if (allocs.length === 0) {
           let rem = amount;
-          for (const due of fState.dues.filter((d) => d['student_id'] === reqBody.student_id && Number(d['balance_amount']) > 0)) {
+          for (const due of fState.dues.filter(
+            (d) => d['student_id'] === reqBody.student_id && Number(d['balance_amount']) > 0,
+          )) {
             if (rem <= 0) break;
             const allocAmt = Math.min(rem, Number(due['balance_amount']));
             due['paid_amount'] = Number(due['paid_amount']) + allocAmt;

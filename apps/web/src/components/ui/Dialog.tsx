@@ -120,12 +120,7 @@ export function Dialog({
               </p>
             )}
           </div>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-            aria-label="Close dialog"
-          >
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close dialog">
             &times;
           </button>
         </header>

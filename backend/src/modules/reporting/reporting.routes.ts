@@ -55,7 +55,10 @@ export const registerReportingRoutes: FastifyPluginAsync<{
         return reply
           .status(200)
           .header('Content-Type', 'text/csv; charset=utf-8')
-          .header('Content-Disposition', `attachment; filename="attendance-summary-${result.date}.csv"`)
+          .header(
+            'Content-Disposition',
+            `attachment; filename="attendance-summary-${result.date}.csv"`,
+          )
           .header('Cache-Control', 'no-store')
           .header('X-Content-Type-Options', 'nosniff')
           .send(result.csv);
@@ -115,4 +118,3 @@ export const registerReportingRoutes: FastifyPluginAsync<{
     },
   );
 };
-

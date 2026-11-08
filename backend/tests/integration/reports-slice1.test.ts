@@ -161,7 +161,9 @@ describe('Essential Administrative Reports — Slice 1', () => {
       title_snapshot: 'Mathematics I',
       status: 'DRAFT',
     });
-    await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [offeringId]);
+    await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+      offeringId,
+    ]);
 
     // Setup Employee (Faculty)
     const empId = await insertIn(T.orgId, 'employees', {
@@ -266,7 +268,9 @@ describe('Essential Administrative Reports — Slice 1', () => {
       attendance_state: 'NOT_STARTED',
       status: 'SCHEDULED',
     });
-    await adminQuery(`UPDATE app.class_sessions SET attendance_state = 'OPEN' WHERE id = $1`, [sessionId]);
+    await adminQuery(`UPDATE app.class_sessions SET attendance_state = 'OPEN' WHERE id = $1`, [
+      sessionId,
+    ]);
 
     const attRec1Id = uuidv7();
     const rev1Id = uuidv7();
@@ -280,7 +284,16 @@ describe('Essential Administrative Reports — Slice 1', () => {
       await pgClient.query(
         `INSERT INTO app.attendance_records (id, organization_id, class_session_id, student_id, course_registration_id, course_offering_id, session_date, status, source, marked_by_user_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'PRESENT', 'MANUAL', $8)`,
-        [attRec1Id, T.orgId, sessionId, T.students.one, cr1, offeringId, '2026-10-15', T.users.admin],
+        [
+          attRec1Id,
+          T.orgId,
+          sessionId,
+          T.students.one,
+          cr1,
+          offeringId,
+          '2026-10-15',
+          T.users.admin,
+        ],
       );
       await pgClient.query(
         `INSERT INTO app.attendance_record_revisions (id, organization_id, attendance_record_id, revision_no, status_before, status_after, source, changed_by_user_id, reason_code, reason_text)
@@ -290,7 +303,16 @@ describe('Essential Administrative Reports — Slice 1', () => {
       await pgClient.query(
         `INSERT INTO app.attendance_records (id, organization_id, class_session_id, student_id, course_registration_id, course_offering_id, session_date, status, source, marked_by_user_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'ABSENT', 'MANUAL', $8)`,
-        [attRec2Id, T.orgId, sessionId, T.students.two, cr2, offeringId, '2026-10-15', T.users.admin],
+        [
+          attRec2Id,
+          T.orgId,
+          sessionId,
+          T.students.two,
+          cr2,
+          offeringId,
+          '2026-10-15',
+          T.users.admin,
+        ],
       );
       await pgClient.query(
         `INSERT INTO app.attendance_record_revisions (id, organization_id, attendance_record_id, revision_no, status_before, status_after, source, changed_by_user_id, reason_code, reason_text)
@@ -504,7 +526,11 @@ describe('Essential Administrative Reports — Slice 1', () => {
     expect(s1?.primary_guardian_phone).toBeNull();
 
     // CSV format test
-    const csvRes = await call('GET', s.admin, `/reports/enrolment-roster?campus_id=${T.campusId}&format=csv`);
+    const csvRes = await call(
+      'GET',
+      s.admin,
+      `/reports/enrolment-roster?campus_id=${T.campusId}&format=csv`,
+    );
     expect(csvRes.statusCode).toBe(200);
     expect(csvRes.headers['content-type']).toContain('text/csv');
     expect(csvRes.body).toContain('Admission No,Student Name,Campus');
@@ -513,7 +539,11 @@ describe('Essential Administrative Reports — Slice 1', () => {
   });
 
   it('2. generates daily attendance summary with conducted sessions vs missing registers', async () => {
-    const res = await call('GET', s.admin, `/reports/attendance-summary?campus_id=${T.campusId}&date=2026-10-15`);
+    const res = await call(
+      'GET',
+      s.admin,
+      `/reports/attendance-summary?campus_id=${T.campusId}&date=2026-10-15`,
+    );
     expect(res.statusCode).toBe(200);
     const body = res.json<{
       data: {
@@ -624,12 +654,20 @@ describe('Essential Administrative Reports — Slice 1', () => {
       marked_by_user_id: T.users.admin,
     });
 
-    const verifyRes = await call('GET', s.admin, `/reports/exam-performance?campus_id=${T.campusId}`);
+    const verifyRes = await call(
+      'GET',
+      s.admin,
+      `/reports/exam-performance?campus_id=${T.campusId}`,
+    );
     const verifyBody = verifyRes.json<{ data: { schedules: Array<{ schedule_id: string }> } }>();
     expect(verifyBody.data.schedules.some((s) => s.schedule_id === draftSchedId)).toBe(false);
 
     // CSV format test
-    const csvRes = await call('GET', s.admin, `/reports/exam-performance?campus_id=${T.campusId}&format=csv`);
+    const csvRes = await call(
+      'GET',
+      s.admin,
+      `/reports/exam-performance?campus_id=${T.campusId}&format=csv`,
+    );
     expect(csvRes.statusCode).toBe(200);
     expect(csvRes.headers['content-type']).toContain('text/csv');
     expect(csvRes.body).toContain('Examination,Exam Type,Campus');
@@ -693,17 +731,29 @@ describe('Essential Administrative Reports — Slice 1', () => {
 
   it('5. strictly enforces multi-tenant isolation and prevents cross-tenant access', async () => {
     // Other tenant admin cannot see Tenant T's student roster
-    const otherRoster = await call('GET', s.otherAdmin, `/reports/enrolment-roster?campus_id=${T.campusId}`);
+    const otherRoster = await call(
+      'GET',
+      s.otherAdmin,
+      `/reports/enrolment-roster?campus_id=${T.campusId}`,
+    );
     expect(otherRoster.statusCode).toBe(200);
     expect(otherRoster.json<{ data: { students: unknown[] } }>().data.students).toHaveLength(0);
 
     // Other tenant admin cannot see Tenant T's exam performance
-    const otherExams = await call('GET', s.otherAdmin, `/reports/exam-performance?campus_id=${T.campusId}`);
+    const otherExams = await call(
+      'GET',
+      s.otherAdmin,
+      `/reports/exam-performance?campus_id=${T.campusId}`,
+    );
     expect(otherExams.statusCode).toBe(200);
     expect(otherExams.json<{ data: { schedules: unknown[] } }>().data.schedules).toHaveLength(0);
 
     // Other tenant admin cannot see Tenant T's fee summary
-    const otherFees = await call('GET', s.otherAdmin, `/reports/fee-summary?campus_id=${T.campusId}`);
+    const otherFees = await call(
+      'GET',
+      s.otherAdmin,
+      `/reports/fee-summary?campus_id=${T.campusId}`,
+    );
     expect(otherFees.statusCode).toBe(200);
     expect(otherFees.json<{ data: { defaulters: unknown[] } }>().data.defaulters).toHaveLength(0);
   });

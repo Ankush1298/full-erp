@@ -27,12 +27,7 @@ const EXAM_TEACHER: MeData = {
   actor_kind: 'STAFF',
   display_name: 'Tara Teacher',
   roles: ['FACULTY'],
-  capabilities: [
-    'session.read',
-    'session.revoke',
-    'exam.marks.enter',
-    'result.read',
-  ],
+  capabilities: ['session.read', 'session.revoke', 'exam.marks.enter', 'result.read'],
 };
 
 const EXAM_STUDENT: MeData = {
@@ -41,11 +36,7 @@ const EXAM_STUDENT: MeData = {
   actor_kind: 'STUDENT',
   display_name: 'Alice Johnson',
   roles: ['STUDENT'],
-  capabilities: [
-    'session.read',
-    'session.revoke',
-    'result.read',
-  ],
+  capabilities: ['session.read', 'session.revoke', 'result.read'],
 };
 
 function setupExamState(backend: ReturnType<typeof createFakeBackend>) {
@@ -113,7 +104,9 @@ describe('Examinations & Results Page', () => {
 
     const { container } = renderApp(backend, '/examinations');
 
-    expect(await screen.findByRole('heading', { name: 'Examinations, Marks & Results' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Examinations, Marks & Results' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Examination Setup' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Marks Entry' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Review & Publish' })).toBeInTheDocument();
@@ -129,7 +122,9 @@ describe('Examinations & Results Page', () => {
 
     renderApp(backend, '/examinations');
 
-    expect(await screen.findByRole('heading', { name: 'Examinations, Marks & Results' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Examinations, Marks & Results' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Marks Entry' })).toBeInTheDocument();
     // Teacher should NOT have Review & Publish (maker-checker separation)
     expect(screen.queryByRole('button', { name: 'Review & Publish' })).not.toBeInTheDocument();
@@ -158,7 +153,11 @@ describe('Examinations & Results Page', () => {
     const pubTab = await screen.findByRole('button', { name: 'Review & Publish' });
     await user.click(pubTab);
 
-    expect(await screen.findByRole('heading', { name: 'Examination Papers Awaiting Review & Publication' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Examination Papers Awaiting Review & Publication',
+      }),
+    ).toBeInTheDocument();
 
     // Click publish results button
     window.confirm = () => true;
@@ -192,7 +191,9 @@ describe('Examinations & Results Page', () => {
 
     renderApp(backend, '/examinations');
 
-    expect(await screen.findByRole('heading', { name: 'My Published Examination Results' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'My Published Examination Results' }),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Introduction to Computer Science')).toBeInTheDocument();
     expect(screen.getByText('CS101')).toBeInTheDocument();
     expect(screen.getByText('Passed')).toBeInTheDocument();

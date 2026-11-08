@@ -73,7 +73,10 @@ async function createTargetUser(orgId: string): Promise<string> {
 }
 
 /** Creates an explicitly non-login user record (no platform.identities row, identity_id is null). */
-async function createRecordOnlyUser(orgId: string, displayName = 'Pupil Record'): Promise<{ id: string; email: string }> {
+async function createRecordOnlyUser(
+  orgId: string,
+  displayName = 'Pupil Record',
+): Promise<{ id: string; email: string }> {
   const id = uuidv7();
   const email = `pupil.${uuidv7()}@school.internal`;
   await adminQuery(
@@ -216,7 +219,9 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
   });
 
   afterAll(async () => {
-    const orgs = [schoolTenant?.orgId, collegeTenant?.orgId, universityTenant?.orgId].filter(Boolean);
+    const orgs = [schoolTenant?.orgId, collegeTenant?.orgId, universityTenant?.orgId].filter(
+      Boolean,
+    );
     if (orgs.length > 0) {
       const pg = await import('pg');
       const k = new pg.default.Client({ connectionString: inject('dbAdminUrl') });
@@ -224,11 +229,25 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
       try {
         await k.query('SET session_replication_role = replica');
         try {
-          await k.query('DELETE FROM app.term_enrollments WHERE organization_id = ANY($1::uuid[])', [orgs]);
-          await k.query('DELETE FROM app.student_program_events WHERE organization_id = ANY($1::uuid[])', [orgs]);
-          await k.query('DELETE FROM app.student_programs WHERE organization_id = ANY($1::uuid[])', [orgs]);
-          await k.query('DELETE FROM app.student_guardians WHERE organization_id = ANY($1::uuid[])', [orgs]);
-          await k.query('DELETE FROM app.guardians WHERE organization_id = ANY($1::uuid[])', [orgs]);
+          await k.query(
+            'DELETE FROM app.term_enrollments WHERE organization_id = ANY($1::uuid[])',
+            [orgs],
+          );
+          await k.query(
+            'DELETE FROM app.student_program_events WHERE organization_id = ANY($1::uuid[])',
+            [orgs],
+          );
+          await k.query(
+            'DELETE FROM app.student_programs WHERE organization_id = ANY($1::uuid[])',
+            [orgs],
+          );
+          await k.query(
+            'DELETE FROM app.student_guardians WHERE organization_id = ANY($1::uuid[])',
+            [orgs],
+          );
+          await k.query('DELETE FROM app.guardians WHERE organization_id = ANY($1::uuid[])', [
+            orgs,
+          ]);
         } finally {
           await k.query('SET session_replication_role = DEFAULT');
         }
@@ -244,7 +263,10 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
 
   it('1. SCHOOL: admissions staff registers pupil into school campus without issuing credentials', async () => {
     const { cookie, csrf } = await login(schoolTenant.emails.registrarCampus);
-    const { id: userId, email: pupilEmail } = await createRecordOnlyUser(schoolTenant.orgId, 'Primary Pupil');
+    const { id: userId, email: pupilEmail } = await createRecordOnlyUser(
+      schoolTenant.orgId,
+      'Primary Pupil',
+    );
     const admissionNumber = num('SCH');
 
     // Verify record-only pupil cannot log in (no credentials / identity)
@@ -328,7 +350,9 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
   });
 
   it('3. Cross-campus isolation: admissions officer of another campus CANNOT find or view newly admitted student', async () => {
-    const { cookie: authCookie, csrf: authCsrf } = await login(collegeTenant.emails.registrarCampus);
+    const { cookie: authCookie, csrf: authCsrf } = await login(
+      collegeTenant.emails.registrarCampus,
+    );
     const { cookie: otherCookie } = await login(otherCampusRegistrar.email);
     const userId = await createTargetUser(collegeTenant.orgId);
     const admissionNumber = num('ISO');
@@ -528,10 +552,11 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
     const sharedPhone = '+919876543210';
 
     // Set user1's display_name and date_of_birth so candidate matching can verify against authoritative user record
-    await adminQuery(
-      `UPDATE app.users SET display_name = $1, date_of_birth = $2 WHERE id = $3`,
-      [sharedName, sharedDob, user1],
-    );
+    await adminQuery(`UPDATE app.users SET display_name = $1, date_of_birth = $2 WHERE id = $3`, [
+      sharedName,
+      sharedDob,
+      user1,
+    ]);
 
     // 1. Admit candidate 1 with matching cells
     const res1 = await app.inject({
@@ -590,9 +615,13 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
       },
     });
     expect(res2.statusCode).toBe(409);
-    const errorBody = res2.json<{ error: { code: string; details?: Array<{ field: string; message: string }> } }>();
+    const errorBody = res2.json<{
+      error: { code: string; details?: Array<{ field: string; message: string }> };
+    }>();
     expect(errorBody.error.code).toBe('POSSIBLE_DUPLICATE_STUDENT');
-    const fingerprint = errorBody.error.details?.find((d) => d.field === 'duplicateAcknowledgement')?.message;
+    const fingerprint = errorBody.error.details?.find(
+      (d) => d.field === 'duplicateAcknowledgement',
+    )?.message;
     expect(fingerprint).toBeDefined();
 
     // 3. Retry with duplicateAcknowledgement: succeeds (201)
@@ -703,7 +732,13 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
     });
     expect(res1.statusCode).toBe(201);
     const id1 = res1.json<{ data: { id: string } }>().data.id;
-    const p1 = (await app.inject({ method: 'GET', url: `${STUDENTS_BASE}/${id1}`, headers: { cookie: `session_token=${cookie}` } })).json<{ data: { campusId: string | null } }>().data;
+    const p1 = (
+      await app.inject({
+        method: 'GET',
+        url: `${STUDENTS_BASE}/${id1}`,
+        headers: { cookie: `session_token=${cookie}` },
+      })
+    ).json<{ data: { campusId: string | null } }>().data;
     expect(p1.campusId).toBe(otherCampusId);
 
     // Without campusId
@@ -725,7 +760,13 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
     });
     expect(res2.statusCode).toBe(201);
     const id2 = res2.json<{ data: { id: string } }>().data.id;
-    const p2 = (await app.inject({ method: 'GET', url: `${STUDENTS_BASE}/${id2}`, headers: { cookie: `session_token=${cookie}` } })).json<{ data: { campusId: string | null } }>().data;
+    const p2 = (
+      await app.inject({
+        method: 'GET',
+        url: `${STUDENTS_BASE}/${id2}`,
+        headers: { cookie: `session_token=${cookie}` },
+      })
+    ).json<{ data: { campusId: string | null } }>().data;
     expect(p2.campusId).toBeNull();
   });
 
@@ -734,8 +775,12 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
     const u1 = await createTargetUser(collegeTenant.orgId);
     const u2 = await createTargetUser(collegeTenant.orgId);
 
-    const email1 = (await adminQuery<{ email: string }>('SELECT email FROM app.users WHERE id = $1', [u1]))[0]!.email;
-    const email2 = (await adminQuery<{ email: string }>('SELECT email FROM app.users WHERE id = $1', [u2]))[0]!.email;
+    const email1 = (
+      await adminQuery<{ email: string }>('SELECT email FROM app.users WHERE id = $1', [u1])
+    )[0]!.email;
+    const email2 = (
+      await adminQuery<{ email: string }>('SELECT email FROM app.users WHERE id = $1', [u2])
+    )[0]!.email;
 
     // 1. Create import job specifying campusId for College Campus A
     const resCreate = await app.inject({
@@ -785,7 +830,9 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
       headers: { cookie: `session_token=${cookie}` },
     });
     expect(resRows.statusCode).toBe(200);
-    const rows = resRows.json<{ data: Array<{ status: string; errors: Array<{ code: string }> }> }>().data;
+    const rows = resRows.json<{
+      data: Array<{ status: string; errors: Array<{ code: string }> }>;
+    }>().data;
     expect(rows[0]!.status).toBe('VALID');
     expect(rows[1]!.status).toBe('INVALID');
     expect(rows[1]!.errors.some((e) => e.code === 'UNAUTHORIZED_CAMPUS')).toBe(true);

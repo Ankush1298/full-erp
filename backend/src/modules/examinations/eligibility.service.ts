@@ -99,7 +99,9 @@ export class EligibilityService {
       const exam = await ExamService.getExamination(tx, ctx, examinationId);
       campusId = lower(exam.campus_id);
     } else {
-      throw invalid('Either scheduleId or examinationId must be specified to save an eligibility policy.');
+      throw invalid(
+        'Either scheduleId or examinationId must be specified to save an eligibility policy.',
+      );
     }
 
     const id = uuidv7();
@@ -258,10 +260,14 @@ export class EligibilityService {
 
     const heldSessions = sessionsRes.rows;
     const totalSessions = heldSessions.length;
-    const firstSessionDate = heldSessions.length > 0 && heldSessions[0] ? heldSessions[0].session_date : null;
+    const firstSessionDate =
+      heldSessions.length > 0 && heldSessions[0] ? heldSessions[0].session_date : null;
 
     // Fetch attendance records for this offering up to cutoff date
-    const attendanceMap = new Map<string, { present: number; late: number; excused: number; absent: number; total: number }>();
+    const attendanceMap = new Map<
+      string,
+      { present: number; late: number; excused: number; absent: number; total: number }
+    >();
     if (totalSessions > 0) {
       const attRes = await tx.query<{
         student_id: string;
@@ -299,7 +305,10 @@ export class EligibilityService {
     }
 
     // Query fee dues and pending receipts if check_fees is enabled
-    const feeMap = new Map<string, { dues_count: number; total_balance: bigint; total_net_due: bigint; total_paid: bigint }>();
+    const feeMap = new Map<
+      string,
+      { dues_count: number; total_balance: bigint; total_net_due: bigint; total_paid: bigint }
+    >();
     const pendingReceiptsMap = new Map<string, number>();
 
     if (policy.check_fees && rosterRes.rows.length > 0) {
@@ -372,7 +381,8 @@ export class EligibilityService {
       };
 
       const attendedSessions = attStats.present + attStats.late;
-      const attendancePercentage = totalSessions > 0 ? Math.round((attendedSessions / totalSessions) * 10000) / 100 : 0;
+      const attendancePercentage =
+        totalSessions > 0 ? Math.round((attendedSessions / totalSessions) * 10000) / 100 : 0;
       const minPercentage = Number(policy.min_attendance_percentage);
 
       // Check Attendance
@@ -382,12 +392,16 @@ export class EligibilityService {
           reasons.push('No conducted class sessions recorded prior to cutoff date');
         } else if (attStats.total < totalSessions) {
           evalStatus = 'NEEDS_REVIEW';
-          reasons.push(`Attendance records incomplete (${attStats.total}/${totalSessions} sessions recorded)`);
+          reasons.push(
+            `Attendance records incomplete (${attStats.total}/${totalSessions} sessions recorded)`,
+          );
         } else if (attendancePercentage >= minPercentage) {
           reasons.push(`Attendance criteria met: ${attendancePercentage}% >= ${minPercentage}%`);
         } else {
           evalStatus = 'NOT_ELIGIBLE';
-          reasons.push(`Attendance below required threshold: ${attendancePercentage}% < ${minPercentage}%`);
+          reasons.push(
+            `Attendance below required threshold: ${attendancePercentage}% < ${minPercentage}%`,
+          );
         }
 
         // Check late enrolment review
@@ -395,7 +409,9 @@ export class EligibilityService {
           const enrollDateStr = student.enrolled_at.split('T')[0];
           if (enrollDateStr && enrollDateStr > firstSessionDate) {
             evalStatus = 'NEEDS_REVIEW';
-            reasons.push(`Mid-period enrolment on ${enrollDateStr} after first session (${firstSessionDate})`);
+            reasons.push(
+              `Mid-period enrolment on ${enrollDateStr} after first session (${firstSessionDate})`,
+            );
           }
         }
       } else {
@@ -403,7 +419,8 @@ export class EligibilityService {
       }
 
       // Check Fees
-      let feeStatus: 'CLEARED' | 'OUTSTANDING' | 'NEEDS_REVIEW' | 'NO_RECORD' | undefined = undefined;
+      let feeStatus: 'CLEARED' | 'OUTSTANDING' | 'NEEDS_REVIEW' | 'NO_RECORD' | undefined =
+        undefined;
       let outstandingBalance = 0;
 
       if (policy.check_fees) {
@@ -422,14 +439,18 @@ export class EligibilityService {
           if (evalStatus === 'ELIGIBLE') {
             evalStatus = 'NEEDS_REVIEW';
           }
-          reasons.push('Fee clearance pending: unverified payment reference awaiting reconciliation');
+          reasons.push(
+            'Fee clearance pending: unverified payment reference awaiting reconciliation',
+          );
         } else if (feeSummary.total_balance > 0n) {
           feeStatus = 'OUTSTANDING';
           outstandingBalance = Number(feeSummary.total_balance);
           if (evalStatus === 'ELIGIBLE') {
             evalStatus = 'NEEDS_REVIEW';
           }
-          reasons.push(`Outstanding fee balance of ${(Number(feeSummary.total_balance) / 100).toFixed(2)} requires administrative review`);
+          reasons.push(
+            `Outstanding fee balance of ${(Number(feeSummary.total_balance) / 100).toFixed(2)} requires administrative review`,
+          );
         } else {
           feeStatus = 'CLEARED';
           outstandingBalance = 0;
@@ -748,13 +769,7 @@ export class EligibilityService {
               overridden_at = now()
         WHERE organization_id = $4 AND id = $5
         RETURNING *`,
-      [
-        input.override_status,
-        input.override_reason,
-        ctx.userId,
-        ctx.tenantId,
-        lower(candidateId),
-      ],
+      [input.override_status, input.override_reason, ctx.userId, ctx.tenantId, lower(candidateId)],
     );
 
     // Recalculate summary counts on candidate list

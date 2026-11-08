@@ -56,7 +56,9 @@ describe('Scoped Admissions UI: Institution-Aware Terminology', () => {
     const { view } = setupWithInstitution('SCHOOL');
     view();
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Pupils & Admissions' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Pupils & Admissions' }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Manage school admissions and pupil records/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'New admission' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Confirm admission' })).toBeInTheDocument();
@@ -66,8 +68,12 @@ describe('Scoped Admissions UI: Institution-Aware Terminology', () => {
     const { view } = setupWithInstitution('COLLEGE');
     view();
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Students & Admissions' })).toBeInTheDocument();
-    expect(screen.getByText(/Manage college admissions and student records across campuses/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Students & Admissions' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Manage college admissions and student records across campuses/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Admit student' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register student' })).toBeInTheDocument();
   });
@@ -76,9 +82,17 @@ describe('Scoped Admissions UI: Institution-Aware Terminology', () => {
     const { view } = setupWithInstitution('UNIVERSITY');
     view();
 
-    expect(await screen.findByRole('heading', { level: 2, name: 'Register student' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Students & Admissions' })).toBeInTheDocument();
-    expect(screen.getByText(/Manage university admissions and student records within your authorized campus/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Register student' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Students & Admissions' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Manage university admissions and student records within your authorized campus/,
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register student' })).toBeInTheDocument();
   });
 });

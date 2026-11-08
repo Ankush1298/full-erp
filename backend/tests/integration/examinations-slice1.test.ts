@@ -269,7 +269,10 @@ describe('Examinations, Marks and Results — Slice 1', () => {
       period_no: 1,
       roll_number: '102',
     });
-    await adminQuery(`UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`, [eid1, eid2]);
+    await adminQuery(`UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`, [
+      eid1,
+      eid2,
+    ]);
 
     await insertIn(T.orgId, 'course_registrations', {
       term_enrollment_id: eid1,
@@ -344,7 +347,9 @@ describe('Examinations, Marks and Results — Slice 1', () => {
     });
 
     expect(res.statusCode).toBe(201);
-    const body = res.json<{ data: { id: string; max_marks: string; pass_marks: string; status: string } }>();
+    const body = res.json<{
+      data: { id: string; max_marks: string; pass_marks: string; status: string };
+    }>();
     expect(Number(body.data.max_marks)).toBe(100);
     expect(Number(body.data.pass_marks)).toBe(40);
     expect(body.data.status).toBe('SCHEDULED');
@@ -362,9 +367,15 @@ describe('Examinations, Marks and Results — Slice 1', () => {
   });
 
   it('assigned teacher can fetch student roster for the exam paper', async () => {
-    const res = await call('GET', s.teacherAssigned, `/examinations/schedules/${scheduleId}/roster`);
+    const res = await call(
+      'GET',
+      s.teacherAssigned,
+      `/examinations/schedules/${scheduleId}/roster`,
+    );
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ data: { students: Array<{ student_id: string; student_name: string }> } }>();
+    const body = res.json<{
+      data: { students: Array<{ student_id: string; student_name: string }> };
+    }>();
     expect(body.data.students.length).toBe(2);
     const studentIds = body.data.students.map((st) => st.student_id);
     expect(studentIds).toContain(student1Id);
@@ -372,40 +383,54 @@ describe('Examinations, Marks and Results — Slice 1', () => {
   });
 
   it('unassigned teacher cannot fetch student roster or enter marks (denied)', async () => {
-    const res = await call('GET', s.teacherUnassigned, `/examinations/schedules/${scheduleId}/roster`);
+    const res = await call(
+      'GET',
+      s.teacherUnassigned,
+      `/examinations/schedules/${scheduleId}/roster`,
+    );
     expect([403, 404]).toContain(res.statusCode);
   });
 
   it('rejects marks greater than maximum marks', async () => {
-    const res = await call('POST', s.teacherAssigned, `/examinations/schedules/${scheduleId}/marks`, {
-      action: 'DRAFT',
-      entries: [
-        {
-          student_id: student1Id,
-          status: 'ENTERED',
-          marks_obtained: 105, // max is 100!
-        },
-      ],
-    });
+    const res = await call(
+      'POST',
+      s.teacherAssigned,
+      `/examinations/schedules/${scheduleId}/marks`,
+      {
+        action: 'DRAFT',
+        entries: [
+          {
+            student_id: student1Id,
+            status: 'ENTERED',
+            marks_obtained: 105, // max is 100!
+          },
+        ],
+      },
+    );
     expect(res.statusCode).toBe(400);
   });
 
   it('assigned teacher can save draft marks', async () => {
-    const res = await call('POST', s.teacherAssigned, `/examinations/schedules/${scheduleId}/marks`, {
-      action: 'DRAFT',
-      entries: [
-        {
-          student_id: student1Id,
-          status: 'ENTERED',
-          marks_obtained: 85,
-          remarks: 'Great performance',
-        },
-        {
-          student_id: student2Id,
-          status: 'ABSENT',
-        },
-      ],
-    });
+    const res = await call(
+      'POST',
+      s.teacherAssigned,
+      `/examinations/schedules/${scheduleId}/marks`,
+      {
+        action: 'DRAFT',
+        entries: [
+          {
+            student_id: student1Id,
+            status: 'ENTERED',
+            marks_obtained: 85,
+            remarks: 'Great performance',
+          },
+          {
+            student_id: student2Id,
+            status: 'ABSENT',
+          },
+        ],
+      },
+    );
     expect(res.statusCode).toBe(200);
     const body = res.json<{ data: { status: string; entries_updated: number } }>();
     expect(body.data.status).toBe('DRAFT_MARKS');
@@ -420,28 +445,37 @@ describe('Examinations, Marks and Results — Slice 1', () => {
   });
 
   it('teacher submits marks -> schedule transitions to SUBMITTED', async () => {
-    const res = await call('POST', s.teacherAssigned, `/examinations/schedules/${scheduleId}/marks`, {
-      action: 'SUBMIT',
-      entries: [
-        {
-          student_id: student1Id,
-          status: 'ENTERED',
-          marks_obtained: 85,
-        },
-        {
-          student_id: student2Id,
-          status: 'ENTERED',
-          marks_obtained: 35, // Below 40 pass mark
-        },
-      ],
-    });
+    const res = await call(
+      'POST',
+      s.teacherAssigned,
+      `/examinations/schedules/${scheduleId}/marks`,
+      {
+        action: 'SUBMIT',
+        entries: [
+          {
+            student_id: student1Id,
+            status: 'ENTERED',
+            marks_obtained: 85,
+          },
+          {
+            student_id: student2Id,
+            status: 'ENTERED',
+            marks_obtained: 35, // Below 40 pass mark
+          },
+        ],
+      },
+    );
     expect(res.statusCode).toBe(200);
     const body = res.json<{ data: { status: string } }>();
     expect(body.data.status).toBe('SUBMITTED');
   });
 
   it('teacher cannot publish results (maker-checker violation -> 403)', async () => {
-    const res = await call('POST', s.teacherAssigned, `/examinations/schedules/${scheduleId}/publish`);
+    const res = await call(
+      'POST',
+      s.teacherAssigned,
+      `/examinations/schedules/${scheduleId}/publish`,
+    );
     expect(res.statusCode).toBe(403);
   });
 
@@ -454,16 +488,21 @@ describe('Examinations, Marks and Results — Slice 1', () => {
   });
 
   it('modifying marks after publication is rejected (conflict 409)', async () => {
-    const res = await call('POST', s.teacherAssigned, `/examinations/schedules/${scheduleId}/marks`, {
-      action: 'DRAFT',
-      entries: [
-        {
-          student_id: student1Id,
-          status: 'ENTERED',
-          marks_obtained: 90,
-        },
-      ],
-    });
+    const res = await call(
+      'POST',
+      s.teacherAssigned,
+      `/examinations/schedules/${scheduleId}/marks`,
+      {
+        action: 'DRAFT',
+        entries: [
+          {
+            student_id: student1Id,
+            status: 'ENTERED',
+            marks_obtained: 90,
+          },
+        ],
+      },
+    );
     expect(res.statusCode).toBe(409);
   });
 
@@ -525,7 +564,11 @@ describe('Examinations, Marks and Results — Slice 1', () => {
     const schedRes = await call('GET', s.otherAdmin, `/examinations/schedules/${scheduleId}`);
     expect(schedRes.statusCode).toBe(404);
 
-    const regRes = await call('GET', s.otherAdmin, `/examinations/schedules/${scheduleId}/register`);
+    const regRes = await call(
+      'GET',
+      s.otherAdmin,
+      `/examinations/schedules/${scheduleId}/register`,
+    );
     expect(regRes.statusCode).toBe(404);
   });
 });

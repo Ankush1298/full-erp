@@ -22,10 +22,7 @@ export const FACULTY_OFFERING_EXAM_SQL = `
      AND ($4::date IS NULL OR (fa.valid_from <= $4::date AND COALESCE(fa.valid_to, t.end_date) >= $4::date))
    LIMIT 1`;
 
-export const EXAM_ASSIGNED_PERMISSIONS = [
-  'exam.marks.enter',
-  'result.read',
-] as const;
+export const EXAM_ASSIGNED_PERMISSIONS = ['exam.marks.enter', 'result.read'] as const;
 
 export function registerExamResolvers(): void {
   for (const permission of EXAM_ASSIGNED_PERMISSIONS) {
@@ -43,4 +40,3 @@ export function registerExamResolvers(): void {
     });
   }
 }
-

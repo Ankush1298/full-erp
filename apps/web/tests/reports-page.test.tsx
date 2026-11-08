@@ -26,7 +26,9 @@ describe('Executive & Administrative Reports Page', () => {
     const backend = createFakeBackend({ me: REPORT_ADMIN, session: true });
     const { container } = renderApp(backend, '/reports');
 
-    expect(await screen.findByRole('heading', { name: 'Executive & Administrative Reports' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Executive & Administrative Reports' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Student Enrolment Roster' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Daily Attendance Summary' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Examination Results Summary' })).toBeInTheDocument();
@@ -49,7 +51,9 @@ describe('Executive & Administrative Reports Page', () => {
     const backend = createFakeBackend({ me: REPORT_ADMIN, session: true });
     renderApp(backend, '/reports');
 
-    expect(await screen.findByRole('heading', { name: 'Executive & Administrative Reports' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Executive & Administrative Reports' }),
+    ).toBeInTheDocument();
 
     // 1. Switch to Daily Attendance Summary
     const attendanceTab = screen.getByRole('button', { name: 'Daily Attendance Summary' });
@@ -92,7 +96,9 @@ describe('Executive & Administrative Reports Page', () => {
 
     renderApp(backend, '/reports');
 
-    expect(await screen.findByRole('heading', { name: 'Executive & Administrative Reports' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Executive & Administrative Reports' }),
+    ).toBeInTheDocument();
 
     const exportBtn = screen.getByRole('button', { name: /Export CSV/i });
     await user.click(exportBtn);

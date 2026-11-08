@@ -183,7 +183,11 @@ export class StudentProgramService {
       },
       async () => {
         // 1. student
-        const s = await tx.query<{ status: string; admission_date: string | null; campus_id: string | null }>(
+        const s = await tx.query<{
+          status: string;
+          admission_date: string | null;
+          campus_id: string | null;
+        }>(
           `SELECT status, admission_date::text AS admission_date, campus_id FROM app.students
             WHERE organization_id = $1 AND id = $2 FOR NO KEY UPDATE`,
           [ctx.tenantId, student],

@@ -614,7 +614,9 @@ export class ImportService {
     const rowCampuses = [
       ...new Set(
         rows
-          .map((r) => (typeof r.campusId === 'string' && r.campusId ? r.campusId.toLowerCase() : null))
+          .map((r) =>
+            typeof r.campusId === 'string' && r.campusId ? r.campusId.toLowerCase() : null,
+          )
           .filter((c): c is string => c !== null),
       ),
     ];
@@ -631,7 +633,11 @@ export class ImportService {
     return runIdempotent(
       tx,
       ctx,
-      { key, operation: adapter.createOperation, request: { type, rows, campusId: campusId ?? null } },
+      {
+        key,
+        operation: adapter.createOperation,
+        request: { type, rows, campusId: campusId ?? null },
+      },
       async () => {
         const jobId = uuidv7();
         await tx.query(

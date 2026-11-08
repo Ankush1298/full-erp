@@ -38,7 +38,9 @@ export const registerFinanceRoutes: FastifyPluginAsync<{
     async (req, reply) => {
       const ctx = requireContext(req);
       const body = CreateFeeCategorySchema.parse(req.body);
-      const created = await db.withTenant(ctx, (tx) => financeService.createCategory(tx, ctx, body));
+      const created = await db.withTenant(ctx, (tx) =>
+        financeService.createCategory(tx, ctx, body),
+      );
       reply.status(201).send({ data: created });
     },
   );
@@ -61,7 +63,9 @@ export const registerFinanceRoutes: FastifyPluginAsync<{
     async (req, reply) => {
       const ctx = requireContext(req);
       const body = CreateFeeStructureSchema.parse(req.body);
-      const created = await db.withTenant(ctx, (tx) => financeService.createStructure(tx, ctx, body));
+      const created = await db.withTenant(ctx, (tx) =>
+        financeService.createStructure(tx, ctx, body),
+      );
       reply.status(201).send({ data: created });
     },
   );
@@ -74,7 +78,9 @@ export const registerFinanceRoutes: FastifyPluginAsync<{
       const { id } = req.params as { id: string };
       const item = await db.withTenant(ctx, (tx) => financeService.getStructure(tx, ctx, id));
       if (!item) {
-        reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Fee structure not found' } });
+        reply
+          .status(404)
+          .send({ error: { code: 'NOT_FOUND', message: 'Fee structure not found' } });
         return;
       }
       reply.send({ data: item });
@@ -161,7 +167,9 @@ export const registerFinanceRoutes: FastifyPluginAsync<{
       const ctx = requireContext(req);
       const { id } = req.params as { id: string };
       const body = ReverseReceiptSchema.parse(req.body);
-      const reversed = await db.withTenant(ctx, (tx) => financeService.reverseReceipt(tx, ctx, id, body));
+      const reversed = await db.withTenant(ctx, (tx) =>
+        financeService.reverseReceipt(tx, ctx, id, body),
+      );
       reply.send({ data: reversed });
     },
   );
@@ -173,7 +181,9 @@ export const registerFinanceRoutes: FastifyPluginAsync<{
     async (req, reply) => {
       const ctx = requireContext(req);
       const query = CollectionSummaryQuerySchema.parse(req.query);
-      const summary = await db.withTenant(ctx, (tx) => financeService.getCollectionSummary(tx, ctx, query));
+      const summary = await db.withTenant(ctx, (tx) =>
+        financeService.getCollectionSummary(tx, ctx, query),
+      );
       reply.send({ data: summary });
     },
   );

@@ -65,11 +65,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'attendance',
     label: 'Attendance',
     to: '/attendance',
-    anyOf: [
-      'attendance.session.mark',
-      'attendance.record.read',
-      'attendance.correction.approve',
-    ],
+    anyOf: ['attendance.session.mark', 'attendance.record.read', 'attendance.correction.approve'],
     audience: 'staff',
   },
   {
@@ -88,12 +84,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'reports',
     label: 'Reports',
     to: '/reports',
-    anyOf: [
-      'student.directory.list',
-      'attendance.record.read',
-      'result.read',
-      'fee.receipt.read',
-    ],
+    anyOf: ['student.directory.list', 'attendance.record.read', 'result.read', 'fee.receipt.read'],
     audience: 'staff',
   },
   {

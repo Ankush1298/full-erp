@@ -39,12 +39,7 @@ const DEFAULT_TONES: Record<string, StatusTone> = {
   unknown: 'neutral',
 };
 
-export function StatusBadge({
-  status,
-  tone,
-  label,
-  className = '',
-}: StatusBadgeProps) {
+export function StatusBadge({ status, tone, label, className = '' }: StatusBadgeProps) {
   const normalizedKey = status.toLowerCase().replace(/[\s-]+/g, '_');
   const computedTone = tone || DEFAULT_TONES[normalizedKey] || 'neutral';
   const displayLabel = label || status.replace(/_/g, ' ');
@@ -59,4 +54,3 @@ export function StatusBadge({
     </span>
   );
 }
-

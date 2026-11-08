@@ -181,7 +181,12 @@ describe('Finance Module: Fees, Dues, Offline Receipts & Reconciliation — Slic
 
     expect(createRes.statusCode).toBe(201);
     const body = createRes.json<{
-      data: { id: string; total_amount: number; status: string; components: Array<{ amount: number }> };
+      data: {
+        id: string;
+        total_amount: number;
+        status: string;
+        components: Array<{ amount: number }>;
+      };
     }>();
     expect(body.data.id).toBeDefined();
     expect(body.data.total_amount).toBe(600000); // 500000 + 100000
@@ -209,7 +214,13 @@ describe('Finance Module: Fees, Dues, Offline Receipts & Reconciliation — Slic
         fee_structure_id: string;
         generated_count: number;
         skipped_count: number;
-        dues: Array<{ id: string; student_id: string; gross_amount: number; discount_amount: number; balance_amount: number }>;
+        dues: Array<{
+          id: string;
+          student_id: string;
+          gross_amount: number;
+          discount_amount: number;
+          balance_amount: number;
+        }>;
       };
     }>();
     expect(body.data.dues).toHaveLength(2);
@@ -277,7 +288,9 @@ describe('Finance Module: Fees, Dues, Offline Receipts & Reconciliation — Slic
     // Verify student 1's due balance was decremented
     const dueCheck = await call('GET', s.admin, `/finance/dues?student_id=${student1Id}`);
     expect(dueCheck.statusCode).toBe(200);
-    const dueList = dueCheck.json<{ data: Array<{ id: string; paid_amount: number; balance_amount: number; status: string }> }>();
+    const dueList = dueCheck.json<{
+      data: Array<{ id: string; paid_amount: number; balance_amount: number; status: string }>;
+    }>();
     const d1 = dueList.data.find((d) => d.id === due1Id);
     expect(d1?.paid_amount).toBe(300000);
     expect(d1?.balance_amount).toBe(250000); // 550,000 - 300,000
@@ -323,7 +336,9 @@ describe('Finance Module: Fees, Dues, Offline Receipts & Reconciliation — Slic
 
     // Due balance becomes 0, status PAID
     const duesRes = await call('GET', s.admin, `/finance/dues?student_id=${student2Id}`);
-    const d2 = duesRes.json<{ data: Array<{ id: string; balance_amount: number; status: string }> }>().data[0];
+    const d2 = duesRes.json<{
+      data: Array<{ id: string; balance_amount: number; status: string }>;
+    }>().data[0];
     expect(d2?.balance_amount).toBe(0);
     expect(d2?.status).toBe('PAID');
   });
@@ -403,7 +418,9 @@ describe('Finance Module: Fees, Dues, Offline Receipts & Reconciliation — Slic
 
     // Verify Student 1's due balance was restored to 550,000 and status returned to PENDING
     const dueCheck = await call('GET', s.admin, `/finance/dues?student_id=${student1Id}`);
-    const d1 = dueCheck.json<{ data: Array<{ id: string; paid_amount: number; balance_amount: number; status: string }> }>().data[0];
+    const d1 = dueCheck.json<{
+      data: Array<{ id: string; paid_amount: number; balance_amount: number; status: string }>;
+    }>().data[0];
     expect(d1?.paid_amount).toBe(0);
     expect(d1?.balance_amount).toBe(550000);
     expect(d1?.status).toBe('PENDING');
@@ -415,7 +432,11 @@ describe('Finance Module: Fees, Dues, Offline Receipts & Reconciliation — Slic
   });
 
   it('8. aggregates collection summary by campus, date range, and payment method', async () => {
-    const summaryRes = await call('GET', s.admin, `/finance/reports/collection-summary?campus_id=${T.campusId}`);
+    const summaryRes = await call(
+      'GET',
+      s.admin,
+      `/finance/reports/collection-summary?campus_id=${T.campusId}`,
+    );
     expect(summaryRes.statusCode).toBe(200);
     const summary = summaryRes.json<{
       data: {

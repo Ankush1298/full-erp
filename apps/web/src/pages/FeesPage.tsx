@@ -52,9 +52,9 @@ export function FeesPage() {
   const canReverseReceipt = identity ? can(identity, 'fee.receipt.reverse') : false;
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'structures' | 'dues' | 'receipts' | 'my-ledger'>(
-    isStudent ? 'my-ledger' : 'overview',
-  );
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'structures' | 'dues' | 'receipts' | 'my-ledger'
+  >(isStudent ? 'my-ledger' : 'overview');
 
   // Data states
   const [loading, setLoading] = useState(true);
@@ -87,9 +87,9 @@ export function FeesPage() {
   const [newStructCode, setNewStructCode] = useState('');
   const [newStructName, setNewStructName] = useState('');
   const [newStructDueDate, setNewStructDueDate] = useState('');
-  const [structComponents, setStructComponents] = useState<Array<{ fee_category_id: string; amount: string; description: string }>>([
-    { fee_category_id: '', amount: '', description: '' },
-  ]);
+  const [structComponents, setStructComponents] = useState<
+    Array<{ fee_category_id: string; amount: string; description: string }>
+  >([{ fee_category_id: '', amount: '', description: '' }]);
 
   // Form states for Dues Generation
   const [selectedStructureId, setSelectedStructureId] = useState('');
@@ -217,15 +217,16 @@ export function FeesPage() {
           .map((s) => s.trim())
           .filter(Boolean);
 
-        const concessions = concessionStudentId && Number(concessionAmount) > 0
-          ? [
-              {
-                student_id: concessionStudentId.trim(),
-                discount_amount: Math.round(Number(concessionAmount) * 100),
-                reason: concessionReason.trim() || 'Institutional concession',
-              },
-            ]
-          : undefined;
+        const concessions =
+          concessionStudentId && Number(concessionAmount) > 0
+            ? [
+                {
+                  student_id: concessionStudentId.trim(),
+                  discount_amount: Math.round(Number(concessionAmount) * 100),
+                  reason: concessionReason.trim() || 'Institutional concession',
+                },
+              ]
+            : undefined;
 
         const res = await generateStudentDues(client, {
           fee_structure_id: selectedStructureId,
@@ -239,7 +240,9 @@ export function FeesPage() {
         setConcessionStudentId('');
         setConcessionAmount('');
         setConcessionReason('');
-        setActionSuccess(`Generated ${res.generated_count} dues (${res.skipped_count} skipped/existing).`);
+        setActionSuccess(
+          `Generated ${res.generated_count} dues (${res.skipped_count} skipped/existing).`,
+        );
         await loadData();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to generate dues');
@@ -331,26 +334,17 @@ export function FeesPage() {
           !isStudent ? (
             <div className="flex flex-wrap items-center gap-3">
               {canManageStructure && (
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowCreateStructureModal(true)}
-                >
+                <Button variant="secondary" onClick={() => setShowCreateStructureModal(true)}>
                   Create Fee Structure
                 </Button>
               )}
               {canGenerateDues && (
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowGenerateDuesModal(true)}
-                >
+                <Button variant="secondary" onClick={() => setShowGenerateDuesModal(true)}>
                   Generate Dues
                 </Button>
               )}
               {canRecordReceipt && (
-                <Button
-                  variant="primary"
-                  onClick={() => setShowRecordPaymentModal(true)}
-                >
+                <Button variant="primary" onClick={() => setShowRecordPaymentModal(true)}>
                   Record Offline Payment
                 </Button>
               )}
@@ -359,20 +353,15 @@ export function FeesPage() {
         }
       />
 
-      {error && (
-        <Alert tone="error">
-          {error}
-        </Alert>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
-      {actionSuccess && (
-        <Alert tone="success">
-          {actionSuccess}
-        </Alert>
-      )}
+      {actionSuccess && <Alert tone="success">{actionSuccess}</Alert>}
 
       {/* Navigation Tabs */}
-      <nav aria-label="Finance Navigation Tabs" className="border-b border-[var(--color-border-subtle)] pb-2 flex gap-4">
+      <nav
+        aria-label="Finance Navigation Tabs"
+        className="border-b border-[var(--color-border-subtle)] pb-2 flex gap-4"
+      >
         {!isStudent && (
           <>
             <button
@@ -455,7 +444,9 @@ export function FeesPage() {
             />
             <StatCard
               label="Reversed Receipts"
-              value={summary?.reversed_count ?? receipts.filter((r) => r.status === 'REVERSED').length}
+              value={
+                summary?.reversed_count ?? receipts.filter((r) => r.status === 'REVERSED').length
+              }
               helper="Audited rollbacks"
               tone="amber"
             />
@@ -465,7 +456,10 @@ export function FeesPage() {
             <Card title="Collections by Payment Method">
               <div className="space-y-3 pt-3">
                 {Object.entries(summary?.by_payment_method ?? {}).map(([method, amount]) => (
-                  <div key={method} className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)] last:border-0">
+                  <div
+                    key={method}
+                    className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)] last:border-0"
+                  >
                     <span className="text-sm font-medium">{method.replace(/_/g, ' ')}</span>
                     <span className="font-semibold text-sm">{formatMoney(amount)}</span>
                   </div>
@@ -476,7 +470,10 @@ export function FeesPage() {
             <Card title="Reconciliation Status Breakdown">
               <div className="space-y-3 pt-3">
                 {Object.entries(summary?.by_reconciliation_status ?? {}).map(([status, amount]) => (
-                  <div key={status} className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)] last:border-0">
+                  <div
+                    key={status}
+                    className="flex justify-between items-center py-2 border-b border-[var(--color-border-subtle)] last:border-0"
+                  >
                     <span className="flex items-center gap-2">
                       <StatusBadge status={status} />
                     </span>
@@ -497,10 +494,7 @@ export function FeesPage() {
               Institution fee schedules, broken down into itemized categories.
             </p>
             {canManageStructure && (
-              <Button
-                variant="secondary"
-                onClick={() => setShowCreateCategoryModal(true)}
-              >
+              <Button variant="secondary" onClick={() => setShowCreateCategoryModal(true)}>
                 Manage Categories ({categories.length})
               </Button>
             )}
@@ -591,14 +585,24 @@ export function FeesPage() {
                     <tr key={d.id} className="hover:bg-[var(--color-bg-subtle)] transition-colors">
                       <td className="p-3 font-mono font-medium">{d.due_number}</td>
                       <td className="p-3">
-                        <div className="font-medium text-[var(--color-fg-default)]">{d.student_name || 'Student'}</div>
-                        <div className="text-xs text-[var(--color-fg-muted)] font-mono">{d.admission_number || d.student_id.slice(0, 8)}</div>
+                        <div className="font-medium text-[var(--color-fg-default)]">
+                          {d.student_name || 'Student'}
+                        </div>
+                        <div className="text-xs text-[var(--color-fg-muted)] font-mono">
+                          {d.admission_number || d.student_id.slice(0, 8)}
+                        </div>
                       </td>
                       <td className="p-3">{d.fee_structure_name || 'Standard Structure'}</td>
                       <td className="p-3">{formatMoney(d.gross_amount)}</td>
-                      <td className="p-3 text-[var(--color-accent-coral)]">{d.discount_amount > 0 ? `-${formatMoney(d.discount_amount)}` : '—'}</td>
-                      <td className="p-3 font-medium text-[var(--color-accent-emerald)]">{formatMoney(d.paid_amount)}</td>
-                      <td className="p-3 font-bold text-[var(--color-fg-default)]">{formatMoney(d.balance_amount)}</td>
+                      <td className="p-3 text-[var(--color-accent-coral)]">
+                        {d.discount_amount > 0 ? `-${formatMoney(d.discount_amount)}` : '—'}
+                      </td>
+                      <td className="p-3 font-medium text-[var(--color-accent-emerald)]">
+                        {formatMoney(d.paid_amount)}
+                      </td>
+                      <td className="p-3 font-bold text-[var(--color-fg-default)]">
+                        {formatMoney(d.balance_amount)}
+                      </td>
                       <td className="p-3">
                         <StatusBadge status={d.status} />
                       </td>
@@ -649,12 +653,20 @@ export function FeesPage() {
                       <td className="p-3 font-mono font-medium">{r.receipt_number}</td>
                       <td className="p-3 text-[var(--color-fg-muted)]">{r.payment_date}</td>
                       <td className="p-3">
-                        <div className="font-medium text-[var(--color-fg-default)]">{r.student_name || 'Student'}</div>
-                        <div className="text-xs text-[var(--color-fg-muted)] font-mono">{r.admission_number || r.student_id.slice(0, 8)}</div>
+                        <div className="font-medium text-[var(--color-fg-default)]">
+                          {r.student_name || 'Student'}
+                        </div>
+                        <div className="text-xs text-[var(--color-fg-muted)] font-mono">
+                          {r.admission_number || r.student_id.slice(0, 8)}
+                        </div>
                       </td>
                       <td className="p-3 font-medium">{r.payment_method.replace(/_/g, ' ')}</td>
-                      <td className="p-3 font-mono text-xs text-[var(--color-fg-muted)]">{r.reference_number || '—'}</td>
-                      <td className="p-3 font-semibold text-[var(--color-fg-default)]">{formatMoney(r.amount, r.currency)}</td>
+                      <td className="p-3 font-mono text-xs text-[var(--color-fg-muted)]">
+                        {r.reference_number || '—'}
+                      </td>
+                      <td className="p-3 font-semibold text-[var(--color-fg-default)]">
+                        {formatMoney(r.amount, r.currency)}
+                      </td>
                       <td className="p-3">
                         <StatusBadge status={r.reconciliation_status} />
                       </td>
@@ -662,10 +674,7 @@ export function FeesPage() {
                         <StatusBadge status={r.status} />
                       </td>
                       <td className="p-3">
-                        <Button
-                          variant="secondary"
-                          onClick={() => setSelectedReceipt(r)}
-                        >
+                        <Button variant="secondary" onClick={() => setSelectedReceipt(r)}>
                           View Receipt
                         </Button>
                       </td>
@@ -704,18 +713,28 @@ export function FeesPage() {
 
           <Card title="Assigned Fee Dues">
             {studentLedger.dues.length === 0 ? (
-              <p className="text-sm text-[var(--color-fg-muted)] pt-3">No dues currently assigned.</p>
+              <p className="text-sm text-[var(--color-fg-muted)] pt-3">
+                No dues currently assigned.
+              </p>
             ) : (
               <div className="divide-y divide-[var(--color-border-subtle)] pt-3">
                 {studentLedger.dues.map((d) => (
                   <div key={d.id} className="py-3 flex justify-between items-center">
                     <div>
-                      <div className="font-medium text-sm text-[var(--color-fg-default)]">{d.fee_structure_name || 'Academic Fee'}</div>
-                      <div className="text-xs text-[var(--color-fg-muted)] font-mono">Due: {d.due_number} | Due Date: {d.due_date}</div>
+                      <div className="font-medium text-sm text-[var(--color-fg-default)]">
+                        {d.fee_structure_name || 'Academic Fee'}
+                      </div>
+                      <div className="text-xs text-[var(--color-fg-muted)] font-mono">
+                        Due: {d.due_number} | Due Date: {d.due_date}
+                      </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-sm">{formatMoney(d.balance_amount)} balance</div>
-                      <div className="text-xs text-[var(--color-fg-muted)]">{formatMoney(d.paid_amount)} of {formatMoney(d.net_amount)} paid</div>
+                      <div className="font-semibold text-sm">
+                        {formatMoney(d.balance_amount)} balance
+                      </div>
+                      <div className="text-xs text-[var(--color-fg-muted)]">
+                        {formatMoney(d.paid_amount)} of {formatMoney(d.net_amount)} paid
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -740,13 +759,12 @@ export function FeesPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className="font-semibold text-sm">{formatMoney(r.amount, r.currency)}</div>
+                        <div className="font-semibold text-sm">
+                          {formatMoney(r.amount, r.currency)}
+                        </div>
                         <StatusBadge status={r.status} />
                       </div>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setSelectedReceipt(r)}
-                      >
+                      <Button variant="secondary" onClick={() => setSelectedReceipt(r)}>
                         Print Receipt
                       </Button>
                     </div>
@@ -849,7 +867,10 @@ export function FeesPage() {
                 variant="secondary"
                 type="button"
                 onClick={() =>
-                  setStructComponents([...structComponents, { fee_category_id: '', amount: '', description: '' }])
+                  setStructComponents([
+                    ...structComponents,
+                    { fee_category_id: '', amount: '', description: '' },
+                  ])
                 }
               >
                 + Add Component
@@ -908,7 +929,9 @@ export function FeesPage() {
                       variant="ghost"
                       className="text-red-600"
                       type="button"
-                      onClick={() => setStructComponents(structComponents.filter((_, i) => i !== idx))}
+                      onClick={() =>
+                        setStructComponents(structComponents.filter((_, i) => i !== idx))
+                      }
                     >
                       Remove
                     </Button>
@@ -939,7 +962,9 @@ export function FeesPage() {
       >
         <form onSubmit={handleGenerateDues} className="space-y-4">
           <div>
-            <label htmlFor="fee-structure-select" className="block text-sm font-medium mb-1">Fee Structure</label>
+            <label htmlFor="fee-structure-select" className="block text-sm font-medium mb-1">
+              Fee Structure
+            </label>
             <select
               id="fee-structure-select"
               className="w-full h-10 px-3 py-2 text-sm rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]"
@@ -964,7 +989,9 @@ export function FeesPage() {
           />
 
           <div className="border-t border-[var(--color-border-subtle)] pt-3">
-            <h4 className="text-xs font-semibold text-[var(--color-fg-muted)] mb-2 uppercase">Optional Student Concession / Scholarship</h4>
+            <h4 className="text-xs font-semibold text-[var(--color-fg-muted)] mb-2 uppercase">
+              Optional Student Concession / Scholarship
+            </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input
                 type="text"
@@ -1029,7 +1056,9 @@ export function FeesPage() {
               required
             />
             <div>
-              <label htmlFor="pay-method-select" className="block text-sm font-medium mb-1">Payment Method</label>
+              <label htmlFor="pay-method-select" className="block text-sm font-medium mb-1">
+                Payment Method
+              </label>
               <select
                 id="pay-method-select"
                 className="w-full h-10 px-3 py-2 text-sm rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]"
@@ -1107,7 +1136,9 @@ export function FeesPage() {
             {/* Header */}
             <div className="text-center border-b pb-4">
               <h2 className="text-xl font-bold tracking-tight">ANESA CAMPUS OS</h2>
-              <p className="text-xs text-gray-500 uppercase tracking-widest">Official Fee Acknowledgment Receipt</p>
+              <p className="text-xs text-gray-500 uppercase tracking-widest">
+                Official Fee Acknowledgment Receipt
+              </p>
             </div>
 
             {/* Receipt Meta */}
@@ -1122,7 +1153,9 @@ export function FeesPage() {
                 <p className="text-xs text-gray-500">Student Name</p>
                 <p className="font-bold">{selectedReceipt.student_name || 'Enrolled Student'}</p>
                 <p className="text-xs text-gray-500 mt-2">Admission Number</p>
-                <p className="font-mono">{selectedReceipt.admission_number || selectedReceipt.student_id.slice(0, 10)}</p>
+                <p className="font-mono">
+                  {selectedReceipt.admission_number || selectedReceipt.student_id.slice(0, 10)}
+                </p>
               </div>
             </div>
 
@@ -1130,7 +1163,9 @@ export function FeesPage() {
             <div className="border rounded-lg p-3 bg-gray-50 text-sm space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-600">Payment Method:</span>
-                <span className="font-semibold">{selectedReceipt.payment_method.replace(/_/g, ' ')}</span>
+                <span className="font-semibold">
+                  {selectedReceipt.payment_method.replace(/_/g, ' ')}
+                </span>
               </div>
               {selectedReceipt.reference_number && (
                 <div className="flex justify-between">
@@ -1140,7 +1175,9 @@ export function FeesPage() {
               )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Reconciliation Status:</span>
-                <span className="font-semibold text-emerald-700">{selectedReceipt.reconciliation_status}</span>
+                <span className="font-semibold text-emerald-700">
+                  {selectedReceipt.reconciliation_status}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Receipt Status:</span>
@@ -1150,7 +1187,9 @@ export function FeesPage() {
 
             {/* Allocations Breakdown */}
             <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Applied Dues Allocation</h4>
+              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                Applied Dues Allocation
+              </h4>
               {selectedReceipt.allocations.length === 0 ? (
                 <p className="text-xs text-gray-400">Allocated to account balance</p>
               ) : (
@@ -1164,8 +1203,12 @@ export function FeesPage() {
                   <tbody>
                     {selectedReceipt.allocations.map((a) => (
                       <tr key={a.id} className="border-b">
-                        <td className="py-2 font-mono">{a.due_number || a.student_due_id.slice(0, 8)}</td>
-                        <td className="py-2 text-right font-medium">{formatMoney(a.allocated_amount, selectedReceipt.currency)}</td>
+                        <td className="py-2 font-mono">
+                          {a.due_number || a.student_due_id.slice(0, 8)}
+                        </td>
+                        <td className="py-2 text-right font-medium">
+                          {formatMoney(a.allocated_amount, selectedReceipt.currency)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1177,7 +1220,9 @@ export function FeesPage() {
             <div className="flex justify-between items-center border-t-2 border-gray-900 pt-4">
               <div>
                 <p className="text-xs text-gray-500">Receiving Cashier / Operator</p>
-                <p className="text-sm font-medium">{selectedReceipt.received_by_name || 'Accounts Office'}</p>
+                <p className="text-sm font-medium">
+                  {selectedReceipt.received_by_name || 'Accounts Office'}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Total Amount Received</p>
@@ -1209,7 +1254,12 @@ export function FeesPage() {
             <Button variant="secondary" onClick={() => setShowReverseModal(false)}>
               Cancel
             </Button>
-            <Button variant="secondary" className="btn-danger text-red-600" onClick={handleReverseReceipt} disabled={actionSubmitting || reversalReason.trim().length < 5}>
+            <Button
+              variant="secondary"
+              className="btn-danger text-red-600"
+              onClick={handleReverseReceipt}
+              disabled={actionSubmitting || reversalReason.trim().length < 5}
+            >
               {actionSubmitting ? 'Reversing...' : 'Confirm Reversal'}
             </Button>
           </div>

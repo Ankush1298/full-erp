@@ -4,11 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { renderApp } from './helpers/render';
 import { createFakeBackend } from './helpers/fakeBackend';
-import {
-  ErrorPage,
-  NotFoundPage,
-  ForbiddenPage,
-} from '../src/pages/StatePages';
+import { ErrorPage, NotFoundPage, ForbiddenPage } from '../src/pages/StatePages';
 import { EmptyState } from '../src/components/ui/EmptyState';
 import { ErrorState } from '../src/components/ui/ErrorState';
 import { PageHeader } from '../src/components/ui/PageHeader';
@@ -43,9 +39,7 @@ describe('StatePages — Canonical Branded Experience', () => {
 
     // 4. Non-technical explanation & preserved error title for test compatibility
     expect(alert).toHaveTextContent('Something went wrong');
-    expect(
-      screen.getByText(/We couldn't reconnect to your session just now/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/We couldn't reconnect to your session just now/i)).toBeInTheDocument();
 
     // 5. Working recovery controls: "Try again" button
     const retryBtn = within(alert).getByRole('button', { name: 'Try again' });
@@ -73,7 +67,9 @@ describe('StatePages — Canonical Branded Experience', () => {
 
     expect(screen.getByRole('heading', { name: 'Access restricted' })).toBeInTheDocument();
     expect(screen.getByText('403')).toBeInTheDocument();
-    expect(screen.getByText(/This area is reserved for another campus role\./i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/This area is reserved for another campus role\./i),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to home' })).toHaveAttribute('href', '/');
   });
 

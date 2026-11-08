@@ -10,20 +10,10 @@ export const PaymentMethodSchema = z.enum([
 ]);
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
-export const ReconciliationStatusSchema = z.enum([
-  'RECORDED',
-  'PENDING_VERIFICATION',
-  'CONFIRMED',
-]);
+export const ReconciliationStatusSchema = z.enum(['RECORDED', 'PENDING_VERIFICATION', 'CONFIRMED']);
 export type ReconciliationStatus = z.infer<typeof ReconciliationStatusSchema>;
 
-export const DueStatusSchema = z.enum([
-  'PENDING',
-  'PARTIAL',
-  'PAID',
-  'CANCELLED',
-  'WAIVED',
-]);
+export const DueStatusSchema = z.enum(['PENDING', 'PARTIAL', 'PAID', 'CANCELLED', 'WAIVED']);
 export type DueStatus = z.infer<typeof DueStatusSchema>;
 
 export const FeeCategoryDtoSchema = z.object({
@@ -180,11 +170,13 @@ export interface CreateFeeStructureInput {
 export interface GenerateStudentDuesInput {
   fee_structure_id: string;
   student_ids?: string[] | undefined;
-  concessions?: Array<{
-    student_id: string;
-    discount_amount: number;
-    reason: string;
-  }> | undefined;
+  concessions?:
+    | Array<{
+        student_id: string;
+        discount_amount: number;
+        reason: string;
+      }>
+    | undefined;
 }
 
 export interface RecordOfflineReceiptInput {
@@ -196,10 +188,12 @@ export interface RecordOfflineReceiptInput {
   currency?: string | undefined;
   reference_number?: string | undefined;
   reconciliation_status?: ReconciliationStatus | undefined;
-  allocations?: Array<{
-    student_due_id: string;
-    amount: number;
-  }> | undefined;
+  allocations?:
+    | Array<{
+        student_due_id: string;
+        amount: number;
+      }>
+    | undefined;
   remarks?: string | undefined;
   idempotency_key?: string | undefined;
 }
@@ -216,7 +210,10 @@ export async function fetchFeeCategories(c: ApiClient): Promise<FeeCategoryDto[]
   return res.data;
 }
 
-export async function createFeeCategory(c: ApiClient, body: CreateFeeCategoryInput): Promise<FeeCategoryDto> {
+export async function createFeeCategory(
+  c: ApiClient,
+  body: CreateFeeCategoryInput,
+): Promise<FeeCategoryDto> {
   const res = await c.post('/v1/finance/categories', {
     schema: z.object({ data: FeeCategoryDtoSchema }),
     body,
@@ -240,7 +237,10 @@ export async function fetchFeeStructures(
   return res.data;
 }
 
-export async function createFeeStructure(c: ApiClient, body: CreateFeeStructureInput): Promise<FeeStructureDto> {
+export async function createFeeStructure(
+  c: ApiClient,
+  body: CreateFeeStructureInput,
+): Promise<FeeStructureDto> {
   const res = await c.post('/v1/finance/structures', {
     schema: z.object({ data: FeeStructureDtoSchema }),
     body,
@@ -295,14 +295,20 @@ export async function fetchStudentDues(
   return res.data;
 }
 
-export async function fetchStudentLedger(c: ApiClient, studentId: string): Promise<StudentLedgerDto> {
+export async function fetchStudentLedger(
+  c: ApiClient,
+  studentId: string,
+): Promise<StudentLedgerDto> {
   const res = await c.get(`/v1/finance/students/${encodeURIComponent(studentId)}/ledger`, {
     schema: z.object({ data: StudentLedgerDtoSchema }),
   });
   return res.data;
 }
 
-export async function recordOfflineReceipt(c: ApiClient, body: RecordOfflineReceiptInput): Promise<FeeReceiptDto> {
+export async function recordOfflineReceipt(
+  c: ApiClient,
+  body: RecordOfflineReceiptInput,
+): Promise<FeeReceiptDto> {
   const res = await c.post('/v1/finance/receipts', {
     schema: z.object({ data: FeeReceiptDtoSchema }),
     body,

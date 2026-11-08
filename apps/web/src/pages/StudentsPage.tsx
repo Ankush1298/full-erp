@@ -187,11 +187,7 @@ function DirectoryCard() {
         />
       ) : null}
       {state.kind === 'ready' && rows.length === 0 ? (
-        <EmptyState
-          title="No students found"
-          description="No students to show."
-          compact
-        />
+        <EmptyState title="No students found" description="No students to show." compact />
       ) : null}
       {state.kind === 'ready' && rows.length > 0 ? (
         <StudentTable label="Student directory" rows={rows} />
@@ -309,7 +305,11 @@ function AdmissionsCard({
   const isSchool = institutionType === 'SCHOOL';
   const isUniversity = institutionType === 'UNIVERSITY';
 
-  const cardTitle = isSchool ? 'New admission' : isUniversity ? 'Register student' : 'Admit student';
+  const cardTitle = isSchool
+    ? 'New admission'
+    : isUniversity
+      ? 'Register student'
+      : 'Admit student';
   const personLabel = isSchool ? 'pupil' : 'student';
   const submitLabel = isSchool ? 'Confirm admission' : 'Register student';
 
@@ -378,7 +378,12 @@ function AdmissionsCard({
             ? 'Register an admitted student under your authorized campus. Academic enrolment and logins remain separate steps.'
             : 'Register an admitted student for the selected campus. Programme enrolment and logins remain separate steps.'}
       </p>
-      <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
+      <form
+        onSubmit={(e) => {
+          void handleSubmit(e);
+        }}
+        noValidate
+      >
         <TextField
           label="User account ID (UUID)"
           name="userId"
@@ -406,7 +411,11 @@ function AdmissionsCard({
         {campuses.length > 0 ? (
           <div className="field" style={{ maxWidth: '24rem' }}>
             <label htmlFor={campusSelectId}>
-              {isSchool ? 'School / Campus' : isUniversity ? 'University Campus / College' : 'Campus'}
+              {isSchool
+                ? 'School / Campus'
+                : isUniversity
+                  ? 'University Campus / College'
+                  : 'Campus'}
             </label>
             <select
               id={campusSelectId}
@@ -465,13 +474,17 @@ function AdmissionsCard({
               Potential duplicate {personLabel} identified. Check the box below if you have verified
               that this is a distinct applicant and wish to acknowledge the warning.
             </Alert>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}
+            >
               <input
                 type="checkbox"
                 checked={acknowledged}
                 onChange={(e) => setAcknowledged(e.target.checked)}
               />
-              <span>I confirm that I have reviewed the duplicate alert and authorize admission.</span>
+              <span>
+                I confirm that I have reviewed the duplicate alert and authorize admission.
+              </span>
             </label>
           </div>
         ) : null}

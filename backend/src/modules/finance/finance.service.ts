@@ -158,7 +158,11 @@ export class FinanceService {
       [ctx.tenantId, input.code],
     );
     if (existing.rows.length > 0) {
-      throw new AppError(409, 'DUPLICATE_FEE_STRUCTURE_CODE', `Fee structure with code "${input.code}" already exists.`);
+      throw new AppError(
+        409,
+        'DUPLICATE_FEE_STRUCTURE_CODE',
+        `Fee structure with code "${input.code}" already exists.`,
+      );
     }
 
     // Insert fee structure
@@ -189,7 +193,14 @@ export class FinanceService {
         `INSERT INTO app.fee_structure_components (
            id, organization_id, fee_structure_id, fee_category_id, amount, description
          ) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [compId, ctx.tenantId, structureId, comp.fee_category_id, comp.amount, comp.description ?? null],
+        [
+          compId,
+          ctx.tenantId,
+          structureId,
+          comp.fee_category_id,
+          comp.amount,
+          comp.description ?? null,
+        ],
       );
     }
 
@@ -292,7 +303,11 @@ export class FinanceService {
       throw new AppError(404, 'FEE_STRUCTURE_NOT_FOUND', 'Fee structure not found.');
     }
     if (structure.total_amount <= 0) {
-      throw new AppError(400, 'EMPTY_FEE_STRUCTURE', 'Cannot generate dues for fee structure with no components.');
+      throw new AppError(
+        400,
+        'EMPTY_FEE_STRUCTURE',
+        'Cannot generate dues for fee structure with no components.',
+      );
     }
 
     // Identify target students
@@ -301,10 +316,7 @@ export class FinanceService {
       targetStudentIds = input.student_ids;
     } else {
       // Auto-identify active students enrolled in this campus/term/program
-      const conditions = [
-        's.organization_id = $1',
-        's.status = $2',
-      ];
+      const conditions = ['s.organization_id = $1', 's.status = $2'];
       const params: unknown[] = [ctx.tenantId, 'ACTIVE'];
 
       if (structure.program_id) {
@@ -580,7 +592,11 @@ export class FinanceService {
           [ctx.tenantId, alloc.student_due_id, input.student_id],
         );
         if (dueRes.rows.length === 0) {
-          throw new AppError(404, 'DUE_NOT_FOUND', `Student due ${alloc.student_due_id} not found.`);
+          throw new AppError(
+            404,
+            'DUE_NOT_FOUND',
+            `Student due ${alloc.student_due_id} not found.`,
+          );
         }
         const due = dueRes.rows[0]!;
         const currentBalance = Number(due.balance_amount);

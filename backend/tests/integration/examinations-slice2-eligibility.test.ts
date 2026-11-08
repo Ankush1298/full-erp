@@ -324,7 +324,10 @@ describe('Examination Eligibility & Automatic Candidate Lists — Slice 2', () =
       period_no: 1,
       roll_number: '102',
     });
-    await adminQuery(`UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`, [eid1, eid2]);
+    await adminQuery(`UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`, [
+      eid1,
+      eid2,
+    ]);
 
     await insertIn(T.orgId, 'course_registrations', {
       term_enrollment_id: eid1,
@@ -405,28 +408,46 @@ describe('Examination Eligibility & Automatic Candidate Lists — Slice 2', () =
   });
 
   it('2. sets and retrieves custom eligibility policy (75% attendance threshold)', async () => {
-    const putPolicy = await call('PUT', s.admin, `/examinations/schedules/${scheduleId}/eligibility-policy`, {
-      name: 'Mid-Term Attendance Policy',
-      min_attendance_percentage: 75,
-      check_attendance: true,
-      check_fees: false,
-      attendance_cutoff_days_prior: 0,
-      allow_late_enrolment_review: true,
-    });
+    const putPolicy = await call(
+      'PUT',
+      s.admin,
+      `/examinations/schedules/${scheduleId}/eligibility-policy`,
+      {
+        name: 'Mid-Term Attendance Policy',
+        min_attendance_percentage: 75,
+        check_attendance: true,
+        check_fees: false,
+        attendance_cutoff_days_prior: 0,
+        allow_late_enrolment_review: true,
+      },
+    );
     expect(putPolicy.statusCode).toBe(200);
     expect(Number(putPolicy.json<{ data: PolicyDto }>().data.min_attendance_percentage)).toBe(75);
 
-    const getPolicy = await call('GET', s.admin, `/examinations/schedules/${scheduleId}/eligibility-policy`);
+    const getPolicy = await call(
+      'GET',
+      s.admin,
+      `/examinations/schedules/${scheduleId}/eligibility-policy`,
+    );
     expect(getPolicy.statusCode).toBe(200);
-    expect(getPolicy.json<{ data: { name: string } }>().data.name).toBe('Mid-Term Attendance Policy');
+    expect(getPolicy.json<{ data: { name: string } }>().data.name).toBe(
+      'Mid-Term Attendance Policy',
+    );
   });
 
   it('3. automatically generates candidates and evaluates attendance threshold', async () => {
-    const genRes = await call('POST', s.admin, `/examinations/schedules/${scheduleId}/candidates/generate`, {
-      cutoff_date: D(-10),
-    });
+    const genRes = await call(
+      'POST',
+      s.admin,
+      `/examinations/schedules/${scheduleId}/candidates/generate`,
+      {
+        cutoff_date: D(-10),
+      },
+    );
     expect(genRes.statusCode).toBe(201);
-    const body = genRes.json<{ data: CandidateListDto & { list: { total_candidates: number; status: string } } }>().data;
+    const body = genRes.json<{
+      data: CandidateListDto & { list: { total_candidates: number; status: string } };
+    }>().data;
     candidateListId = body.list.id;
     expect(body.list.total_candidates).toBe(2);
     expect(body.list.eligible_count).toBe(1);
@@ -504,7 +525,11 @@ describe('Examination Eligibility & Automatic Candidate Lists — Slice 2', () =
     expect(updated.final_status).toBe('ELIGIBLE');
 
     // Verify candidate list summary updated
-    const candListRes = await call('GET', s.admin, `/examinations/schedules/${scheduleId}/candidates`);
+    const candListRes = await call(
+      'GET',
+      s.admin,
+      `/examinations/schedules/${scheduleId}/candidates`,
+    );
     expect(candListRes.statusCode).toBe(200);
     expect(candListRes.json<{ data: CandidateListDto }>().data.list.eligible_count).toBe(2);
     expect(candListRes.json<{ data: CandidateListDto }>().data.list.not_eligible_count).toBe(0);

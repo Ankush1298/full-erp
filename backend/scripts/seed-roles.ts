@@ -1,6 +1,6 @@
 /**
  * Smart Campus OS - Multi-Role Account Provisioning Script
- * 
+ *
  * Safely and idempotently provisions accounts for all 8 canonical roles in campusos_dev:
  *  1. COLLEGE_ADMIN
  *  2. CAMPUS_ADMIN
@@ -10,7 +10,7 @@
  *  6. FACULTY
  *  7. STAFF
  *  8. STUDENT
- * 
+ *
  * Pre-configures TOTP MFA & emergency recovery codes for MFA-required roles,
  * creates necessary campus and department academic structures,
  * links student profile records for the STUDENT role,
@@ -24,7 +24,12 @@ import * as argon2 from 'argon2';
 import { uuidv7 } from '../src/shared/ids/uuidv7.js';
 import { seedTenantRoles } from '../src/shared/authorization/seed.js';
 import { verifyLocalDevDatabaseUrl, probeLocalDevDatabase } from './dev-seed-core.js';
-import { MfaSecretBox, generateRecoveryCodes, hashRecoveryCode, normaliseRecoveryCode } from '../src/modules/auth/mfa/mfa-crypto.js';
+import {
+  MfaSecretBox,
+  generateRecoveryCodes,
+  hashRecoveryCode,
+  normaliseRecoveryCode,
+} from '../src/modules/auth/mfa/mfa-crypto.js';
 import { base32Encode, hotp, totpStep } from '../src/modules/auth/mfa/totp.js';
 import { Secret } from '../src/config/env.js';
 
@@ -204,7 +209,9 @@ export async function seedAllRoles(): Promise<SeededAccountResult[]> {
     }
 
     // Set up MFA Secret Box with k1
-    const mfaKey = process.env['MFA_ENCRYPTION_KEYS']?.split(':')[1] || 'w8Y3Zc81IS2cHXJ53mERz1fklKbMwfFdPZaatH7nOJ4';
+    const mfaKey =
+      process.env['MFA_ENCRYPTION_KEYS']?.split(':')[1] ||
+      'w8Y3Zc81IS2cHXJ53mERz1fklKbMwfFdPZaatH7nOJ4';
     const activeKeyId = process.env['MFA_ENCRYPTION_ACTIVE_KEY_ID'] || 'k1';
     const ring = {
       keys: new Map([[activeKeyId, new Secret(mfaKey)]]),
@@ -335,7 +342,16 @@ export async function seedAllRoles(): Promise<SeededAccountResult[]> {
           `INSERT INTO app.role_assignments (
              id, organization_id, user_id, role_id, scope_type, scope_id, campus_id, department_id, status, valid_from
            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ACTIVE', now())`,
-          [assignmentId, organizationId, userId, roleId, acct.scopeType, scopeId, targetCampusId, targetDeptId],
+          [
+            assignmentId,
+            organizationId,
+            userId,
+            roleId,
+            acct.scopeType,
+            scopeId,
+            targetCampusId,
+            targetDeptId,
+          ],
         );
       } else {
         await client.query(
@@ -367,7 +383,8 @@ export async function seedAllRoles(): Promise<SeededAccountResult[]> {
         const ticketId = uuidv7();
         mfaTicketPlain = crypto.randomBytes(32).toString('hex');
         const codeHash = crypto.createHash('sha256').update(mfaTicketPlain).digest('hex');
-        const creatorId = (adminCreatorUserId && adminCreatorUserId !== userId) ? adminCreatorUserId : null;
+        const creatorId =
+          adminCreatorUserId && adminCreatorUserId !== userId ? adminCreatorUserId : null;
 
         // Revoke any previous active ticket for this user
         await client.query(
@@ -415,10 +432,9 @@ export async function seedAllRoles(): Promise<SeededAccountResult[]> {
         }
 
         // Mark ticket used
-        await client.query(
-          `UPDATE app.mfa_enrollment_tickets SET used_at = now() WHERE id = $1`,
-          [ticketId],
-        );
+        await client.query(`UPDATE app.mfa_enrollment_tickets SET used_at = now() WHERE id = $1`, [
+          ticketId,
+        ]);
 
         // Generate fresh recovery codes
         allRecoveryCodes = generateRecoveryCodes();
@@ -483,7 +499,10 @@ export function updateEnvFile(results: SeededAccountResult[]): void {
   if (startIdx !== -1) {
     const endIdx = content.indexOf(markerEnd);
     if (endIdx !== -1) {
-      content = content.slice(0, startIdx).trimEnd() + '\n\n' + content.slice(endIdx + markerEnd.length).trimStart();
+      content =
+        content.slice(0, startIdx).trimEnd() +
+        '\n\n' +
+        content.slice(endIdx + markerEnd.length).trimStart();
     }
   }
 

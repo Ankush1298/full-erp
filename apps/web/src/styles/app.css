@@ -294,7 +294,9 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   padding: 0.25rem 0.375rem 0.25rem 1rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .search-pill:focus-within {
   border-color: var(--color-primary);
@@ -344,7 +346,9 @@
   color: var(--color-muted);
   text-decoration: none;
   border: 1px solid var(--color-border);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 .topbar-action-btn:hover {
   background: var(--color-primary-soft);
@@ -457,7 +461,9 @@
   text-decoration: none;
   font-weight: 500;
   font-size: 0.9375rem;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
   position: relative;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
@@ -705,7 +711,9 @@
   align-items: center;
   gap: var(--space-4);
   overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .kpi-card:hover {
   transform: translateY(-2px);
@@ -845,7 +853,9 @@
   border-radius: 50%;
   border: none;
   cursor: pointer;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
 }
 .month-nav-btn--prev {
   background: var(--color-coral);
@@ -1485,9 +1495,9 @@
 }
 
 .brand-state-page--recovery {
-  background: radial-gradient(circle at 80% 20%, rgba(242, 162, 173, 0.15), transparent 40%),
-              radial-gradient(circle at 10% 90%, rgba(80, 65, 117, 0.12), transparent 45%),
-              var(--color-bg);
+  background:
+    radial-gradient(circle at 80% 20%, rgba(242, 162, 173, 0.15), transparent 40%),
+    radial-gradient(circle at 10% 90%, rgba(80, 65, 117, 0.12), transparent 45%), var(--color-bg);
 }
 
 .brand-state-backdrop {
@@ -1522,7 +1532,9 @@
   border: 1px solid var(--color-border);
   border-radius: 1.25rem;
   padding: var(--space-6) var(--space-6);
-  box-shadow: 0 16px 40px rgba(80, 65, 117, 0.08), 0 2px 8px rgba(80, 65, 117, 0.04);
+  box-shadow:
+    0 16px 40px rgba(80, 65, 117, 0.08),
+    0 2px 8px rgba(80, 65, 117, 0.04);
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1563,7 +1575,8 @@
 }
 
 @keyframes floatSubtle {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -1801,7 +1814,9 @@
   gap: var(--space-2);
   position: relative;
   overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .stat-card:hover {

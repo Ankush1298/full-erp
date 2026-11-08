@@ -177,11 +177,7 @@ export function ErrorPage({ onRetry }: { onRetry: () => void }) {
               stroke="#504175"
               strokeWidth="2"
             />
-            <path
-              d="M50 24h4a6 6 0 0 1 6 6v4a6 6 0 0 1-6 6h-4"
-              stroke="#504175"
-              strokeWidth="2"
-            />
+            <path d="M50 24h4a6 6 0 0 1 6 6v4a6 6 0 0 1-6 6h-4" stroke="#504175" strokeWidth="2" />
             <path d="M8 58h48" stroke="#504175" strokeWidth="2.5" />
           </svg>
         </div>
@@ -193,7 +189,8 @@ export function ErrorPage({ onRetry }: { onRetry: () => void }) {
         <div className="brand-state-subhead">
           <span className="brand-state-tag">Something went wrong</span>
           <p className="brand-state-desc">
-            We couldn&apos;t reconnect to your session just now. Check your connection; this is usually temporary.
+            We couldn&apos;t reconnect to your session just now. Check your connection; this is
+            usually temporary.
           </p>
         </div>
 

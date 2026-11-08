@@ -16,7 +16,10 @@ export function csvCell(value: string | number | null | undefined): string {
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function buildCsv(headers: string[], rows: (string | number | null | undefined)[][]): string {
+export function buildCsv(
+  headers: string[],
+  rows: (string | number | null | undefined)[][],
+): string {
   const lines: string[] = [headers.map(csvCell).join(',')];
   for (const row of rows) {
     lines.push(row.map(csvCell).join(','));
@@ -228,7 +231,9 @@ export class ReportingService {
 
     if (query.campus_id) {
       params.push(query.campus_id);
-      conditions.push(`(s.campus_id = $${params.length} OR (s.campus_id IS NULL AND c.id = $${params.length}))`);
+      conditions.push(
+        `(s.campus_id = $${params.length} OR (s.campus_id IS NULL AND c.id = $${params.length}))`,
+      );
     }
     if (query.program_id) {
       params.push(query.program_id);
@@ -428,9 +433,7 @@ export class ReportingService {
     });
 
     const overallRate =
-      totalRecords > 0
-        ? Math.round(((totalPresent + totalLate) / totalRecords) * 1000) / 10
-        : 0;
+      totalRecords > 0 ? Math.round(((totalPresent + totalLate) / totalRecords) * 1000) / 10 : 0;
 
     let csv: string | undefined;
     if (query.format === 'csv') {
@@ -874,7 +877,8 @@ export class ReportingService {
     });
 
     const uniqueDefaulters = new Set(defaulters.map((d) => d.student_id)).size;
-    const totalBilled = totalNetBilled > 0 ? totalNetBilled : confirmedCollections + totalOutstanding;
+    const totalBilled =
+      totalNetBilled > 0 ? totalNetBilled : confirmedCollections + totalOutstanding;
     const efficiency =
       totalBilled > 0 ? Math.round((confirmedCollections / totalBilled) * 1000) / 10 : 0;
 
@@ -912,7 +916,11 @@ export class ReportingService {
         const headers = ['Metric', 'Amount (INR)', 'Receipt / Student Count'];
         const rows = [
           ['Confirmed Collections', (confirmedCollections / 100).toFixed(2), confirmedCount],
-          ['Unverified Payments (In Clearing)', (unverifiedCollections / 100).toFixed(2), unverifiedCount],
+          [
+            'Unverified Payments (In Clearing)',
+            (unverifiedCollections / 100).toFixed(2),
+            unverifiedCount,
+          ],
           ['Total Outstanding Dues', (totalOutstanding / 100).toFixed(2), uniqueDefaulters],
           ['Collection Efficiency', `${efficiency}%`, ''],
         ];

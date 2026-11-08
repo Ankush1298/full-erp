@@ -29,12 +29,7 @@ export const ScheduleStatusSchema = z.enum([
 ]);
 export type ScheduleStatus = z.infer<typeof ScheduleStatusSchema>;
 
-export const MarkStatusSchema = z.enum([
-  'ENTERED',
-  'ABSENT',
-  'EXEMPT',
-  'WITHHELD',
-]);
+export const MarkStatusSchema = z.enum(['ENTERED', 'ABSENT', 'EXEMPT', 'WITHHELD']);
 export type MarkStatus = z.infer<typeof MarkStatusSchema>;
 
 export const ExaminationDtoSchema = z.object({
@@ -498,4 +493,3 @@ export async function approveCandidateList(
   );
   return res.data;
 }
-

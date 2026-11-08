@@ -143,10 +143,14 @@ export function ExaminationsPage() {
   const [approvingList, setApprovingList] = useState(false);
 
   // Evidence modal state
-  const [selectedEvidenceCandidate, setSelectedEvidenceCandidate] = useState<CandidateItem | null>(null);
+  const [selectedEvidenceCandidate, setSelectedEvidenceCandidate] = useState<CandidateItem | null>(
+    null,
+  );
 
   // Override modal state
-  const [selectedOverrideCandidate, setSelectedOverrideCandidate] = useState<CandidateItem | null>(null);
+  const [selectedOverrideCandidate, setSelectedOverrideCandidate] = useState<CandidateItem | null>(
+    null,
+  );
   const [overrideStatusChoice, setOverrideStatusChoice] = useState<OverrideStatus>('EXEMPTED');
   const [overrideReasonInput, setOverrideReasonInput] = useState('');
   const [savingOverride, setSavingOverride] = useState(false);
@@ -311,14 +315,19 @@ export function ExaminationsPage() {
         for (const st of data.students) {
           initialMap[st.student_id] = {
             status: st.mark_status ?? 'ENTERED',
-            marks_obtained: st.marks_obtained !== null && st.marks_obtained !== undefined ? String(st.marks_obtained) : '',
+            marks_obtained:
+              st.marks_obtained !== null && st.marks_obtained !== undefined
+                ? String(st.marks_obtained)
+                : '',
             remarks: st.remarks ?? '',
           };
         }
         setMarksEntries(initialMap);
       } catch (err) {
         if (!active) return;
-        setError(isApiError(err) ? err.message : 'Failed to load student roster for this schedule.');
+        setError(
+          isApiError(err) ? err.message : 'Failed to load student roster for this schedule.',
+        );
         setRosterData(null);
       } finally {
         if (active) setLoading(false);
@@ -474,7 +483,9 @@ export function ExaminationsPage() {
         cutoffDateInput ? { cutoff_date: cutoffDateInput } : undefined,
       );
       setCandidateListData(res);
-      setSuccess(`Candidate list generated with ${res.list.total_candidates} candidates evaluated.`);
+      setSuccess(
+        `Candidate list generated with ${res.list.total_candidates} candidates evaluated.`,
+      );
     } catch (err) {
       setError(isApiError(err) ? err.message : 'Failed to generate candidate list.');
     } finally {
@@ -489,9 +500,14 @@ export function ExaminationsPage() {
     setSuccess(null);
     setApprovingList(true);
     try {
-      const res = await approveCandidateList(client, selectedScheduleId, candidateListData.list.id, {
-        freeze,
-      });
+      const res = await approveCandidateList(
+        client,
+        selectedScheduleId,
+        candidateListData.list.id,
+        {
+          freeze,
+        },
+      );
       setCandidateListData((prev) =>
         prev ? { ...prev, list: { ...prev.list, status: res.status } } : null,
       );
@@ -588,7 +604,9 @@ export function ExaminationsPage() {
 
       // Refresh schedule
       setSchedules((prev) =>
-        prev.map((s) => (s.id === selectedScheduleId ? { ...s, status: res.status as ScheduleStatus } : s)),
+        prev.map((s) =>
+          s.id === selectedScheduleId ? { ...s, status: res.status as ScheduleStatus } : s,
+        ),
       );
       if (rosterData) {
         setRosterData({
@@ -597,7 +615,13 @@ export function ExaminationsPage() {
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : isApiError(err) ? err.message : 'Failed to save marks.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : isApiError(err)
+            ? err.message
+            : 'Failed to save marks.',
+      );
     } finally {
       setSubmittingMarks(false);
     }
@@ -606,7 +630,11 @@ export function ExaminationsPage() {
   // Publish results handler
   async function handlePublishResults(schedId: string) {
     if (!client) return;
-    if (!confirm('Are you sure you want to publish the examination results? Published results are visible to students and cannot be modified.')) {
+    if (
+      !confirm(
+        'Are you sure you want to publish the examination results? Published results are visible to students and cannot be modified.',
+      )
+    ) {
       return;
     }
     setError(null);
@@ -620,7 +648,11 @@ export function ExaminationsPage() {
         prev.map((s) => (s.id === schedId ? { ...s, status: 'PUBLISHED' } : s)),
       );
     } catch (err) {
-      setError(isApiError(err) ? err.message : 'Failed to publish results. Step-up MFA verification may be required.');
+      setError(
+        isApiError(err)
+          ? err.message
+          : 'Failed to publish results. Step-up MFA verification may be required.',
+      );
     } finally {
       setPublishingId(null);
     }
@@ -761,7 +793,10 @@ export function ExaminationsPage() {
         <div className="card p-4 bg-surface-muted/30">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="exam-select" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
+              <label
+                htmlFor="exam-select"
+                className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1"
+              >
                 Select Examination
               </label>
               <select
@@ -781,7 +816,10 @@ export function ExaminationsPage() {
 
             {(tab === 'candidates' || tab === 'marks' || tab === 'register') && (
               <div>
-                <label htmlFor="schedule-select" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1">
+                <label
+                  htmlFor="schedule-select"
+                  className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1"
+                >
                   Select Scheduled Paper
                 </label>
                 <select
@@ -793,7 +831,8 @@ export function ExaminationsPage() {
                   {schedules.length === 0 && <option value="">No papers scheduled</option>}
                   {schedules.map((sc) => (
                     <option key={sc.id} value={sc.id}>
-                      {sc.course_code ? `${sc.course_code}: ` : ''}{sc.course_title || 'Paper'} — {sc.exam_date} ({sc.status})
+                      {sc.course_code ? `${sc.course_code}: ` : ''}
+                      {sc.course_title || 'Paper'} — {sc.exam_date} ({sc.status})
                     </option>
                   ))}
                 </select>
@@ -809,7 +848,12 @@ export function ExaminationsPage() {
       {tab === 'setup' && canManage && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card title="Create New Examination">
-            <form onSubmit={(e) => { void handleCreateExamination(e); }} className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                void handleCreateExamination(e);
+              }}
+              className="space-y-4"
+            >
               <TextField
                 label="Examination Name"
                 placeholder="e.g. Autumn Mid-Term 2026"
@@ -820,7 +864,10 @@ export function ExaminationsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="exam-type-select" className="block text-xs font-medium text-muted mb-1">
+                  <label
+                    htmlFor="exam-type-select"
+                    className="block text-xs font-medium text-muted mb-1"
+                  >
                     Exam Type
                   </label>
                   <select
@@ -839,7 +886,10 @@ export function ExaminationsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="exam-campus-select" className="block text-xs font-medium text-muted mb-1">
+                  <label
+                    htmlFor="exam-campus-select"
+                    className="block text-xs font-medium text-muted mb-1"
+                  >
                     Campus
                   </label>
                   <select
@@ -850,7 +900,9 @@ export function ExaminationsPage() {
                     required
                   >
                     {campuses.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -858,7 +910,10 @@ export function ExaminationsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="exam-term-select" className="block text-xs font-medium text-muted mb-1">
+                  <label
+                    htmlFor="exam-term-select"
+                    className="block text-xs font-medium text-muted mb-1"
+                  >
                     Academic Term
                   </label>
                   <select
@@ -869,7 +924,9 @@ export function ExaminationsPage() {
                     required
                   >
                     {terms.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -903,7 +960,12 @@ export function ExaminationsPage() {
 
           <Card title="Schedule Paper for Selected Exam">
             {selectedExamId ? (
-              <form onSubmit={(e) => { void handleCreateSchedule(e); }} className="space-y-4">
+              <form
+                onSubmit={(e) => {
+                  void handleCreateSchedule(e);
+                }}
+                className="space-y-4"
+              >
                 <TextField
                   label="Course Offering ID"
                   placeholder="UUID of course offering"
@@ -974,7 +1036,8 @@ export function ExaminationsPage() {
 
           {!loadingCandidates && !selectedScheduleId && (
             <div className="card p-8 text-center text-muted">
-              Select an examination and scheduled paper above to manage candidate eligibility and view candidate lists.
+              Select an examination and scheduled paper above to manage candidate eligibility and
+              view candidate lists.
             </div>
           )}
 
@@ -988,36 +1051,42 @@ export function ExaminationsPage() {
                       Candidate Eligibility & Automatic Verification
                     </h2>
                     <p className="text-xs text-muted">
-                      Evaluates active term enrolments and real attendance records against policy criteria. Overrides require mandatory justification.
+                      Evaluates active term enrolments and real attendance records against policy
+                      criteria. Overrides require mandatory justification.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {canManage && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => setShowPolicyModal(true)}
-                      >
+                      <Button variant="secondary" onClick={() => setShowPolicyModal(true)}>
                         Configure Policy
                       </Button>
                     )}
-                    {canManage && candidateListData?.list && candidateListData.list.status === 'DRAFT' && (
-                      <Button
-                        variant="primary"
-                        disabled={approvingList}
-                        onClick={() => { void handleApproveOrFreeze(false); }}
-                      >
-                        {approvingList ? 'Approving...' : 'Approve Candidate List'}
-                      </Button>
-                    )}
-                    {canManage && candidateListData?.list && candidateListData.list.status === 'APPROVED' && (
-                      <Button
-                        variant="secondary"
-                        disabled={approvingList}
-                        onClick={() => { void handleApproveOrFreeze(true); }}
-                      >
-                        {approvingList ? 'Freezing...' : 'Freeze Candidate List'}
-                      </Button>
-                    )}
+                    {canManage &&
+                      candidateListData?.list &&
+                      candidateListData.list.status === 'DRAFT' && (
+                        <Button
+                          variant="primary"
+                          disabled={approvingList}
+                          onClick={() => {
+                            void handleApproveOrFreeze(false);
+                          }}
+                        >
+                          {approvingList ? 'Approving...' : 'Approve Candidate List'}
+                        </Button>
+                      )}
+                    {canManage &&
+                      candidateListData?.list &&
+                      candidateListData.list.status === 'APPROVED' && (
+                        <Button
+                          variant="secondary"
+                          disabled={approvingList}
+                          onClick={() => {
+                            void handleApproveOrFreeze(true);
+                          }}
+                        >
+                          {approvingList ? 'Freezing...' : 'Freeze Candidate List'}
+                        </Button>
+                      )}
                   </div>
                 </div>
 
@@ -1050,13 +1119,16 @@ export function ExaminationsPage() {
                   <Alert tone="info">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <span>
-                        Attendance marks or course registrations have been updated since this list was generated. Candidate evaluation may be stale.
+                        Attendance marks or course registrations have been updated since this list
+                        was generated. Candidate evaluation may be stale.
                       </span>
                       {canManage && candidateListData.list.status !== 'FROZEN' && (
                         <Button
                           variant="secondary"
                           disabled={generatingCandidates}
-                          onClick={() => { void handleGenerateCandidates(); }}
+                          onClick={() => {
+                            void handleGenerateCandidates();
+                          }}
                         >
                           Re-evaluate Candidates
                         </Button>
@@ -1066,33 +1138,39 @@ export function ExaminationsPage() {
                 )}
 
                 {/* Generate bar */}
-                {canManage && (!candidateListData || candidateListData.list.status !== 'FROZEN') && (
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
-                    <div className="flex items-center gap-2">
-                      <label htmlFor="cutoff-date-input" className="text-xs font-medium text-muted">
-                        Evidence Cutoff Date (optional):
-                      </label>
-                      <input
-                        id="cutoff-date-input"
-                        type="date"
-                        value={cutoffDateInput}
-                        onChange={(e) => setCutoffDateInput(e.target.value)}
-                        className="h-8 px-2 text-xs rounded border border-input bg-surface"
-                      />
+                {canManage &&
+                  (!candidateListData || candidateListData.list.status !== 'FROZEN') && (
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                      <div className="flex items-center gap-2">
+                        <label
+                          htmlFor="cutoff-date-input"
+                          className="text-xs font-medium text-muted"
+                        >
+                          Evidence Cutoff Date (optional):
+                        </label>
+                        <input
+                          id="cutoff-date-input"
+                          type="date"
+                          value={cutoffDateInput}
+                          onChange={(e) => setCutoffDateInput(e.target.value)}
+                          className="h-8 px-2 text-xs rounded border border-input bg-surface"
+                        />
+                      </div>
+                      <Button
+                        variant="primary"
+                        disabled={generatingCandidates}
+                        onClick={() => {
+                          void handleGenerateCandidates();
+                        }}
+                      >
+                        {generatingCandidates
+                          ? 'Evaluating Candidates...'
+                          : candidateListData
+                            ? 'Re-generate Candidates'
+                            : 'Generate Candidate List'}
+                      </Button>
                     </div>
-                    <Button
-                      variant="primary"
-                      disabled={generatingCandidates}
-                      onClick={() => { void handleGenerateCandidates(); }}
-                    >
-                      {generatingCandidates
-                        ? 'Evaluating Candidates...'
-                        : candidateListData
-                        ? 'Re-generate Candidates'
-                        : 'Generate Candidate List'}
-                    </Button>
-                  </div>
-                )}
+                  )}
               </div>
 
               {/* Candidate List Metrics Summary */}
@@ -1100,19 +1178,27 @@ export function ExaminationsPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   <div className="card p-3 text-center">
                     <p className="text-xs text-muted uppercase font-semibold">Total Candidates</p>
-                    <p className="text-xl font-bold text-foreground">{candidateListData.list.total_candidates}</p>
+                    <p className="text-xl font-bold text-foreground">
+                      {candidateListData.list.total_candidates}
+                    </p>
                   </div>
                   <div className="card p-3 text-center">
                     <p className="text-xs text-muted uppercase font-semibold">Eligible</p>
-                    <p className="text-xl font-bold text-green-700">{candidateListData.list.eligible_count}</p>
+                    <p className="text-xl font-bold text-green-700">
+                      {candidateListData.list.eligible_count}
+                    </p>
                   </div>
                   <div className="card p-3 text-center">
                     <p className="text-xs text-muted uppercase font-semibold">Not Eligible</p>
-                    <p className="text-xl font-bold text-red-700">{candidateListData.list.not_eligible_count}</p>
+                    <p className="text-xl font-bold text-red-700">
+                      {candidateListData.list.not_eligible_count}
+                    </p>
                   </div>
                   <div className="card p-3 text-center">
                     <p className="text-xs text-muted uppercase font-semibold">Needs Review</p>
-                    <p className="text-xl font-bold text-amber-700">{candidateListData.list.needs_review_count}</p>
+                    <p className="text-xl font-bold text-amber-700">
+                      {candidateListData.list.needs_review_count}
+                    </p>
                   </div>
                   <div className="card p-3 text-center">
                     <p className="text-xs text-muted uppercase font-semibold">List Status</p>
@@ -1122,7 +1208,9 @@ export function ExaminationsPage() {
                   </div>
                   <div className="card p-3 text-center">
                     <p className="text-xs text-muted uppercase font-semibold">Snapshot Version</p>
-                    <p className="text-xl font-bold text-brand-700">v{candidateListData.list.snapshot_version}</p>
+                    <p className="text-xl font-bold text-brand-700">
+                      v{candidateListData.list.snapshot_version}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1131,7 +1219,11 @@ export function ExaminationsPage() {
               {candidateListData ? (
                 <Card title="Candidate List Roster">
                   {/* Status Filters */}
-                  <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Candidate list filters">
+                  <div
+                    className="flex flex-wrap gap-2 mb-4"
+                    role="group"
+                    aria-label="Candidate list filters"
+                  >
                     <button
                       type="button"
                       onClick={() => setCandidateFilter('ALL')}
@@ -1184,17 +1276,37 @@ export function ExaminationsPage() {
                     </p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm" role="table" aria-label="Candidate List Table">
+                      <table
+                        className="w-full text-left text-sm"
+                        role="table"
+                        aria-label="Candidate List Table"
+                      >
                         <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
                           <tr>
-                            <th scope="col" className="px-3 py-2">Admission No</th>
-                            <th scope="col" className="px-3 py-2">Student Name</th>
-                            <th scope="col" className="px-3 py-2">Roll No</th>
-                            <th scope="col" className="px-3 py-2">Attendance %</th>
-                            <th scope="col" className="px-3 py-2">Evaluation</th>
-                            <th scope="col" className="px-3 py-2">Override</th>
-                            <th scope="col" className="px-3 py-2">Final Status</th>
-                            <th scope="col" className="px-3 py-2 text-right">Actions</th>
+                            <th scope="col" className="px-3 py-2">
+                              Admission No
+                            </th>
+                            <th scope="col" className="px-3 py-2">
+                              Student Name
+                            </th>
+                            <th scope="col" className="px-3 py-2">
+                              Roll No
+                            </th>
+                            <th scope="col" className="px-3 py-2">
+                              Attendance %
+                            </th>
+                            <th scope="col" className="px-3 py-2">
+                              Evaluation
+                            </th>
+                            <th scope="col" className="px-3 py-2">
+                              Override
+                            </th>
+                            <th scope="col" className="px-3 py-2">
+                              Final Status
+                            </th>
+                            <th scope="col" className="px-3 py-2 text-right">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -1205,13 +1317,15 @@ export function ExaminationsPage() {
                               <td className="px-3 py-2 text-muted">{c.roll_number ?? '—'}</td>
                               <td className="px-3 py-2">
                                 <span className="font-semibold">
-                                  {c.evidence_summary?.attendance_percentage !== undefined && c.evidence_summary?.attendance_percentage !== null
+                                  {c.evidence_summary?.attendance_percentage !== undefined &&
+                                  c.evidence_summary?.attendance_percentage !== null
                                     ? `${c.evidence_summary.attendance_percentage}%`
                                     : '—'}
                                 </span>
                                 {c.evidence_summary && (
                                   <span className="text-[11px] text-muted block">
-                                    {c.evidence_summary.attended_sessions}/{c.evidence_summary.total_sessions} sessions
+                                    {c.evidence_summary.attended_sessions}/
+                                    {c.evidence_summary.total_sessions} sessions
                                   </span>
                                 )}
                               </td>
@@ -1252,7 +1366,11 @@ export function ExaminationsPage() {
                                       type="button"
                                       onClick={() => {
                                         setSelectedOverrideCandidate(c);
-                                        setOverrideStatusChoice(c.override_status !== 'NONE' ? c.override_status : 'EXEMPTED');
+                                        setOverrideStatusChoice(
+                                          c.override_status !== 'NONE'
+                                            ? c.override_status
+                                            : 'EXEMPTED',
+                                        );
                                         setOverrideReasonInput(c.override_reason ?? '');
                                       }}
                                       className="text-xs text-brand-700 hover:text-brand-900 underline font-medium ml-2"
@@ -1271,8 +1389,9 @@ export function ExaminationsPage() {
                 </Card>
               ) : (
                 <div className="card p-8 text-center text-muted">
-                  No candidate list has been generated yet for this examination paper.
-                  Click &quot;Generate Candidate List&quot; above to automatically identify eligible students.
+                  No candidate list has been generated yet for this examination paper. Click
+                  &quot;Generate Candidate List&quot; above to automatically identify eligible
+                  students.
                 </div>
               )}
             </div>
@@ -1302,7 +1421,9 @@ export function ExaminationsPage() {
                     {rosterData.schedule.course_title || 'Course Paper'}
                   </h2>
                   <p className="text-xs text-muted">
-                    Exam Date: {rosterData.schedule.exam_date} | Max Marks: {rosterData.schedule.max_marks} | Passing Marks: {rosterData.schedule.pass_marks}
+                    Exam Date: {rosterData.schedule.exam_date} | Max Marks:{' '}
+                    {rosterData.schedule.max_marks} | Passing Marks:{' '}
+                    {rosterData.schedule.pass_marks}
                   </p>
                 </div>
                 <div className="mt-2 sm:mt-0 flex items-center gap-2">
@@ -1314,8 +1435,10 @@ export function ExaminationsPage() {
               {rosterData.candidate_list ? (
                 <div className="p-3 bg-brand-50 border border-brand-200 rounded-md text-xs text-brand-900 flex items-center justify-between">
                   <span>
-                    Candidate List Status: <strong>{rosterData.candidate_list.status}</strong> (Snapshot v{rosterData.candidate_list.snapshot_version}).
-                    {rosterData.candidate_list.status === 'APPROVED' || rosterData.candidate_list.status === 'FROZEN'
+                    Candidate List Status: <strong>{rosterData.candidate_list.status}</strong>{' '}
+                    (Snapshot v{rosterData.candidate_list.snapshot_version}).
+                    {rosterData.candidate_list.status === 'APPROVED' ||
+                    rosterData.candidate_list.status === 'FROZEN'
                       ? ' Marks entry is restricted to verified eligible candidates.'
                       : ' Candidate list is in draft; finalize approval before submission.'}
                   </span>
@@ -1336,15 +1459,31 @@ export function ExaminationsPage() {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm" role="table" aria-label="Student Marks Entry Table">
+                    <table
+                      className="w-full text-left text-sm"
+                      role="table"
+                      aria-label="Student Marks Entry Table"
+                    >
                       <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
                         <tr>
-                          <th scope="col" className="px-3 py-2">Admission No</th>
-                          <th scope="col" className="px-3 py-2">Student Name</th>
-                          <th scope="col" className="px-3 py-2">Roll No</th>
-                          <th scope="col" className="px-3 py-2">Status</th>
-                          <th scope="col" className="px-3 py-2">Marks Obtained</th>
-                          <th scope="col" className="px-3 py-2">Remarks</th>
+                          <th scope="col" className="px-3 py-2">
+                            Admission No
+                          </th>
+                          <th scope="col" className="px-3 py-2">
+                            Student Name
+                          </th>
+                          <th scope="col" className="px-3 py-2">
+                            Roll No
+                          </th>
+                          <th scope="col" className="px-3 py-2">
+                            Status
+                          </th>
+                          <th scope="col" className="px-3 py-2">
+                            Marks Obtained
+                          </th>
+                          <th scope="col" className="px-3 py-2">
+                            Remarks
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -1361,7 +1500,10 @@ export function ExaminationsPage() {
                             st.final_status === 'NOT_ELIGIBLE';
 
                           return (
-                            <tr key={st.student_id} className={`hover:bg-surface-muted/20 ${isCandidateIneligible ? 'opacity-60 bg-red-50/20' : ''}`}>
+                            <tr
+                              key={st.student_id}
+                              className={`hover:bg-surface-muted/20 ${isCandidateIneligible ? 'opacity-60 bg-red-50/20' : ''}`}
+                            >
                               <td className="px-3 py-2 font-mono text-xs">{st.admission_number}</td>
                               <td className="px-3 py-2 font-medium">
                                 {st.student_name}
@@ -1407,8 +1549,16 @@ export function ExaminationsPage() {
                                   step="0.5"
                                   aria-label={`Marks for ${st.student_name}`}
                                   disabled={!isEntered || isCandidateIneligible}
-                                  placeholder={isCandidateIneligible ? 'Ineligible' : isEntered ? '0 - 100' : 'N/A'}
-                                  value={isEntered && !isCandidateIneligible ? entry.marks_obtained : ''}
+                                  placeholder={
+                                    isCandidateIneligible
+                                      ? 'Ineligible'
+                                      : isEntered
+                                        ? '0 - 100'
+                                        : 'N/A'
+                                  }
+                                  value={
+                                    isEntered && !isCandidateIneligible ? entry.marks_obtained : ''
+                                  }
                                   onChange={(e) =>
                                     setMarksEntries((prev) => ({
                                       ...prev,
@@ -1425,7 +1575,11 @@ export function ExaminationsPage() {
                                 <input
                                   type="text"
                                   aria-label={`Remarks for ${st.student_name}`}
-                                  placeholder={isCandidateIneligible ? 'Candidate ineligible on approved candidate list' : 'Optional remarks'}
+                                  placeholder={
+                                    isCandidateIneligible
+                                      ? 'Candidate ineligible on approved candidate list'
+                                      : 'Optional remarks'
+                                  }
                                   disabled={isCandidateIneligible}
                                   value={entry.remarks}
                                   onChange={(e) =>
@@ -1451,14 +1605,18 @@ export function ExaminationsPage() {
                     <Button
                       variant="secondary"
                       disabled={submittingMarks}
-                      onClick={() => { void handleSaveMarks('DRAFT'); }}
+                      onClick={() => {
+                        void handleSaveMarks('DRAFT');
+                      }}
                     >
                       Save Draft
                     </Button>
                     <Button
                       variant="primary"
                       disabled={submittingMarks}
-                      onClick={() => { void handleSaveMarks('SUBMIT'); }}
+                      onClick={() => {
+                        void handleSaveMarks('SUBMIT');
+                      }}
                     >
                       Submit Marks
                     </Button>
@@ -1476,32 +1634,50 @@ export function ExaminationsPage() {
       {tab === 'publish' && canPublish && (
         <Card title="Examination Papers Awaiting Review & Publication">
           <p className="text-xs text-muted mb-4">
-            Only authorized academic administrators (HOD, Registrar, Campus Admin) can publish results. Teachers record marks, but cannot self-publish.
+            Only authorized academic administrators (HOD, Registrar, Campus Admin) can publish
+            results. Teachers record marks, but cannot self-publish.
           </p>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm" role="table" aria-label="Review and Publish Table">
+            <table
+              className="w-full text-left text-sm"
+              role="table"
+              aria-label="Review and Publish Table"
+            >
               <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
                 <tr>
-                  <th scope="col" className="px-3 py-2">Course Paper</th>
-                  <th scope="col" className="px-3 py-2">Exam Date</th>
-                  <th scope="col" className="px-3 py-2">Status</th>
-                  <th scope="col" className="px-3 py-2">Marks Submitted At</th>
-                  <th scope="col" className="px-3 py-2 text-right">Action</th>
+                  <th scope="col" className="px-3 py-2">
+                    Course Paper
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Exam Date
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Status
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Marks Submitted At
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {schedules.map((sc) => (
                   <tr key={sc.id} className="hover:bg-surface-muted/20">
                     <td className="px-3 py-2 font-medium">
-                      {sc.course_code ? `${sc.course_code}: ` : ''}{sc.course_title || 'Paper'}
+                      {sc.course_code ? `${sc.course_code}: ` : ''}
+                      {sc.course_title || 'Paper'}
                     </td>
                     <td className="px-3 py-2 text-muted">{sc.exam_date}</td>
                     <td className="px-3 py-2">
                       <Badge>{sc.status}</Badge>
                     </td>
                     <td className="px-3 py-2 text-xs text-muted">
-                      {sc.marks_submitted_at ? new Date(sc.marks_submitted_at).toLocaleDateString() : 'Pending Submission'}
+                      {sc.marks_submitted_at
+                        ? new Date(sc.marks_submitted_at).toLocaleDateString()
+                        : 'Pending Submission'}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {sc.status === 'PUBLISHED' ? (
@@ -1509,8 +1685,13 @@ export function ExaminationsPage() {
                       ) : (
                         <Button
                           variant="primary"
-                          disabled={publishingId === sc.id || (sc.status !== 'SUBMITTED' && sc.status !== 'DRAFT_MARKS')}
-                          onClick={() => { void handlePublishResults(sc.id); }}
+                          disabled={
+                            publishingId === sc.id ||
+                            (sc.status !== 'SUBMITTED' && sc.status !== 'DRAFT_MARKS')
+                          }
+                          onClick={() => {
+                            void handlePublishResults(sc.id);
+                          }}
                         >
                           {publishingId === sc.id ? 'Publishing...' : 'Publish Results'}
                         </Button>
@@ -1533,7 +1714,8 @@ export function ExaminationsPage() {
 
           {!loading && !registerData && (
             <div className="card p-8 text-center text-muted">
-              Select an examination and scheduled paper to view the marks register and class statistics.
+              Select an examination and scheduled paper to view the marks register and class
+              statistics.
             </div>
           )}
 
@@ -1543,11 +1725,15 @@ export function ExaminationsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Total</p>
-                  <p className="text-xl font-bold text-foreground">{registerData.statistics.total_students}</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {registerData.statistics.total_students}
+                  </p>
                 </div>
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Appeared</p>
-                  <p className="text-xl font-bold text-foreground">{registerData.statistics.appeared}</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {registerData.statistics.appeared}
+                  </p>
                 </div>
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Absent</p>
@@ -1555,11 +1741,15 @@ export function ExaminationsPage() {
                 </div>
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Exempt</p>
-                  <p className="text-xl font-bold text-foreground">{registerData.statistics.exempt}</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {registerData.statistics.exempt}
+                  </p>
                 </div>
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Passed</p>
-                  <p className="text-xl font-bold text-green-700">{registerData.statistics.passed}</p>
+                  <p className="text-xl font-bold text-green-700">
+                    {registerData.statistics.passed}
+                  </p>
                 </div>
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Failed</p>
@@ -1567,27 +1757,49 @@ export function ExaminationsPage() {
                 </div>
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Avg Marks</p>
-                  <p className="text-xl font-bold text-foreground">{registerData.statistics.average_marks}</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {registerData.statistics.average_marks}
+                  </p>
                 </div>
                 <div className="card p-3 text-center">
                   <p className="text-xs text-muted uppercase font-semibold">Pass %</p>
-                  <p className="text-xl font-bold text-brand-700">{registerData.statistics.pass_percentage}%</p>
+                  <p className="text-xl font-bold text-brand-700">
+                    {registerData.statistics.pass_percentage}%
+                  </p>
                 </div>
               </div>
 
               {/* Marks Register Sheet */}
               <Card title="Class Marks Sheet">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm" role="table" aria-label="Class Register Table">
+                  <table
+                    className="w-full text-left text-sm"
+                    role="table"
+                    aria-label="Class Register Table"
+                  >
                     <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
                       <tr>
-                        <th scope="col" className="px-3 py-2">Admission No</th>
-                        <th scope="col" className="px-3 py-2">Student Name</th>
-                        <th scope="col" className="px-3 py-2">Roll No</th>
-                        <th scope="col" className="px-3 py-2">Status</th>
-                        <th scope="col" className="px-3 py-2">Marks Obtained</th>
-                        <th scope="col" className="px-3 py-2">Result</th>
-                        <th scope="col" className="px-3 py-2">Remarks</th>
+                        <th scope="col" className="px-3 py-2">
+                          Admission No
+                        </th>
+                        <th scope="col" className="px-3 py-2">
+                          Student Name
+                        </th>
+                        <th scope="col" className="px-3 py-2">
+                          Roll No
+                        </th>
+                        <th scope="col" className="px-3 py-2">
+                          Status
+                        </th>
+                        <th scope="col" className="px-3 py-2">
+                          Marks Obtained
+                        </th>
+                        <th scope="col" className="px-3 py-2">
+                          Result
+                        </th>
+                        <th scope="col" className="px-3 py-2">
+                          Remarks
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -1600,7 +1812,9 @@ export function ExaminationsPage() {
                             <Badge>{m.status}</Badge>
                           </td>
                           <td className="px-3 py-2 font-semibold">
-                            {m.marks_obtained !== null && m.marks_obtained !== undefined ? m.marks_obtained : '—'}
+                            {m.marks_obtained !== null && m.marks_obtained !== undefined
+                              ? m.marks_obtained
+                              : '—'}
                           </td>
                           <td className="px-3 py-2">
                             {m.is_passing === true && <Badge>Passed</Badge>}
@@ -1623,7 +1837,9 @@ export function ExaminationsPage() {
       {/* 6. STUDENT RESULTS TAB (STUDENT SELF VIEW)                    */}
       {/* ------------------------------------------------------------- */}
       {tab === 'results' && (
-        <Card title={isStudent ? 'My Published Examination Results' : 'Student Examination Results'}>
+        <Card
+          title={isStudent ? 'My Published Examination Results' : 'Student Examination Results'}
+        >
           {loading && <Spinner />}
 
           {!loading && studentResults.length === 0 && (
@@ -1642,7 +1858,9 @@ export function ExaminationsPage() {
                         {res.course_code}
                       </span>
                       <h3 className="text-base font-bold text-foreground">{res.course_title}</h3>
-                      <p className="text-xs text-muted mt-0.5">{res.exam_name} ({res.exam_type})</p>
+                      <p className="text-xs text-muted mt-0.5">
+                        {res.exam_name} ({res.exam_type})
+                      </p>
                     </div>
                     <Badge>{res.is_passing ? 'Passed' : 'Failed'}</Badge>
                   </div>
@@ -1691,10 +1909,16 @@ export function ExaminationsPage() {
               Configure Eligibility Policy
             </h3>
             <p className="text-xs text-muted mb-4">
-              Define the automated rules for generating candidate lists for this examination schedule.
+              Define the automated rules for generating candidate lists for this examination
+              schedule.
             </p>
 
-            <form onSubmit={(e) => { void handleSavePolicy(e); }} className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                void handleSavePolicy(e);
+              }}
+              className="space-y-4"
+            >
               <TextField
                 label="Policy Name"
                 value={policyName}
@@ -1764,11 +1988,7 @@ export function ExaminationsPage() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={savingPolicy}
-                >
+                <Button type="submit" variant="primary" disabled={savingPolicy}>
                   {savingPolicy ? 'Saving...' : 'Save Policy'}
                 </Button>
               </div>
@@ -1797,25 +2017,33 @@ export function ExaminationsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-surface-muted/30 p-3 rounded-md">
                 <div>
-                  <span className="text-[11px] uppercase font-semibold text-muted block">Sessions Held</span>
+                  <span className="text-[11px] uppercase font-semibold text-muted block">
+                    Sessions Held
+                  </span>
                   <span className="text-base font-bold text-foreground">
                     {selectedEvidenceCandidate.evidence_summary?.total_sessions ?? '—'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] uppercase font-semibold text-muted block">Attended</span>
+                  <span className="text-[11px] uppercase font-semibold text-muted block">
+                    Attended
+                  </span>
                   <span className="text-base font-bold text-green-700">
                     {selectedEvidenceCandidate.evidence_summary?.attended_sessions ?? '—'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] uppercase font-semibold text-muted block">Absent</span>
+                  <span className="text-[11px] uppercase font-semibold text-muted block">
+                    Absent
+                  </span>
                   <span className="text-base font-bold text-red-700">
                     {selectedEvidenceCandidate.evidence_summary?.absent_sessions ?? '—'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] uppercase font-semibold text-muted block">Excused</span>
+                  <span className="text-[11px] uppercase font-semibold text-muted block">
+                    Excused
+                  </span>
                   <span className="text-base font-bold text-foreground">
                     {selectedEvidenceCandidate.evidence_summary?.excused_sessions ?? '—'}
                   </span>
@@ -1823,7 +2051,9 @@ export function ExaminationsPage() {
               </div>
 
               <div>
-                <h4 className="text-xs font-semibold uppercase text-muted mb-2">Evaluation Details & Reasons</h4>
+                <h4 className="text-xs font-semibold uppercase text-muted mb-2">
+                  Evaluation Details & Reasons
+                </h4>
                 {selectedEvidenceCandidate.reasons.length === 0 ? (
                   <p className="text-xs text-muted">No specific notes recorded.</p>
                 ) : (
@@ -1876,12 +2106,21 @@ export function ExaminationsPage() {
               Override Candidate Eligibility — {selectedOverrideCandidate.student_name}
             </h3>
             <p className="text-xs text-muted mb-4 font-mono">
-              Admission: {selectedOverrideCandidate.admission_number} | Evaluated Status: {selectedOverrideCandidate.evaluation_status}
+              Admission: {selectedOverrideCandidate.admission_number} | Evaluated Status:{' '}
+              {selectedOverrideCandidate.evaluation_status}
             </p>
 
-            <form onSubmit={(e) => { void handleSaveOverride(e); }} className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                void handleSaveOverride(e);
+              }}
+              className="space-y-4"
+            >
               <div>
-                <label htmlFor="override-choice-select" className="block text-xs font-medium text-muted mb-1">
+                <label
+                  htmlFor="override-choice-select"
+                  className="block text-xs font-medium text-muted mb-1"
+                >
                   Override Decision
                 </label>
                 <select
@@ -1891,14 +2130,21 @@ export function ExaminationsPage() {
                   className="w-full h-9 px-2 text-sm rounded border border-input bg-surface"
                 >
                   <option value="NONE">NONE (Revert to Evaluated Status)</option>
-                  <option value="EXEMPTED">EXEMPTED (Administrative Waiver / Medical / Sports)</option>
-                  <option value="CONDITIONAL_APPROVAL">CONDITIONAL APPROVAL (Provisional Admit)</option>
+                  <option value="EXEMPTED">
+                    EXEMPTED (Administrative Waiver / Medical / Sports)
+                  </option>
+                  <option value="CONDITIONAL_APPROVAL">
+                    CONDITIONAL APPROVAL (Provisional Admit)
+                  </option>
                   <option value="DISQUALIFIED">DISQUALIFIED (Disciplinary / Barred)</option>
                 </select>
               </div>
 
               <div>
-                <label htmlFor="override-reason-input" className="block text-xs font-medium text-muted mb-1">
+                <label
+                  htmlFor="override-reason-input"
+                  className="block text-xs font-medium text-muted mb-1"
+                >
                   Override Justification / Reason (Mandatory)
                 </label>
                 <textarea
@@ -1921,11 +2167,7 @@ export function ExaminationsPage() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={savingOverride}
-                >
+                <Button type="submit" variant="primary" disabled={savingOverride}>
                   {savingOverride ? 'Applying...' : 'Apply Override'}
                 </Button>
               </div>

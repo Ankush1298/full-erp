@@ -30,12 +30,7 @@ const FINANCE_STUDENT: MeData = {
   actor_kind: 'STUDENT',
   display_name: 'Asha Student',
   roles: ['STUDENT'],
-  capabilities: [
-    'session.read',
-    'session.revoke',
-    'fee.dues.read',
-    'fee.receipt.read',
-  ],
+  capabilities: ['session.read', 'session.revoke', 'fee.dues.read', 'fee.receipt.read'],
 };
 
 function setupFinanceState(backend: ReturnType<typeof createFakeBackend>) {
@@ -155,7 +150,9 @@ describe('Fees & Finance Management Page', () => {
 
     const { container } = renderApp(backend, '/fees');
 
-    expect(await screen.findByRole('heading', { name: 'Fees & Finance Management' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Fees & Finance Management' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Overview & Collections' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Fee Structures/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Student Dues/ })).toBeInTheDocument();
@@ -178,7 +175,9 @@ describe('Fees & Finance Management Page', () => {
 
     renderApp(backend, '/fees');
 
-    expect(await screen.findByRole('heading', { name: 'Fees & Finance Management' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Fees & Finance Management' }),
+    ).toBeInTheDocument();
 
     // Switch to Fee Structures tab
     const structuresTab = screen.getByRole('button', { name: /Fee Structures/ });
@@ -275,8 +274,12 @@ describe('Fees & Finance Management Page', () => {
     const reverseBtn = await screen.findByRole('button', { name: 'Reverse Receipt' });
     await user.click(reverseBtn);
 
-    expect(await screen.findByRole('heading', { name: 'Confirm Receipt Reversal' })).toBeInTheDocument();
-    expect(screen.getByText(/CRITICAL ACTION: Reversing this receipt will restore student balances/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Confirm Receipt Reversal' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/CRITICAL ACTION: Reversing this receipt will restore student balances/),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/Mandatory Audit Reversal Reason/)).toBeInTheDocument();
 
     // Cancel modal
@@ -284,7 +287,9 @@ describe('Fees & Finance Management Page', () => {
     await user.click(cancelBtn);
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Confirm Receipt Reversal' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Confirm Receipt Reversal' }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -295,9 +300,13 @@ describe('Fees & Finance Management Page', () => {
     renderApp(backend, '/fees');
 
     // Student only sees "My Fee Ledger"
-    expect(await screen.findByRole('heading', { name: 'Fees & Finance Management' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Fees & Finance Management' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'My Fee Ledger' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Overview & Collections' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Overview & Collections' }),
+    ).not.toBeInTheDocument();
 
     // Verify ledger cards
     expect(await screen.findByText('Assessed Net Fees')).toBeInTheDocument();

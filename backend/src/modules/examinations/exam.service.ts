@@ -129,11 +129,7 @@ export class ExamService {
   }
 
   /** List examinations */
-  static async listExaminations(
-    tx: TenantTx,
-    ctx: TrustedContext,
-    query: ListExaminationsQuery,
-  ) {
+  static async listExaminations(tx: TenantTx, ctx: TrustedContext, query: ListExaminationsQuery) {
     ensureTrusted(ctx);
 
     const conditions: string[] = ['e.organization_id = $1'];
@@ -271,16 +267,15 @@ export class ExamService {
 
       return res.rows[0];
     } catch (err) {
-      return mapDbError(err, 'Failed to create exam schedule or schedule already exists for this course offering.');
+      return mapDbError(
+        err,
+        'Failed to create exam schedule or schedule already exists for this course offering.',
+      );
     }
   }
 
   /** List schedules for an examination */
-  static async listSchedules(
-    tx: TenantTx,
-    ctx: TrustedContext,
-    query: ListSchedulesQuery,
-  ) {
+  static async listSchedules(tx: TenantTx, ctx: TrustedContext, query: ListSchedulesQuery) {
     ensureTrusted(ctx);
 
     const conditions: string[] = ['s.organization_id = $1'];
@@ -404,13 +399,13 @@ export class ExamService {
      ORDER BY s.admission_number ASC
     `;
 
-    const res = await tx.query(sql, [
-      ctx.tenantId,
-      lower(scheduleId),
-      schedule.course_offering_id,
-    ]);
+    const res = await tx.query(sql, [ctx.tenantId, lower(scheduleId), schedule.course_offering_id]);
 
-    const candidateListRes = await tx.query<{ id: string; status: string; snapshot_version: number }>(
+    const candidateListRes = await tx.query<{
+      id: string;
+      status: string;
+      snapshot_version: number;
+    }>(
       `SELECT id, status, snapshot_version FROM app.exam_candidate_lists
         WHERE organization_id = $1 AND exam_schedule_id = $2
         ORDER BY snapshot_version DESC
@@ -491,7 +486,9 @@ export class ExamService {
       if (entry.status === 'ENTERED') {
         const val = Number(entry.marks_obtained);
         if (Number.isNaN(val) || val < 0 || val > maxMarks) {
-          throw invalid(`Marks obtained (${val}) cannot exceed maximum marks (${maxMarks}) or be negative.`);
+          throw invalid(
+            `Marks obtained (${val}) cannot exceed maximum marks (${maxMarks}) or be negative.`,
+          );
         }
       }
     }
@@ -502,9 +499,11 @@ export class ExamService {
     // Upsert marks
     for (const entry of input.entries) {
       const studentId = lower(entry.student_id);
-      const isAbsentOrExempt = entry.status === 'ABSENT' || entry.status === 'EXEMPT' || entry.status === 'WITHHELD';
+      const isAbsentOrExempt =
+        entry.status === 'ABSENT' || entry.status === 'EXEMPT' || entry.status === 'WITHHELD';
       const marksVal = isAbsentOrExempt ? null : entry.marks_obtained;
-      const isPassing = marksVal !== null && marksVal !== undefined ? Number(marksVal) >= passMarks : false;
+      const isPassing =
+        marksVal !== null && marksVal !== undefined ? Number(marksVal) >= passMarks : false;
 
       const upsertSql = `
         INSERT INTO app.exam_marks (
@@ -758,18 +757,18 @@ export class ExamService {
         [ctx.tenantId, lower(studentId), ctx.userId],
       );
       if (!studentMatch.rows[0]) {
-        throw new AppError(403, 'FORBIDDEN', 'Students may only access their own examination results.');
+        throw new AppError(
+          403,
+          'FORBIDDEN',
+          'Students may only access their own examination results.',
+        );
       }
     } else {
       await AuthorizationEngine.assert(tx, ctx, 'result.read');
     }
 
     // Students only ever see PUBLISHED results!
-    const conditions = [
-      'm.organization_id = $1',
-      'm.student_id = $2',
-      "s.status = 'PUBLISHED'",
-    ];
+    const conditions = ['m.organization_id = $1', 'm.student_id = $2', "s.status = 'PUBLISHED'"];
     const params: unknown[] = [ctx.tenantId, lower(studentId)];
 
     if (termId) {

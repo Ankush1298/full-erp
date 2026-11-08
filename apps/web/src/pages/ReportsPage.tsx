@@ -90,7 +90,11 @@ export function ReportsPage() {
       } else if (activeTab === 'exams') {
         await downloadReportCsv(client, 'exam-performance', 'examination-marks-summary.csv');
       } else if (activeTab === 'fees') {
-        await downloadReportCsv(client, 'fee-summary?view=defaulters', 'fee-collections-and-dues.csv');
+        await downloadReportCsv(
+          client,
+          'fee-summary?view=defaulters',
+          'fee-collections-and-dues.csv',
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'CSV export failed');
@@ -201,7 +205,9 @@ export function ReportsPage() {
       {loading ? (
         <div className="p-12 flex flex-col items-center justify-center min-h-[300px]">
           <Spinner />
-          <p className="mt-4 text-sm text-[var(--color-fg-muted)]">Generating administrative report...</p>
+          <p className="mt-4 text-sm text-[var(--color-fg-muted)]">
+            Generating administrative report...
+          </p>
         </div>
       ) : (
         <>
@@ -245,19 +251,38 @@ export function ReportsPage() {
                     <table className="w-full text-left text-sm">
                       <thead className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] text-[var(--color-fg-muted)]">
                         <tr>
-                          <th scope="col" className="p-3">Admission No</th>
-                          <th scope="col" className="p-3">Student Name</th>
-                          <th scope="col" className="p-3">Campus</th>
-                          <th scope="col" className="p-3">{labels.program || 'Program'}</th>
-                          <th scope="col" className="p-3">{labels.cohort || 'Cohort'}</th>
-                          <th scope="col" className="p-3">Primary Guardian</th>
-                          <th scope="col" className="p-3">Guardian Contact</th>
-                          <th scope="col" className="p-3">Status</th>
+                          <th scope="col" className="p-3">
+                            Admission No
+                          </th>
+                          <th scope="col" className="p-3">
+                            Student Name
+                          </th>
+                          <th scope="col" className="p-3">
+                            Campus
+                          </th>
+                          <th scope="col" className="p-3">
+                            {labels.program || 'Program'}
+                          </th>
+                          <th scope="col" className="p-3">
+                            {labels.cohort || 'Cohort'}
+                          </th>
+                          <th scope="col" className="p-3">
+                            Primary Guardian
+                          </th>
+                          <th scope="col" className="p-3">
+                            Guardian Contact
+                          </th>
+                          <th scope="col" className="p-3">
+                            Status
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--color-border-subtle)]">
                         {rosterData.students.map((s) => (
-                          <tr key={s.student_id} className="hover:bg-[var(--color-bg-subtle)] transition-colors">
+                          <tr
+                            key={s.student_id}
+                            className="hover:bg-[var(--color-bg-subtle)] transition-colors"
+                          >
                             <td className="p-3 font-mono font-medium text-[var(--color-fg-default)]">
                               {s.admission_number}
                             </td>
@@ -265,8 +290,12 @@ export function ReportsPage() {
                               {s.student_name}
                             </td>
                             <td className="p-3 text-[var(--color-fg-muted)]">{s.campus_name}</td>
-                            <td className="p-3 text-[var(--color-fg-default)]">{s.program_name ?? '—'}</td>
-                            <td className="p-3 text-[var(--color-fg-muted)]">{s.cohort_name ?? '—'}</td>
+                            <td className="p-3 text-[var(--color-fg-default)]">
+                              {s.program_name ?? '—'}
+                            </td>
+                            <td className="p-3 text-[var(--color-fg-muted)]">
+                              {s.cohort_name ?? '—'}
+                            </td>
                             <td className="p-3 text-[var(--color-fg-default)]">
                               {s.primary_guardian_name ?? 'Not Listed'}
                             </td>
@@ -352,34 +381,69 @@ export function ReportsPage() {
                     <table className="w-full text-left text-sm">
                       <thead className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] text-[var(--color-fg-muted)]">
                         <tr>
-                          <th scope="col" className="p-3">Course / Subject</th>
-                          <th scope="col" className="p-3">Campus</th>
-                          <th scope="col" className="p-3">Faculty</th>
-                          <th scope="col" className="p-3">Status</th>
-                          <th scope="col" className="p-3 text-right">Present</th>
-                          <th scope="col" className="p-3 text-right">Absent</th>
-                          <th scope="col" className="p-3 text-right">Late</th>
-                          <th scope="col" className="p-3 text-right">Attendance %</th>
+                          <th scope="col" className="p-3">
+                            Course / Subject
+                          </th>
+                          <th scope="col" className="p-3">
+                            Campus
+                          </th>
+                          <th scope="col" className="p-3">
+                            Faculty
+                          </th>
+                          <th scope="col" className="p-3">
+                            Status
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Present
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Absent
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Late
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Attendance %
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--color-border-subtle)]">
                         {attendanceData.sessions.map((s) => (
-                          <tr key={s.session_id} className="hover:bg-[var(--color-bg-subtle)] transition-colors">
+                          <tr
+                            key={s.session_id}
+                            className="hover:bg-[var(--color-bg-subtle)] transition-colors"
+                          >
                             <td className="p-3">
-                              <div className="font-medium text-[var(--color-fg-default)]">{s.course_name}</div>
-                              <div className="text-xs font-mono text-[var(--color-fg-muted)]">{s.course_code}</div>
+                              <div className="font-medium text-[var(--color-fg-default)]">
+                                {s.course_name}
+                              </div>
+                              <div className="text-xs font-mono text-[var(--color-fg-muted)]">
+                                {s.course_code}
+                              </div>
                             </td>
                             <td className="p-3 text-[var(--color-fg-muted)]">{s.campus_name}</td>
                             <td className="p-3 text-[var(--color-fg-default)]">{s.teacher_name}</td>
                             <td className="p-3">
                               <StatusBadge
-                                status={s.attendance_state === 'SUBMITTED' ? 'confirmed' : 'pending'}
-                                label={s.attendance_state === 'SUBMITTED' ? 'Conducted' : 'Missing Register'}
+                                status={
+                                  s.attendance_state === 'SUBMITTED' ? 'confirmed' : 'pending'
+                                }
+                                label={
+                                  s.attendance_state === 'SUBMITTED'
+                                    ? 'Conducted'
+                                    : 'Missing Register'
+                                }
                               />
                             </td>
-                            <td className="p-3 text-right font-medium text-emerald-600">{s.present_count}</td>
-                            <td className="p-3 text-right font-medium text-rose-600">{s.absent_count}</td>
-                            <td className="p-3 text-right text-[var(--color-fg-muted)]">{s.late_count}</td>
+                            <td className="p-3 text-right font-medium text-emerald-600">
+                              {s.present_count}
+                            </td>
+                            <td className="p-3 text-right font-medium text-rose-600">
+                              {s.absent_count}
+                            </td>
+                            <td className="p-3 text-right text-[var(--color-fg-muted)]">
+                              {s.late_count}
+                            </td>
                             <td className="p-3 text-right font-semibold text-[var(--color-fg-default)]">
                               {s.total_marked > 0 ? `${s.attendance_percentage}%` : '—'}
                             </td>
@@ -439,41 +503,78 @@ export function ReportsPage() {
                     <table className="w-full text-left text-sm">
                       <thead className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] text-[var(--color-fg-muted)]">
                         <tr>
-                          <th scope="col" className="p-3">Examination</th>
-                          <th scope="col" className="p-3">Subject / Course</th>
-                          <th scope="col" className="p-3">Date</th>
-                          <th scope="col" className="p-3 text-right">Max Marks</th>
-                          <th scope="col" className="p-3 text-right">Appeared</th>
-                          <th scope="col" className="p-3 text-right">Passed</th>
-                          <th scope="col" className="p-3 text-right">Pass %</th>
-                          <th scope="col" className="p-3 text-right">Average</th>
-                          <th scope="col" className="p-3 text-right">Highest</th>
+                          <th scope="col" className="p-3">
+                            Examination
+                          </th>
+                          <th scope="col" className="p-3">
+                            Subject / Course
+                          </th>
+                          <th scope="col" className="p-3">
+                            Date
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Max Marks
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Appeared
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Passed
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Pass %
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Average
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Highest
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--color-border-subtle)]">
                         {examData.schedules.map((s) => (
-                          <tr key={s.schedule_id} className="hover:bg-[var(--color-bg-subtle)] transition-colors">
+                          <tr
+                            key={s.schedule_id}
+                            className="hover:bg-[var(--color-bg-subtle)] transition-colors"
+                          >
                             <td className="p-3">
-                              <div className="font-medium text-[var(--color-fg-default)]">{s.examination_name}</div>
-                              <div className="text-xs text-[var(--color-fg-muted)]">{s.exam_type}</div>
+                              <div className="font-medium text-[var(--color-fg-default)]">
+                                {s.examination_name}
+                              </div>
+                              <div className="text-xs text-[var(--color-fg-muted)]">
+                                {s.exam_type}
+                              </div>
                             </td>
                             <td className="p-3">
-                              <div className="font-medium text-[var(--color-fg-default)]">{s.course_name}</div>
-                              <div className="text-xs font-mono text-[var(--color-fg-muted)]">{s.course_code}</div>
+                              <div className="font-medium text-[var(--color-fg-default)]">
+                                {s.course_name}
+                              </div>
+                              <div className="text-xs font-mono text-[var(--color-fg-muted)]">
+                                {s.course_code}
+                              </div>
                             </td>
-                            <td className="p-3 text-[var(--color-fg-muted)] font-mono text-xs">{s.exam_date}</td>
-                            <td className="p-3 text-right text-[var(--color-fg-muted)]">{s.max_marks}</td>
+                            <td className="p-3 text-[var(--color-fg-muted)] font-mono text-xs">
+                              {s.exam_date}
+                            </td>
+                            <td className="p-3 text-right text-[var(--color-fg-muted)]">
+                              {s.max_marks}
+                            </td>
                             <td className="p-3 text-right font-medium text-[var(--color-fg-default)]">
                               {s.appeared_count}
                             </td>
-                            <td className="p-3 text-right font-medium text-emerald-600">{s.passed_count}</td>
+                            <td className="p-3 text-right font-medium text-emerald-600">
+                              {s.passed_count}
+                            </td>
                             <td className="p-3 text-right font-semibold text-[var(--color-fg-default)]">
                               {s.pass_percentage}%
                             </td>
                             <td className="p-3 text-right font-medium text-[var(--color-fg-default)]">
                               {s.average_marks}
                             </td>
-                            <td className="p-3 text-right font-medium text-indigo-600">{s.highest_marks}</td>
+                            <td className="p-3 text-right font-medium text-indigo-600">
+                              {s.highest_marks}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -533,25 +634,50 @@ export function ReportsPage() {
                     <table className="w-full text-left text-sm">
                       <thead className="bg-[var(--color-bg-subtle)] border-b border-[var(--color-border-subtle)] text-[var(--color-fg-muted)]">
                         <tr>
-                          <th scope="col" className="p-3">Admission No</th>
-                          <th scope="col" className="p-3">Student Name</th>
-                          <th scope="col" className="p-3">Due Number</th>
-                          <th scope="col" className="p-3">Due Date</th>
-                          <th scope="col" className="p-3 text-right">Net Billed</th>
-                          <th scope="col" className="p-3 text-right">Confirmed Paid</th>
-                          <th scope="col" className="p-3 text-right">Balance Due</th>
-                          <th scope="col" className="p-3">In-Flight Clearing</th>
+                          <th scope="col" className="p-3">
+                            Admission No
+                          </th>
+                          <th scope="col" className="p-3">
+                            Student Name
+                          </th>
+                          <th scope="col" className="p-3">
+                            Due Number
+                          </th>
+                          <th scope="col" className="p-3">
+                            Due Date
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Net Billed
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Confirmed Paid
+                          </th>
+                          <th scope="col" className="p-3 text-right">
+                            Balance Due
+                          </th>
+                          <th scope="col" className="p-3">
+                            In-Flight Clearing
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--color-border-subtle)]">
                         {feeData.defaulters.map((d) => (
-                          <tr key={d.due_number} className="hover:bg-[var(--color-bg-subtle)] transition-colors">
+                          <tr
+                            key={d.due_number}
+                            className="hover:bg-[var(--color-bg-subtle)] transition-colors"
+                          >
                             <td className="p-3 font-mono font-medium text-[var(--color-fg-default)]">
                               {d.admission_number}
                             </td>
-                            <td className="p-3 font-medium text-[var(--color-fg-default)]">{d.student_name}</td>
-                            <td className="p-3 font-mono text-xs text-[var(--color-fg-muted)]">{d.due_number}</td>
-                            <td className="p-3 text-xs text-[var(--color-fg-muted)]">{d.due_date}</td>
+                            <td className="p-3 font-medium text-[var(--color-fg-default)]">
+                              {d.student_name}
+                            </td>
+                            <td className="p-3 font-mono text-xs text-[var(--color-fg-muted)]">
+                              {d.due_number}
+                            </td>
+                            <td className="p-3 text-xs text-[var(--color-fg-muted)]">
+                              {d.due_date}
+                            </td>
                             <td className="p-3 text-right text-[var(--color-fg-muted)]">
                               {formatCurrency(d.net_amount)}
                             </td>
@@ -565,7 +691,9 @@ export function ReportsPage() {
                               {d.has_unverified_receipt ? (
                                 <StatusBadge status="pending" label="Cheque in Clearing" />
                               ) : (
-                                <span className="text-xs text-[var(--color-fg-muted)]">No In-Flight Ref</span>
+                                <span className="text-xs text-[var(--color-fg-muted)]">
+                                  No In-Flight Ref
+                                </span>
                               )}
                             </td>
                           </tr>
