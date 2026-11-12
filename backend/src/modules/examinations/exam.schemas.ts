@@ -113,6 +113,19 @@ export const StudentMarkEntrySchema = z
 export const SaveMarksSchema = z.object({
   action: z.enum(['DRAFT', 'SUBMIT']).default('DRAFT'),
   entries: z.array(StudentMarkEntrySchema).min(1),
+  allow_early_entry: z.boolean().optional(),
+  early_entry_reason: z.string().optional(),
+});
+
+export const CorrectMarksSchema = z.object({
+  student_id: z.string().uuid(),
+  status: MarkStatusSchema.default('ENTERED'),
+  marks_obtained: z.coerce.number().min(0).max(10000).optional().nullable(),
+  reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(500),
+  evidence_url: z.string().url().optional().nullable(),
+  evidence_exception: z.boolean().default(false),
+  is_amendment: z.boolean().default(false),
+  remarks: z.string().max(500).optional().nullable(),
 });
 
 export const ListExaminationsQuerySchema = z.object({
@@ -132,5 +145,6 @@ export type UpdateExaminationInput = z.infer<typeof UpdateExaminationSchema>;
 export type CreateScheduleInput = z.infer<typeof CreateScheduleSchema>;
 export type StudentMarkEntry = z.infer<typeof StudentMarkEntrySchema>;
 export type SaveMarksInput = z.infer<typeof SaveMarksSchema>;
+export type CorrectMarksInput = z.infer<typeof CorrectMarksSchema>;
 export type ListExaminationsQuery = z.infer<typeof ListExaminationsQuerySchema>;
 export type ListSchedulesQuery = z.infer<typeof ListSchedulesQuerySchema>;

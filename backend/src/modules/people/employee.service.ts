@@ -16,6 +16,8 @@ import {
   type EmployeeType,
   type ListEmployeesQuery,
   type UpdateEmployeeBody,
+  type EmployeeSearchQuery,
+  type EmployeeSearchResultDto,
 } from './employee.schemas.js';
 import { lockPersonIdentity } from '../../shared/authorization/person-identity.js';
 import { invalid, parseDate, parseReason } from './validation.js';
@@ -351,6 +353,141 @@ export class EmployeeService {
       params,
     );
     return res.rows.map(toDto);
+  }
+
+  /**
+   * Search active employees for assignment selector (Defect #7).
+   * Authorized for callers with 'academic.faculty.assign' or 'employee.profile.read'.
+   * Searches by display name, employee code, or email. Returns minimal data needed for selector.
+   */
+  static async search(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    query: EmployeeSearchQuery = {},
+  ): Promise<EmployeeSearchResultDto[]> {
+    ensureTrusted(ctx);
+
+    if (query.campusId && !isUuidV7(query.campusId)) {
+      throw invalid('Invalid campus ID.');
+    }
+
+    const facultyGrants = await AuthorizationEngine.loadGrants(tx, ctx, 'academic.faculty.assign');
+    const profileGrants = await AuthorizationEngine.loadGrants(tx, ctx, 'employee.profile.read');
+    const allGrants = [...facultyGrants, ...profileGrants];
+    if (allGrants.length === 0) {
+      throw new AppError(403, 'FORBIDDEN', 'Access denied.');
+    }
+
+    const isOrgWide = allGrants.some(
+      (g) => g.scope_mode === 'GRANTED' && g.scope_type === 'ORGANIZATION',
+    );
+    const campusIds = [
+      ...new Set(
+        allGrants
+          .filter(
+            (g) => g.scope_mode === 'GRANTED' && g.scope_type === 'CAMPUS' && g.scope_id !== null,
+          )
+          .map((g) => g.scope_id as string),
+      ),
+    ];
+
+    if (!isOrgWide && campusIds.length === 0) {
+      return [];
+    }
+
+    if (query.campusId && !isOrgWide && !campusIds.includes(query.campusId)) {
+      return [];
+    }
+
+    const conditions = [
+      'e.organization_id = $1',
+      "e.status = 'ACTIVE'",
+    ];
+    const params: unknown[] = [ctx.tenantId];
+
+    if (query.campusId) {
+      params.push(query.campusId);
+      conditions.push(`d.campus_id = $${params.length}`);
+    } else if (!isOrgWide && campusIds.length > 0) {
+      params.push(campusIds);
+      conditions.push(`d.campus_id = ANY($${params.length}::uuid[])`);
+    }
+
+    const trimmedQ = (query.q ?? '').trim();
+    if (trimmedQ) {
+      const escaped = trimmedQ.replace(/[%_\\]/g, '\\$&');
+      params.push(`%${escaped}%`);
+      const qParamIdx = params.length;
+      conditions.push(
+        `(u.display_name ILIKE $${qParamIdx} ESCAPE '\\' OR e.employee_code ILIKE $${qParamIdx} ESCAPE '\\' OR u.email ILIKE $${qParamIdx} ESCAPE '\\')`,
+      );
+    }
+
+    let orderClause = 'u.display_name ASC, e.employee_code ASC';
+    if (trimmedQ) {
+      params.push(trimmedQ.toLowerCase());
+      const exactIdx = params.length;
+      orderClause = `
+        CASE
+          WHEN lower(e.employee_code) = $${exactIdx} THEN 0
+          WHEN lower(u.display_name) = $${exactIdx} THEN 1
+          WHEN lower(u.display_name) LIKE $${exactIdx} || '%' THEN 2
+          ELSE 3
+        END,
+        u.display_name ASC,
+        e.employee_code ASC
+      `;
+    }
+
+    const limit = Math.min(query.limit ?? 25, 50);
+    params.push(limit);
+    const limitIdx = params.length;
+
+    const res = await tx.query<{
+      id: string;
+      employee_code: string;
+      display_name: string;
+      email: string;
+      campus_id: string;
+      campus_name: string;
+    }>(
+      `SELECT
+         e.id,
+         e.employee_code,
+         u.display_name,
+         u.email,
+         c.id AS campus_id,
+         c.name AS campus_name
+       FROM app.employees e
+       JOIN app.users u
+         ON u.organization_id = e.organization_id
+        AND u.id = e.user_id
+       JOIN app.employee_postings p
+         ON p.organization_id = e.organization_id
+        AND p.employee_id = e.id
+        AND p.is_primary = true
+        AND p.valid_to IS NULL
+       JOIN app.departments d
+         ON d.organization_id = p.organization_id
+        AND d.id = p.department_id
+       JOIN app.campuses c
+         ON c.organization_id = d.organization_id
+        AND c.id = d.campus_id
+        AND p.valid_from <= (now() AT TIME ZONE c.timezone)::date
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY ${orderClause}
+       LIMIT $${limitIdx}`,
+      params,
+    );
+
+    return res.rows.map((r) => ({
+      id: r.id,
+      employeeCode: r.employee_code,
+      displayName: r.display_name,
+      email: r.email,
+      campusId: r.campus_id,
+      campusName: r.campus_name,
+    }));
   }
 
   /**

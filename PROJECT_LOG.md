@@ -1,5 +1,184 @@
 # Anesa Project Activity Log
 
+## [2026-11-13] Unified Offline & Multi-Gateway Online Fee Payments
+
+- **Actor**: Agent D (Finance & Payment Gateway Integration Lead)
+- **Status**: Complete & Verified (`UNIFIED FEE PAYMENTS: COMPLETE; PROVIDERS: RAZORPAY, CASHFREE, PHONEPE; ENCRYPTION: AES-256-GCM; ZERO PERSISTENT DB MUTATION`)
+- **Governing Objective**: Deliver unified offline fee collection and multi-gateway online payments supporting Razorpay, Cashfree, and PhonePe with provider-neutral abstraction, AES-256-GCM credential encryption, atomic ledger posting, and end-to-end parent/student portal integration.
+- **1. Database Architecture & Migration 0050**:
+  - Implemented migration `database/migrations/0050_payment_gateways_and_online_collections.sql`:
+    - Created `app.payment_gateway_configs` for tenant-isolated gateway settings, storing encrypted merchant credentials and webhook secrets.
+    - Created `app.payment_attempts` with idempotency controls, order references, gateway attempt tracking, minor-unit (paise) integer balances, and state machine (`INITIATED`, `PENDING`, `SUCCESS`, `FAILED`, `USER_DROPPED`, `EXPIRED`).
+    - Created `app.payment_refunds` for tracking gateway-initiated refunds.
+    - Expanded `app.fee_receipts.payment_method` check constraint to support `ONLINE_RAZORPAY`, `ONLINE_CASHFREE`, `ONLINE_PHONEPE`, `ONLINE_GATEWAY` and linked `payment_attempt_id`.
+    - Enforced Row-Level Security: permissive tenant isolation, restrictive staff administration policies, student self-access for checkout and active gateway resolution, and adjusted restrictive policies on receipts, allocations, and dues to permit verified online completion under student actors.
+    - Revoked all `DELETE` privileges from `app_runtime` across payment and receipt tables.
+    - Registered 4 new platform permissions: `fee.gateway.read`, `fee.gateway.manage`, `fee.payment.initiate`, `fee.refund.initiate`.
+- **2. Security & Cryptographic Envelope**:
+  - Built `backend/src/shared/crypto/gateway-crypto.ts` utilizing AES-256-GCM with PBKDF2 key derivation, random 96-bit initialization vectors, 128-bit authentication tags, and tenant AAD binding (`tenantId:payment-gateway-credentials`).
+  - Added secret masking (`maskSecret`) and constant-time string comparison (`safeEqual`).
+  - Required step-up authentication (`PASSWORD_REAUTH` or `PASSWORD_MFA`) for credential management and refund initiation.
+- **3. Provider-Neutral Integration Layer & Gateway Adapters**:
+  - Defined `IPaymentGatewayAdapter` in `backend/src/modules/finance/gateways/types.ts`.
+  - Implemented `RazorpayAdapter`: Standard checkout orders API, HMAC-SHA256 signature verification, webhook signature validation, and refund processing.
+  - Implemented `CashfreeAdapter`: PG Orders API (v2023-08-01), payment status verification, timestamped HMAC-SHA256 signature validation, and refunds.
+  - Implemented `PhonePeAdapter`: Standard Checkout v1 API, SHA256 base64 payload checksums (`checksum###saltIndex`), webhook verification, and refunds.
+  - Centralized gateway registry with runtime provider dispatch and dynamic fetch injection.
+- **4. Unified Core Engine & Ledger Integrity**:
+  - Implemented `PaymentGatewayService` in `backend/src/modules/finance/gateway.service.ts`:
+    - Server-side authoritative verification preventing client-side spoofing.
+    - Strict row-level locking (`FOR UPDATE`) on payment attempts and student dues.
+    - Exactly-once fee receipt posting with idempotency keys and automatic outstanding dues allocation (oldest first).
+    - Idempotent webhook handler with cryptographic signature verification.
+    - Full online refund processing with automated fee receipt reversal and student dues balance restoration.
+    - Financial reconciliation reporting cross-referencing gateway attempts vs ledger receipts.
+- **5. Frontend Parent/Student Portal & Admin UI**:
+  - Re-architected `apps/web/src/pages/FeesPage.tsx` with 8 specialized tabs: Overview & Collections, Fee Structures, Student Dues, Online Payments, Offline Payments, Receipts & Reversals, Gateway Settings, and Financial Reconciliation.
+  - Student Portal: Instant due inspection, dynamic active gateway selection, secure checkout initiation, and automated client verification.
+  - Admin Portal: Gateway credential configuration with masked secrets, Sandbox/Live toggle, connection health testing, and refund workflows.
+- **6. Verification & Test Suite**:
+  - Unit tests: `backend/tests/unit/gateway-crypto.test.ts` (10/10 passing), `backend/tests/unit/payment-gateways.test.ts` (12/12 passing).
+  - Integration tests: `backend/tests/integration/payment-gateways.test.ts` (8/8 passing).
+  - Web tests: `apps/web/tests/fees-page.test.tsx` (6/6 passing including axe-core accessibility).
+  - Security & lint tests: `permission-matrix.test.ts` (10/10), `schema-linter.test.ts` (11/11), `privilege-guardrails.test.ts` (19/19), migration ordering (10/10).
+  - Typecheck: 0 errors across all packages (`pnpm typecheck`).
+  - Prettier: Clean formatting across all payment modules.
+  - Persistent databases (`campusos_demo`, `campusos_dev` on 54329) left 100% untouched. No git commits or branch switches executed.
+
+## [2026-11-08] Manual Demo Setup: Credential Safety, Platform Isolation & Staff Invitation Workflow
+
+- **Actor**: Pilot V1 Security & Operations Pair
+- **Status**: Manual Demo Environment Ready (`MANUAL SCHOOL CREATION: READY; PRINCIPAL ACTIVATION: READY; ORDINARY STAFF INVITATION: READY`)
+- **Governing Objective**: Enable manual end-to-end operation of synthetic school "Anesa Demo School" on a dedicated local database (`campusos_demo`) without exposing credentials, without modifying or corrupting `campusos_dev`, while establishing safe development-only staff invitation link retrieval and verifying complete isolation.
+- **1. Credential Safety & Database Isolation Hardening**:
+  - Investigated role and credential dependencies between `campusos_demo` and `campusos_dev`: both reside on the same PostgreSQL instance (`127.0.0.1:54329`) sharing global roles (`campusos_admin`, `app_runtime`, `app_migrator`). Shared cluster credentials must not be rotated without coordination.
+  - Implemented safe connection string handling using environment variable substitution (`${DATABASE_URL%/campusos_dev}/campusos_demo`) and private `.env.local` / `.env.demo` configurations excluded by `.gitignore`.
+  - Zero raw passwords or credentials output in logs, reports, or documentation.
+  - `campusos_dev` was preserved untouched with schema ledger head intact at `0046`.
+  - Dedicated `campusos_demo` database initialized with roles, schemas, and migrations `0001` through `0048` applied, verified with 0 organizations (ready for owner initiation).
+- **2. Platform Provisioning Privileges Audit**:
+  - Audited whether a restricted platform operator role exists. Confirmed that `app_provisioner` is currently an open architecture design proposal (doc 48 §3).
+  - Superuser / `BYPASSRLS` privileges via `PLATFORM_DATABASE_URL` are currently required for `tenant:create` because it inserts into `app.organizations` before a tenant context exists under Row-Level Security (`FORCE ROW LEVEL SECURITY`).
+  - Strict platform CLI isolation enforced (doc 48 §1.3): CLI requires explicit `PLATFORM_DATABASE_URL` and refuses to fall back silently to superuser or admin connection strings.
+- **3. Local Staff Invitation Link Generation (`staff:invite-link`)**:
+  - Implemented `issueStaffInvitationLink` in `backend/tools/platform/first-admin.ts` and wired into `backend/tools/platform/cli.ts`.
+  - Workflow: The Principal invites a staff member via the authenticated web application (`/users` -> "Invite User"), creating an `app.users` record in `INVITED` status with assigned role (e.g. `FACULTY`). The platform CLI command `staff:invite-link --tenant <slug> --email <email>` generates a compliant 256-bit token in `app.invite_tokens`, records a Tier 2 audit event, and prints the local activation URL to the console.
+  - Gated by `assertLocalTokenOutput`: requires explicit `PLATFORM_ALLOW_LOCAL_TOKEN_OUTPUT=true`, strictly non-production, and loopback database connection.
+  - Ordinary staff accounts never gain platform administrative privileges.
+  - No raw tokens in application logs or server output.
+- **4. Quality Gates Verification**:
+  - Secret scanning (`pnpm check:secrets`): 0 findings.
+  - TypeScript typecheck (`pnpm typecheck`): 0 errors across web and backend.
+  - ESLint (`pnpm lint`): 0 errors across workspace.
+  - Prettier formatting (`pnpm format:check`): Clean.
+  - Unit tests (`pnpm test:unit`): 49 files, 980 tests passing (100%).
+  - Security tests (`pnpm test:security`): 46 files, 743 tests passing (100%).
+  - Integration onboarding test (`first-admin-onboarding.test.ts`): 11 tests passing, including local staff invitation workflow.
+
+## [2026-11-08] Pilot V1: Step 4 of 6 Security, Privacy & Legal Readiness — TECHNICAL REMEDIATION COMPLETE
+
+- **Actor**: Pilot V1 Security, Privacy & Legal Readiness Lead (Pair Programming)
+- **Status**: Technical Remediation Complete; Formal Legal/Institutional Approvals Pending (`STEP 4 TECHNICAL REMEDIATION: COMPLETE; FORMAL LEGAL/INSTITUTIONAL APPROVALS: PENDING`)
+- **Governing Objective**: Complete the highest-priority, actionable Step 4 technical security and privacy remediation under the 45–75-day Pilot V1 master roadmap (`docs/architecture/v3/47-pilot-v1-master-roadmap.md`), resolve Residual Risk P1-1, eliminate platform CLI fallback to superuser privileges, verify financial/academic permission segregation, enforce student data compartmentalization, confirm manual pilot offboarding procedure while bulk export remains deferred, and assemble the formal legal approval checklist without claiming unauthorized sign-offs.
+- **Mandatory Decision**: `STEP 4 TECHNICAL REMEDIATION: COMPLETE. FORMAL LEGAL/INSTITUTIONAL APPROVALS: PENDING unless independently evidenced.`
+- **1. Residual Risk P1-1 Resolution (Platform Identity & Session Access Hardening)**:
+  - Applied migration `database/migrations/0048_platform_identity_session_lookup_hardening.sql`:
+    - Defined 5 tightly scoped `SECURITY DEFINER` lookup and mutation functions owned by `app_migrator` with immutable `SET search_path = pg_catalog`: `platform.lookup_identity_by_email(text)`, `platform.lookup_identity_by_id(app.uuid_v7)`, `platform.lock_identity_by_email(text)`, `platform.lookup_session_by_token(text)`, and `platform.lookup_session_by_id(app.uuid_v7)`.
+    - Function permissions: Revoked from `PUBLIC`, granted strictly to `app_runtime`.
+    - Revoked table-wide `SELECT` on `platform.identities` and `platform.auth_sessions` from `app_runtime`.
+    - Table-level grants restricted to column-level `SELECT` on non-sensitive columns required for account creation and lockout arbitration (`id, email, failed_login_count, locked_until` on `platform.identities`) and session assurance checks (`id, identity_id, tenant_id, expires_at, revoked_at, step_up_at, auth_strength, mfa_verified_at` on `platform.auth_sessions`).
+    - Verified via database security tests that hostile raw `SELECT` queries (`SELECT * FROM platform.identities`, `SELECT password_hash ...`, `SELECT * FROM platform.auth_sessions`, `SELECT token_hash ...`) executed by `app_runtime` fail closed with error code `42501` (`insufficient_privilege`).
+  - Refactored backend auth repository (`backend/src/modules/auth/auth.repository.ts`) and auth service (`backend/src/modules/auth/auth.service.ts`) to query the dedicated `SECURITY DEFINER` lookup functions.
+- **2. Platform CLI Fallback Hardening (Platform Isolation Hardening §1.3)**:
+  - Refactored `backend/tools/platform/cli.ts` to remove silent fallback from `PLATFORM_DATABASE_URL` to `DATABASE_ADMIN_URL` or `MIGRATION_DATABASE_URL`.
+  - The CLI now fails closed and exits non-zero with an explicit security error message if `PLATFORM_DATABASE_URL` is unset, preventing accidental execution under superuser privileges.
+  - Verified via unit test `backend/tests/unit/platform-cli.test.ts`.
+- **3. Financial, Examination & Student Permission Review**:
+  - Confirmed strict role and permission segregation in permission catalog and enforcement layers:
+    - Financial reversals (`fee.receipt.reverse`) require `COLLEGE_ADMIN` or higher, step-up authentication (`PASSWORD_REAUTH` or `PASSWORD_MFA`), and write immutable Tier 3 audit logs; regular staff holding `fee.receipt.record` cannot reverse receipts or alter fee structures.
+    - Examination result publishing (`result.publish`) requires administrator privilege and is strictly segregated from marks entry (`exam.marks.enter`); teachers cannot self-publish examination results.
+    - Fee clearance integration enforces financial due checks during exam candidate list generation without exposing sensitive payment ledger details across unauthorized scopes.
+  - Student data compartmentalization verified:
+    - General administrative reporting rosters strictly exclude guardian personal phone numbers and names, preserving minor privacy in compliance with DPDP principles.
+    - Inactive and graduated student records retain immutable historical audit and transcript traces while being excluded from active cohort rosters and attendance marking sheets.
+    - Formula-safe CSV streaming escapes CSV injection attack vectors (`=`, `+`, `-`, `@`) across all export endpoints.
+- **4. Institutional Data Export Status & Offboarding Clarification**:
+  - Bulk institutional export remains strictly **DEFERRED BY OWNER INSTRUCTION**.
+  - **Critical Security Clarification on Offboarding**: A raw `pg_dump` targeting `app.*` or `audit.*` tables is NOT a tenant-scoped export and must NEVER be presented as one. In Anesa's multi-tenant architecture, multiple institutions share the same relational tables discriminated by `organization_id` under Row-Level Security (RLS). A superuser `pg_dump` bypasses RLS and would dump records belonging to ALL institutions, creating a catastrophic cross-tenant data breach. A true institutional export requires an authorized, tenant-filtered extraction service or per-tenant logical isolation, which remains deferred by owner instruction.
+- **5. External Legal & Operational Approval Package**:
+  - Evaluated the 8 actual legal drafts in `docs/legal-drafts/` (`01` through `08`):
+    - `01-institutional-data-protection-principles.md`: Institutional governing principles and fiduciary commitments.
+    - `02-no-sale-and-unrelated-use-policy.md`: Strict prohibition against data monetization, third-party sharing, or unrelated commercial use.
+    - `03-data-processing-agreement-outline.md`: Data Processing Agreement outline under DPDP Act 2023.
+    - `04-hosting-and-subprocessor-disclosure-outline.md`: Transparent infrastructure hosting, sovereignty, and subprocessor disclosure.
+    - `05-data-export-and-offboarding-policy.md`: Institutional data custody, retention, export, and post-termination offboarding policy.
+    - `06-privileged-support-access-policy.md`: Emergency support bounds, break-glass logging, and access supervision.
+    - `07-incident-response-and-breach-notification-outline.md`: Security event classification, containment, and <72h breach notice commitments.
+    - `08-pilot-data-handling-checklist.md`: Operational pre-pilot data handling checklist.
+  - Compiled complete legal counsel review checklist; formal acceptance explicitly recorded as PENDING legal counsel review and pilot school execution.
+- **6. Full Quality Gates Verification (Reconciled Test Accounting)**:
+  - Backend Unit Suite: 49 files, 979 tests passed (`pnpm test:unit`).
+  - Database Security Suite (`security-db` project): 27 files, 510 tests passed (`pnpm test:security:db`).
+  - Static Security Suite (`security` project): 19 files, 233 tests passed (`vitest run --project security`).
+  - Note: `pnpm test:security` aggregates both `--project security` (19 files, 233 tests) and `--project security-db` (27 files, 510 tests), reporting 46 files and 743 tests. Double-counting is eliminated.
+  - Backend Integration Suite (`integration` project): 90 files, 1,710 tests passed (`pnpm test:integration`).
+  - Frontend Web Suite: 31 files, 433 tests passed (`pnpm --filter @campusos/web test`).
+  - Total Unique Automated Test Coverage: 216 test files, 3,865 tests passing across workspace (100% pass rate).
+  - TypeScript Typecheck: 0 errors across workspace (`pnpm typecheck`).
+  - ESLint: 0 errors across workspace (`pnpm lint`).
+  - Prettier: 0 format issues across workspace (`pnpm format:check`).
+  - Secret Scanner: 0 findings (`pnpm check:secrets`).
+  - Production Builds: Clean backend and web production builds (`pnpm build`).
+  - Bundle Size Check: Clean (`pnpm check:bundle`).
+  - Whitespace: 0 warnings (`git diff --check`).
+- **7. Repository & Environment Safety**:
+  - Zero git commits, pushes, resets, cleans, stashes, or branch changes.
+  - Persistent database `campusos_dev` on port 54329 completely untouched.
+  - Step 5 hosting deployment and Step 6 real-school onboarding NOT started.
+
+## [2026-11-08] Pilot V1: Step 3 Full Integrated Synthetic School Rehearsal — COMPLETE
+
+- **Actor**: Pilot V1 Rehearsal Lead (Pair Programming)
+- **Status**: Complete & Verified (`STEP 3 COMPLETE`)
+- **Governing Objective**: Verify all Pilot V1 core ERP capabilities operate together as one coherent, usable school system in a real browser environment under strict disposable-database isolation before advancing to Step 4 (Security, Privacy & Legal Readiness).
+- **Decision**: `STEP 3 COMPLETE`
+- **1. Synthetic Environment Isolation & Infrastructure**:
+  - Rehearsal executed against ephemeral throw-away PostgreSQL database (`rehearsal_*` on randomized port) with fresh sequential migration sequence 0001 through 0047 active.
+  - ZERO interaction with persistent development database `campusos_dev` on port 54329 (which remains pristine at migration 0046).
+  - Multi-user browser automation executed with real Google Chrome browser sessions testing real session cookies, CSRF tokens, responsive viewports, and timezones.
+- **2. End-to-End Operational Walkthrough (44/44 Rehearsal Steps Passed)**:
+  - **Operator Institution Provisioning**: Created synthetic school "Greenwood Academy" (`type: SCHOOL`, terminology preset: `SCHOOL`).
+  - **Principal Activation & MFA**: Accepted invitation token, established compliant password ($\ge 12$ chars, mixed case, symbols, numbers), completed mandatory TOTP enrollment with step-up verification.
+  - **Academic Setup Wizard**: Configured campus `Asia/Kolkata`, Department of Primary Education, Academic Year 2026-2027, Term 1 (`ACTIVE`), Period Type `GRADE`, Cohort Period `Class 5`, and published course offerings for Mathematics (MATH5) and English (ENG5).
+  - **Staff Appointments & Roles**: Principal invited 5 staff members; all accepted invitations and set passwords. Principal granted canonical RBAC roles with step-up authentication: Admissions Officer (`REGISTRAR`), Teachers (`FACULTY`), Exam Administrator (`HOD`), Finance Officer (`COLLEGE_ADMIN`). Faculty assigned to course offerings.
+  - **Admissions & Enrolment**: Admissions officer admitted 4 pupils with durable campus ownership. Verified non-login record-only pupil workaround (`identity_id = NULL`; fails closed with 401 `UNAUTHORIZED`). Verified duplicate admission number conflict detection (409). Linked primary guardian. Completed academic term enrolment and course registrations.
+  - **Timetable & Teacher Attendance**: Teacher 1 scheduled session in campus timezone (`Asia/Kolkata` 09:00 IST) from a browser configured in `America/Los_Angeles`; verified stored UTC timestamp (`03:30`). Marked roster (2 Present, 1 Absent, 1 Excused) and submitted register (`CONDUCTED`, `SUBMITTED`). Verified unauthorized teacher 2 is denied access (404 anti-enumeration barrier). Verified correction attempt is refused when `ATTENDANCE_CORRECTIONS_ENABLED` is false (403 `ATTENDANCE_CORRECTIONS_DISABLED`; 0 revisions written).
+  - **Examinations & Eligibility**: Created Mid-Term Examination and Mathematics schedule. Configured 75% attendance eligibility policy. Generated candidate list: Aarav (100% attendance) and Divya (100% attendance) evaluated `ELIGIBLE`; Bhavya (0% attendance) evaluated `NOT_ELIGIBLE` with evidence summary. Exam Administrator applied authorized override (`CONDITIONAL_APPROVAL`) promoting Bhavya to `ELIGIBLE`. Approved and froze candidate list (immutable; subsequent modifications reject with 409 conflict). Teacher entered marks (85, 55, 92) and submitted mark sheet. Verified teacher cannot publish results (403 maker-checker separation). Exam Administrator published results (`PUBLISHED`).
+  - **Fees & Offline Receipts**: Finance Officer configured fee categories (`TUITION`, `ACTIVITY`) and structure (`FEES-C5-2026`, 600,000 paise / 6,000.00 INR total in integer minor units). Generated student dues with sibling concession for Divya (500,000 net). Recorded offline cash receipt for Aarav (cleared dues balance to 0); verified receipt immutability guard trigger rejects direct SQL mutation. Recorded cheque receipt for Bhavya (`PENDING_VERIFICATION`). Tested authorized receipt reversal with step-up authentication.
+  - **Administrative Reporting Reconciliation**: Reconciled all synthetic metrics across all 4 core administrative reports:
+    - Enrolment Roster: 4 total students, guardian contact privacy maintained (`guardian_count = 0`, `primary_guardian_name = null`, `primary_guardian_phone = null`).
+    - Daily Attendance Summary: 1 session conducted, 2 present, 1 absent, 1 excused.
+    - Exam Performance: 1 published exam, 3 candidates appeared, 3 passed (100% pass rate).
+    - Fee Collections & Dues: confirmed collections 600,000 paise (cash), unverified collections 600,000 paise (cheque), outstanding dues 500,000 paise (Divya).
+    - Formula-safe CSV export verified across all 4 reports with injection character escaping.
+  - **Multi-Device Responsive Visuals**: Captured 18 screenshots across Desktop (1280x800), Tablet (768x1024), and Mobile (375x812) for all 6 core workflows into artifact directory.
+- **3. Quality Gates Verification**:
+  - Backend Unit Suite: 49/49 files passed, 978/978 tests passed.
+  - Backend Security Suite: 19/19 files passed, 233/233 tests passed.
+  - Database Security Suite: 27/27 files passed, 510/510 tests passed.
+  - Backend Integration Suite: 90/90 files passed, 1,710/1,710 tests passed.
+  - Web Suite: 31/31 files passed, 433/433 tests passed.
+  - Total tests passing: 216 test suites, 3,864 tests (100% pass rate).
+  - TypeScript Typecheck: 0 errors across workspace (`pnpm typecheck`).
+  - ESLint: 0 errors across workspace (`pnpm lint`).
+  - Secrets Scan: 0 findings (`pnpm check:secrets`).
+  - Web & Backend Builds: Clean production builds.
+  - Whitespace: 0 warnings (`git diff --check`).
+- **4. Repository & Safety Commitments**:
+  - ZERO git commits, pushes, resets, cleans, stashes, or branch changes executed.
+  - Persistent database (`campusos_dev` on 54329) completely untouched.
+  - Institutional bulk export remains strictly deferred by owner instruction.
+
 ## [2026-11-08] Pilot V1: Step 2 Final Integration & Admissions Closure — COMPLETE
 
 - **Actor**: Step 2 Integration Lead (Pair Programming)

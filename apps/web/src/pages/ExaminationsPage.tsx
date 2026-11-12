@@ -9,10 +9,13 @@ import { StatCard } from '../components/ui/StatCard';
 import { TextField } from '../components/ui/TextField';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
+import { useStepUp } from '../features/auth/StepUp';
 import { can } from '../features/auth/identity';
 import { isApiError } from '../lib/api/errors';
 import {
+  amendPublishedExamResult,
   approveCandidateList,
+  correctExamMark,
   createExamination,
   createSchedule,
   fetchCandidateList,
@@ -43,8 +46,18 @@ import {
 } from '../lib/api/examinations-api';
 import { fetchTerms, type Term } from '../lib/api/academics-api';
 import { fetchCampuses, type CampusItem } from '../lib/api/organisation-api';
+import { ExaminationPoliciesTab } from '../features/examinations/ExaminationPoliciesTab';
+import { PolicySettingRow } from '../features/examinations/PolicySettingRow';
+import {
+  formatFriendlyDate,
+  formatDateRange,
+  formatTimeRange,
+  formatExamType,
+  formatScheduleStatus,
+} from '../features/examinations/exam-formatters';
+import '../features/examinations/examinations.css';
 
-type Tab = 'setup' | 'candidates' | 'marks' | 'publish' | 'register' | 'results';
+type Tab = 'setup' | 'policies' | 'candidates' | 'marks' | 'publish' | 'register' | 'results';
 
 const modalOverlayStyle: React.CSSProperties = {
   position: 'fixed',
@@ -74,6 +87,7 @@ const modalCardStyle: React.CSSProperties = {
 export function ExaminationsPage() {
   usePageTitle('Examinations & Results');
   const { client, identity } = useAuth();
+  const { runWithStepUp } = useStepUp();
 
   const isStudent = identity?.actorKind === 'STUDENT';
   const canManage = identity ? can(identity, 'exam.manage') : false;
@@ -102,6 +116,15 @@ export function ExaminationsPage() {
   const [selectedExamId, setSelectedExamId] = useState<string>('');
   const [schedules, setSchedules] = useState<ExamScheduleDto[]>([]);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
+
+  const activeExam = useMemo(
+    () => examinations.find((e) => e.id === selectedExamId),
+    [examinations, selectedExamId],
+  );
+  const activeSchedule = useMemo(
+    () => schedules.find((s) => s.id === selectedScheduleId),
+    [schedules, selectedScheduleId],
+  );
 
   // Setup tab state
   const [campuses, setCampuses] = useState<CampusItem[]>([]);
@@ -171,6 +194,21 @@ export function ExaminationsPage() {
 
   // Review & Publish state
   const [publishingId, setPublishingId] = useState<string | null>(null);
+
+  // Mark correction and amendment state
+  const [correctionTarget, setCorrectionTarget] = useState<{
+    student_id: string;
+    student_name: string;
+    admission_number: string;
+    roll_number?: string | null;
+    current_marks: string | number;
+    status: MarkStatus;
+    is_amendment: boolean;
+  } | null>(null);
+  const [correctionNewMarks, setCorrectionNewMarks] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [correctionEvidenceUrl, setCorrectionEvidenceUrl] = useState('');
+  const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
   // Class Register state
   const [registerData, setRegisterData] = useState<ClassRegisterResponse | null>(null);
@@ -314,7 +352,12 @@ export function ExaminationsPage() {
         const initialMap: typeof marksEntries = {};
         for (const st of data.students) {
           initialMap[st.student_id] = {
-            status: st.mark_status ?? 'ENTERED',
+            status:
+              st.mark_status === 'ABSENT' ||
+              st.mark_status === 'EXEMPT' ||
+              st.mark_status === 'WITHHELD'
+                ? st.mark_status
+                : 'ENTERED',
             marks_obtained:
               st.marks_obtained !== null && st.marks_obtained !== undefined
                 ? String(st.marks_obtained)
@@ -615,15 +658,85 @@ export function ExaminationsPage() {
         });
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : isApiError(err)
-            ? err.message
-            : 'Failed to save marks.',
-      );
+      if (isApiError(err)) {
+        if (err.code === 'CANDIDATE_LIST_NOT_APPROVED') {
+          setError('Candidate approval is required before marks can be submitted.');
+        } else if (err.code === 'EXAM_DATE_NOT_REACHED') {
+          setError('This examination has not reached the permitted marks-entry stage.');
+        } else if (err.code === 'MARKS_ALREADY_SUBMITTED') {
+          setError(
+            'Marks have already been submitted. A submitted-mark correction requires administrative authorization.',
+          );
+        } else if (err.code === 'STUDENT_NOT_ELIGIBLE') {
+          setError('One or more students are not approved eligible candidates for this examination.');
+        } else if (err.status === 403) {
+          setError('You do not have permission to enter marks for this examination.');
+        } else {
+          setError(err.message);
+        }
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to save marks.');
+      }
     } finally {
       setSubmittingMarks(false);
+    }
+  }
+
+  // Handle Principal authorized mark correction or amendment
+  async function handleApplyCorrection(e: FormEvent) {
+    e.preventDefault();
+    if (!client || !selectedScheduleId || !correctionTarget) return;
+    if (correctionReason.trim().length < 5) {
+      setError('A mandatory justification of at least 5 characters is required for marks correction.');
+      return;
+    }
+    setError(null);
+    setSubmittingCorrection(true);
+
+    try {
+      if (correctionTarget.is_amendment) {
+        await amendPublishedExamResult(client, selectedScheduleId, {
+          student_id: correctionTarget.student_id,
+          marks_obtained: correctionNewMarks !== '' ? Number(correctionNewMarks) : null,
+          status: correctionTarget.status,
+          reason: correctionReason.trim(),
+          evidence_url: correctionEvidenceUrl.trim() || null,
+        });
+        setSuccess(`Published result for ${correctionTarget.student_name} amended and republished successfully.`);
+      } else {
+        await correctExamMark(client, selectedScheduleId, {
+          student_id: correctionTarget.student_id,
+          marks_obtained: correctionNewMarks !== '' ? Number(correctionNewMarks) : null,
+          status: correctionTarget.status,
+          reason: correctionReason.trim(),
+          evidence_url: correctionEvidenceUrl.trim() || null,
+        });
+        setSuccess(`Submitted mark for ${correctionTarget.student_name} corrected successfully.`);
+      }
+
+      setCorrectionTarget(null);
+      setCorrectionNewMarks('');
+      setCorrectionReason('');
+      setCorrectionEvidenceUrl('');
+
+      // Refresh roster data
+      const data = await fetchScheduleRoster(client, selectedScheduleId);
+      setRosterData(data);
+      const initial: Record<string, { status: MarkStatus; marks_obtained: string; remarks: string }> = {};
+      for (const st of data.students) {
+        initial[st.student_id] = {
+          status: (st.mark_status as MarkStatus) || 'ENTERED',
+          marks_obtained: st.marks_obtained !== null && st.marks_obtained !== undefined ? String(st.marks_obtained) : '',
+          remarks: st.remarks || '',
+        };
+      }
+      setMarksEntries(initial);
+    } catch (err) {
+      setError(isApiError(err) ? err.message : 'Failed to apply marks correction.');
+    } finally {
+      setSubmittingCorrection(false);
     }
   }
 
@@ -642,17 +755,36 @@ export function ExaminationsPage() {
     setPublishingId(schedId);
 
     try {
-      await publishExamResults(client, schedId);
-      setSuccess('Results published successfully.');
+      await runWithStepUp(
+        () => publishExamResults(client, schedId),
+        'PASSWORD_MFA',
+      );
+      setSuccess('Results published successfully. Students can now view their grades.');
       setSchedules((prev) =>
         prev.map((s) => (s.id === schedId ? { ...s, status: 'PUBLISHED' } : s)),
       );
     } catch (err) {
-      setError(
-        isApiError(err)
-          ? err.message
-          : 'Failed to publish results. Step-up MFA verification may be required.',
-      );
+      if (isApiError(err)) {
+        if (err.status === 403) {
+          if (err.code === 'MAKER_CHECKER_VIOLATION') {
+            setError(
+              'Separation of duties required: Marks submitter cannot publish their own marks without independent review.',
+            );
+          } else {
+            setError(
+              'You do not have permission to publish examination results, or re-authentication was cancelled.',
+            );
+          }
+        } else if (err.code === 'CANDIDATE_LIST_NOT_APPROVED') {
+          setError('Candidate approval is required before results can be published.');
+        } else if (err.code === 'MARKS_NOT_SUBMITTED') {
+          setError('Examination marks must be entered and submitted before publishing results.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('Failed to publish results. Step-up MFA verification may be required.');
+      }
     } finally {
       setPublishingId(null);
     }
@@ -704,30 +836,43 @@ export function ExaminationsPage() {
       {error && <Alert tone="error">{error}</Alert>}
       {success && <Alert tone="success">{success}</Alert>}
 
-      {/* Navigation Tabs */}
-      <div className="border-b border-border">
-        <nav className="flex space-x-4" aria-label="Examination sections">
+      {/* Navigation Tabs - Modern Segmented Control Bar */}
+      <div className="bg-surface-muted/60 p-1.5 rounded-xl border border-border shadow-xs">
+        <nav className="flex flex-wrap gap-1.5" aria-label="Examination sections">
           {canManage && (
             <button
               type="button"
               onClick={() => setTab('setup')}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 tab === 'setup'
-                  ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-muted hover:text-foreground'
+                  ? 'bg-brand-700 text-white shadow-xs'
+                  : 'text-muted hover:text-foreground hover:bg-surface/80'
               }`}
             >
               Examination Setup
+            </button>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setTab('policies')}
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                tab === 'policies'
+                  ? 'bg-brand-700 text-white shadow-xs'
+                  : 'text-muted hover:text-foreground hover:bg-surface/80'
+              }`}
+            >
+              Examination Policies & Settings
             </button>
           )}
           {(canManage || canEnterMarks) && (
             <button
               type="button"
               onClick={() => setTab('candidates')}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 tab === 'candidates'
-                  ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-muted hover:text-foreground'
+                  ? 'bg-brand-700 text-white shadow-xs'
+                  : 'text-muted hover:text-foreground hover:bg-surface/80'
               }`}
             >
               Eligibility & Candidates
@@ -737,10 +882,10 @@ export function ExaminationsPage() {
             <button
               type="button"
               onClick={() => setTab('marks')}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 tab === 'marks'
-                  ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-muted hover:text-foreground'
+                  ? 'bg-brand-700 text-white shadow-xs'
+                  : 'text-muted hover:text-foreground hover:bg-surface/80'
               }`}
             >
               Marks Entry
@@ -750,10 +895,10 @@ export function ExaminationsPage() {
             <button
               type="button"
               onClick={() => setTab('publish')}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 tab === 'publish'
-                  ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-muted hover:text-foreground'
+                  ? 'bg-brand-700 text-white shadow-xs'
+                  : 'text-muted hover:text-foreground hover:bg-surface/80'
               }`}
             >
               Review & Publish
@@ -763,10 +908,10 @@ export function ExaminationsPage() {
             <button
               type="button"
               onClick={() => setTab('register')}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 tab === 'register'
-                  ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-muted hover:text-foreground'
+                  ? 'bg-brand-700 text-white shadow-xs'
+                  : 'text-muted hover:text-foreground hover:bg-surface/80'
               }`}
             >
               Marks Register
@@ -776,10 +921,10 @@ export function ExaminationsPage() {
             <button
               type="button"
               onClick={() => setTab('results')}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 tab === 'results'
-                  ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-muted hover:text-foreground'
+                  ? 'bg-brand-700 text-white shadow-xs'
+                  : 'text-muted hover:text-foreground hover:bg-surface/80'
               }`}
             >
               {isStudent ? 'My Results' : 'Student Results'}
@@ -790,12 +935,12 @@ export function ExaminationsPage() {
 
       {/* Filter / Selector Bar (for non-student staff views) */}
       {!isStudent && tab !== 'results' && (
-        <div className="card p-4 bg-surface-muted/30">
+        <div className="card p-5 bg-surface border border-border shadow-xs space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 htmlFor="exam-select"
-                className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1"
+                className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5"
               >
                 Select Examination
               </label>
@@ -803,7 +948,7 @@ export function ExaminationsPage() {
                 id="exam-select"
                 value={selectedExamId}
                 onChange={(e) => setSelectedExamId(e.target.value)}
-                className="w-full h-10 px-3 text-sm rounded-md border border-input bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full h-10 px-3 text-sm rounded-lg border border-input bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 {examinations.length === 0 && <option value="">No examinations created</option>}
                 {examinations.map((ex) => (
@@ -818,7 +963,7 @@ export function ExaminationsPage() {
               <div>
                 <label
                   htmlFor="schedule-select"
-                  className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1"
+                  className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5"
                 >
                   Select Scheduled Paper
                 </label>
@@ -826,19 +971,57 @@ export function ExaminationsPage() {
                   id="schedule-select"
                   value={selectedScheduleId}
                   onChange={(e) => setSelectedScheduleId(e.target.value)}
-                  className="w-full h-10 px-3 text-sm rounded-md border border-input bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full h-10 px-3 text-sm rounded-lg border border-input bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   {schedules.length === 0 && <option value="">No papers scheduled</option>}
                   {schedules.map((sc) => (
                     <option key={sc.id} value={sc.id}>
                       {sc.course_code ? `${sc.course_code}: ` : ''}
-                      {sc.course_title || 'Paper'} — {sc.exam_date} ({sc.status})
+                      {sc.course_title || 'Paper'} — {formatFriendlyDate(sc.exam_date)} ({formatScheduleStatus(sc.status)})
                     </option>
                   ))}
                 </select>
               </div>
             )}
           </div>
+
+          {/* Active Paper Quick Context Card */}
+          {activeSchedule && (
+            <div className="pt-3 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-surface-muted/30 p-3.5 rounded-lg border border-border/60">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Subject Paper</span>
+                <span className="text-xs font-bold text-foreground block truncate">
+                  {activeSchedule.course_code ? `${activeSchedule.course_code} - ` : ''}
+                  {activeSchedule.course_title || 'General Paper'}
+                </span>
+                {activeExam && (
+                  <span className="text-[10px] text-muted block mt-0.5">
+                    {formatExamType(activeExam.exam_type)} ({formatDateRange(activeExam.starts_on, activeExam.ends_on)})
+                  </span>
+                )}
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Date & Time</span>
+                <span className="text-xs font-medium text-foreground block">
+                  {formatFriendlyDate(activeSchedule.exam_date)}
+                  {activeSchedule.start_time ? ` (${formatTimeRange(activeSchedule.start_time, activeSchedule.end_time)})` : ''}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Grading Scheme</span>
+                <span className="text-xs font-medium text-foreground block">
+                  Max: <strong className="text-foreground">{activeSchedule.max_marks}</strong> | Pass: <strong className="text-foreground">{activeSchedule.pass_marks}</strong>
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Workflow Status</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-700">
+                  <span className="w-2 h-2 rounded-full bg-brand-600 inline-block" />
+                  {formatScheduleStatus(activeSchedule.status)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1028,6 +1211,13 @@ export function ExaminationsPage() {
       )}
 
       {/* ------------------------------------------------------------- */}
+      {/* POLICIES & SETTINGS TAB                                       */}
+      {/* ------------------------------------------------------------- */}
+      {tab === 'policies' && canManage && client && (
+        <ExaminationPoliciesTab client={client} schedules={schedules} />
+      )}
+
+      {/* ------------------------------------------------------------- */}
       {/* 2. ELIGIBILITY & CANDIDATE LISTS TAB (SLICE 2)                */}
       {/* ------------------------------------------------------------- */}
       {tab === 'candidates' && (canManage || canEnterMarks) && (
@@ -1091,26 +1281,36 @@ export function ExaminationsPage() {
                 </div>
 
                 {/* Policy parameters overview */}
-                <div className="flex flex-wrap items-center gap-4 text-xs text-muted bg-surface-muted/30 p-3 rounded-md">
-                  <div>
-                    <span className="font-semibold text-foreground">Policy: </span>
-                    {policyData?.name ?? 'Default Eligibility Policy'}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs bg-surface-muted/30 p-3.5 rounded-lg border border-border/60">
+                  <div className="bg-surface p-2.5 rounded-md border border-border/50">
+                    <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Policy:</span>
+                    <span className="font-semibold text-foreground truncate block">
+                      {policyData?.name ?? 'Default Eligibility Policy'}
+                    </span>
                   </div>
-                  <div>
-                    <span className="font-semibold text-foreground">Attendance Threshold: </span>
-                    {policyData ? `${policyData.min_attendance_percentage}%` : '75%'}
+                  <div className="bg-surface p-2.5 rounded-md border border-border/50">
+                    <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Attendance Threshold:</span>
+                    <span className="font-bold text-brand-700">
+                      {policyData ? `${policyData.min_attendance_percentage}%` : '75%'}
+                    </span>
                   </div>
-                  <div>
-                    <span className="font-semibold text-foreground">Attendance Check: </span>
-                    {policyData?.check_attendance ? 'Enabled' : 'Disabled'}
+                  <div className="bg-surface p-2.5 rounded-md border border-border/50">
+                    <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Attendance Check:</span>
+                    <span className="font-semibold text-foreground">
+                      {policyData?.check_attendance ? 'Enabled' : 'Disabled'}
+                    </span>
                   </div>
-                  <div>
-                    <span className="font-semibold text-foreground">Fee Clearance: </span>
-                    {policyData?.check_fees ? 'Required (Pending Finance)' : 'Disabled'}
+                  <div className="bg-surface p-2.5 rounded-md border border-border/50">
+                    <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Fee Clearance:</span>
+                    <span className="font-semibold text-foreground">
+                      {policyData?.check_fees ? 'Required (Pending Finance)' : 'Disabled'}
+                    </span>
                   </div>
-                  <div>
-                    <span className="font-semibold text-foreground">Late Enrolment Review: </span>
-                    {policyData?.allow_late_enrolment_review ? 'Enabled' : 'Disabled'}
+                  <div className="bg-surface p-2.5 rounded-md border border-border/50">
+                    <span className="text-[10px] uppercase font-bold text-muted block mb-0.5">Late Enrolment Review:</span>
+                    <span className="font-semibold text-foreground">
+                      {policyData?.allow_late_enrolment_review ? 'Enabled' : 'Disabled'}
+                    </span>
                   </div>
                 </div>
 
@@ -1140,11 +1340,11 @@ export function ExaminationsPage() {
                 {/* Generate bar */}
                 {canManage &&
                   (!candidateListData || candidateListData.list.status !== 'FROZEN') && (
-                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <div className="flex flex-wrap items-center gap-3 pt-2 bg-surface-muted/20 p-3 rounded-lg border border-border">
                       <div className="flex items-center gap-2">
                         <label
                           htmlFor="cutoff-date-input"
-                          className="text-xs font-medium text-muted"
+                          className="text-xs font-semibold text-muted"
                         >
                           Evidence Cutoff Date (optional):
                         </label>
@@ -1153,7 +1353,7 @@ export function ExaminationsPage() {
                           type="date"
                           value={cutoffDateInput}
                           onChange={(e) => setCutoffDateInput(e.target.value)}
-                          className="h-8 px-2 text-xs rounded border border-input bg-surface"
+                          className="h-9 px-3 text-xs rounded-md border border-input bg-surface text-foreground"
                         />
                       </div>
                       <Button
@@ -1176,39 +1376,41 @@ export function ExaminationsPage() {
               {/* Candidate List Metrics Summary */}
               {candidateListData?.list && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div className="card p-3 text-center">
-                    <p className="text-xs text-muted uppercase font-semibold">Total Candidates</p>
-                    <p className="text-xl font-bold text-foreground">
+                  <div className="card p-3.5 text-center bg-surface border border-border shadow-2xs">
+                    <p className="text-xs text-muted uppercase font-bold">Total Candidates</p>
+                    <p className="text-2xl font-black text-foreground mt-1">
                       {candidateListData.list.total_candidates}
                     </p>
                   </div>
-                  <div className="card p-3 text-center">
-                    <p className="text-xs text-muted uppercase font-semibold">Eligible</p>
-                    <p className="text-xl font-bold text-green-700">
+                  <div className="card p-3.5 text-center bg-emerald-50/50 border border-emerald-200 shadow-2xs">
+                    <p className="text-xs text-emerald-800 uppercase font-bold">Eligible</p>
+                    <p className="text-2xl font-black text-emerald-700 mt-1">
                       {candidateListData.list.eligible_count}
                     </p>
                   </div>
-                  <div className="card p-3 text-center">
-                    <p className="text-xs text-muted uppercase font-semibold">Not Eligible</p>
-                    <p className="text-xl font-bold text-red-700">
+                  <div className="card p-3.5 text-center bg-red-50/50 border border-red-200 shadow-2xs">
+                    <p className="text-xs text-red-800 uppercase font-bold">Not Eligible</p>
+                    <p className="text-2xl font-black text-red-700 mt-1">
                       {candidateListData.list.not_eligible_count}
                     </p>
                   </div>
-                  <div className="card p-3 text-center">
-                    <p className="text-xs text-muted uppercase font-semibold">Needs Review</p>
-                    <p className="text-xl font-bold text-amber-700">
+                  <div className="card p-3.5 text-center bg-amber-50/50 border border-amber-200 shadow-2xs">
+                    <p className="text-xs text-amber-800 uppercase font-bold">Needs Review</p>
+                    <p className="text-2xl font-black text-amber-700 mt-1">
                       {candidateListData.list.needs_review_count}
                     </p>
                   </div>
-                  <div className="card p-3 text-center">
-                    <p className="text-xs text-muted uppercase font-semibold">List Status</p>
-                    <div className="mt-1">
-                      <Badge>{candidateListData.list.status}</Badge>
+                  <div className="card p-3.5 text-center bg-surface border border-border shadow-2xs">
+                    <p className="text-xs text-muted uppercase font-bold">List Status</p>
+                    <div className="mt-2">
+                      <span className="inline-flex items-center px-2 py-0.5 text-xs font-bold rounded-md bg-surface-muted text-foreground border border-border">
+                        {candidateListData.list.status}
+                      </span>
                     </div>
                   </div>
-                  <div className="card p-3 text-center">
-                    <p className="text-xs text-muted uppercase font-semibold">Snapshot Version</p>
-                    <p className="text-xl font-bold text-brand-700">
+                  <div className="card p-3.5 text-center bg-brand-50/50 border border-brand-200 shadow-2xs">
+                    <p className="text-xs text-brand-800 uppercase font-bold">Snapshot Version</p>
+                    <p className="text-2xl font-black text-brand-700 mt-1">
                       v{candidateListData.list.snapshot_version}
                     </p>
                   </div>
@@ -1227,10 +1429,10 @@ export function ExaminationsPage() {
                     <button
                       type="button"
                       onClick={() => setCandidateFilter('ALL')}
-                      className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                      className={`px-3.5 py-1.5 text-xs rounded-full font-semibold transition-all ${
                         candidateFilter === 'ALL'
-                          ? 'bg-brand-600 text-white'
-                          : 'bg-surface-muted/60 text-muted hover:text-foreground'
+                          ? 'bg-brand-700 text-white shadow-xs'
+                          : 'bg-surface-muted text-muted hover:text-foreground hover:bg-surface-muted/80'
                       }`}
                     >
                       All ({candidateListData.list.total_candidates})
@@ -1238,10 +1440,10 @@ export function ExaminationsPage() {
                     <button
                       type="button"
                       onClick={() => setCandidateFilter('ELIGIBLE')}
-                      className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                      className={`px-3.5 py-1.5 text-xs rounded-full font-semibold transition-all ${
                         candidateFilter === 'ELIGIBLE'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-surface-muted/60 text-muted hover:text-foreground'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-surface-muted text-muted hover:text-foreground hover:bg-surface-muted/80'
                       }`}
                     >
                       Eligible ({candidateListData.list.eligible_count})
@@ -1249,10 +1451,10 @@ export function ExaminationsPage() {
                     <button
                       type="button"
                       onClick={() => setCandidateFilter('NOT_ELIGIBLE')}
-                      className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                      className={`px-3.5 py-1.5 text-xs rounded-full font-semibold transition-all ${
                         candidateFilter === 'NOT_ELIGIBLE'
-                          ? 'bg-red-600 text-white'
-                          : 'bg-surface-muted/60 text-muted hover:text-foreground'
+                          ? 'bg-red-600 text-white shadow-xs'
+                          : 'bg-surface-muted text-muted hover:text-foreground hover:bg-surface-muted/80'
                       }`}
                     >
                       Not Eligible ({candidateListData.list.not_eligible_count})
@@ -1260,10 +1462,10 @@ export function ExaminationsPage() {
                     <button
                       type="button"
                       onClick={() => setCandidateFilter('NEEDS_REVIEW')}
-                      className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                      className={`px-3.5 py-1.5 text-xs rounded-full font-semibold transition-all ${
                         candidateFilter === 'NEEDS_REVIEW'
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-surface-muted/60 text-muted hover:text-foreground'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-surface-muted text-muted hover:text-foreground hover:bg-surface-muted/80'
                       }`}
                     >
                       Needs Review ({candidateListData.list.needs_review_count})
@@ -1271,93 +1473,110 @@ export function ExaminationsPage() {
                   </div>
 
                   {filteredCandidates.length === 0 ? (
-                    <p className="text-sm text-muted py-6 text-center">
+                    <p className="text-sm text-muted py-8 text-center bg-surface-muted/20 rounded-lg">
                       No candidates match the selected filter.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto border border-border rounded-lg shadow-2xs">
                       <table
                         className="w-full text-left text-sm"
                         role="table"
                         aria-label="Candidate List Table"
                       >
-                        <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
+                        <thead className="bg-surface-muted text-xs font-bold uppercase tracking-wider text-muted border-b border-border">
                           <tr>
-                            <th scope="col" className="px-3 py-2">
+                            <th scope="col" className="px-4 py-3">
                               Admission No
                             </th>
-                            <th scope="col" className="px-3 py-2">
+                            <th scope="col" className="px-4 py-3">
                               Student Name
                             </th>
-                            <th scope="col" className="px-3 py-2">
+                            <th scope="col" className="px-4 py-3">
                               Roll No
                             </th>
-                            <th scope="col" className="px-3 py-2">
+                            <th scope="col" className="px-4 py-3">
                               Attendance %
                             </th>
-                            <th scope="col" className="px-3 py-2">
+                            <th scope="col" className="px-4 py-3">
                               Evaluation
                             </th>
-                            <th scope="col" className="px-3 py-2">
+                            <th scope="col" className="px-4 py-3">
                               Override
                             </th>
-                            <th scope="col" className="px-3 py-2">
+                            <th scope="col" className="px-4 py-3">
                               Final Status
                             </th>
-                            <th scope="col" className="px-3 py-2 text-right">
+                            <th scope="col" className="px-4 py-3 text-right">
                               Actions
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-border">
+                        <tbody className="divide-y divide-border bg-surface">
                           {filteredCandidates.map((c) => (
-                            <tr key={c.candidate_id} className="hover:bg-surface-muted/20">
-                              <td className="px-3 py-2 font-mono text-xs">{c.admission_number}</td>
-                              <td className="px-3 py-2 font-medium">{c.student_name}</td>
-                              <td className="px-3 py-2 text-muted">{c.roll_number ?? '—'}</td>
-                              <td className="px-3 py-2">
-                                <span className="font-semibold">
-                                  {c.evidence_summary?.attendance_percentage !== undefined &&
-                                  c.evidence_summary?.attendance_percentage !== null
-                                    ? `${c.evidence_summary.attendance_percentage}%`
-                                    : '—'}
-                                </span>
-                                {c.evidence_summary && (
-                                  <span className="text-[11px] text-muted block">
-                                    {c.evidence_summary.attended_sessions}/
-                                    {c.evidence_summary.total_sessions} sessions
+                            <tr key={c.candidate_id} className="hover:bg-surface-muted/30 transition-colors">
+                              <td className="px-4 py-3 font-mono text-xs text-muted font-medium">{c.admission_number}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-800 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                                    {c.student_name.slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <span className="font-semibold text-foreground text-sm">{c.student_name}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-muted text-xs">
+                                {c.roll_number ? (
+                                  <span className="px-2 py-0.5 rounded bg-surface-muted font-mono font-medium text-foreground">
+                                    #{c.roll_number}
                                   </span>
+                                ) : (
+                                  '—'
                                 )}
                               </td>
-                              <td className="px-3 py-2">
+                              <td className="px-4 py-3">
+                                <div className="space-y-0.5">
+                                  <span className="font-bold text-foreground text-xs block">
+                                    {c.evidence_summary?.attendance_percentage !== undefined &&
+                                    c.evidence_summary?.attendance_percentage !== null
+                                      ? `${c.evidence_summary.attendance_percentage}%`
+                                      : '—'}
+                                  </span>
+                                  {c.evidence_summary && (
+                                    <span className="text-[10px] text-muted block">
+                                      {c.evidence_summary.attended_sessions}/
+                                      {c.evidence_summary.total_sessions} sessions
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
                                 <Badge>{c.evaluation_status}</Badge>
                               </td>
-                              <td className="px-3 py-2">
+                              <td className="px-4 py-3">
                                 {c.override_status === 'NONE' ? (
                                   <span className="text-xs text-muted">None</span>
                                 ) : (
-                                  <span className="text-xs font-medium text-brand-700">
+                                  <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
                                     {c.override_status}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-3 py-2">
+                              <td className="px-4 py-3">
                                 {c.final_status === 'ELIGIBLE' ? (
-                                  <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded bg-green-100 text-green-800">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-800">
                                     ELIGIBLE
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded bg-red-100 text-red-800">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-md bg-red-100 text-red-800">
                                     NOT ELIGIBLE
                                   </span>
                                 )}
                               </td>
-                              <td className="px-3 py-2 text-right">
+                              <td className="px-4 py-3 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <button
                                     type="button"
                                     onClick={() => setSelectedEvidenceCandidate(c)}
-                                    className="text-xs text-brand-700 hover:text-brand-900 underline font-medium"
+                                    className="px-2.5 py-1 text-xs font-semibold rounded-md border border-brand-300 text-brand-700 hover:bg-brand-50 transition-colors"
                                   >
                                     Evidence
                                   </button>
@@ -1367,13 +1586,13 @@ export function ExaminationsPage() {
                                       onClick={() => {
                                         setSelectedOverrideCandidate(c);
                                         setOverrideStatusChoice(
-                                          c.override_status !== 'NONE'
+                                          c.override_status && c.override_status !== 'NONE'
                                             ? c.override_status
                                             : 'EXEMPTED',
                                         );
                                         setOverrideReasonInput(c.override_reason ?? '');
                                       }}
-                                      className="text-xs text-brand-700 hover:text-brand-900 underline font-medium ml-2"
+                                      className="px-2.5 py-1 text-xs font-semibold rounded-md border border-border text-foreground hover:bg-surface-muted transition-colors"
                                     >
                                       Override
                                     </button>
@@ -1407,33 +1626,34 @@ export function ExaminationsPage() {
           {loading && <Spinner />}
 
           {!loading && !selectedScheduleId && (
-            <div className="card p-8 text-center text-muted">
-              Select an examination and scheduled paper above to record student marks.
+            <div className="card p-12 text-center text-muted border border-dashed border-border rounded-xl">
+              <p className="text-sm font-medium">Select an examination and scheduled paper above to record student marks.</p>
             </div>
           )}
 
           {!loading && rosterData && (
-            <div className="card p-5 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-3">
+            <div className="card p-6 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4 gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">
+                  <h2 className="text-lg font-bold text-foreground">
                     {rosterData.schedule.course_code ? `${rosterData.schedule.course_code} - ` : ''}
                     {rosterData.schedule.course_title || 'Course Paper'}
                   </h2>
-                  <p className="text-xs text-muted">
-                    Exam Date: {rosterData.schedule.exam_date} | Max Marks:{' '}
-                    {rosterData.schedule.max_marks} | Passing Marks:{' '}
-                    {rosterData.schedule.pass_marks}
+                  <p className="text-xs text-muted mt-0.5">
+                    Exam Date: <strong>{formatFriendlyDate(rosterData.schedule.exam_date)}</strong> | Max Marks:{' '}
+                    <strong>{rosterData.schedule.max_marks}</strong> | Passing Marks:{' '}
+                    <strong>{rosterData.schedule.pass_marks}</strong>
                   </p>
                 </div>
-                <div className="mt-2 sm:mt-0 flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-muted uppercase">Status:</span>
                   <Badge>{rosterData.schedule.status}</Badge>
                 </div>
               </div>
 
               {/* Candidate List status indicator */}
               {rosterData.candidate_list ? (
-                <div className="p-3 bg-brand-50 border border-brand-200 rounded-md text-xs text-brand-900 flex items-center justify-between">
+                <div className="p-3.5 bg-brand-50/80 border border-brand-200 rounded-lg text-xs text-brand-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span>
                     Candidate List Status: <strong>{rosterData.candidate_list.status}</strong>{' '}
                     (Snapshot v{rosterData.candidate_list.snapshot_version}).
@@ -1445,163 +1665,236 @@ export function ExaminationsPage() {
                   <button
                     type="button"
                     onClick={() => setTab('candidates')}
-                    className="text-xs text-brand-700 underline font-medium hover:text-brand-900"
+                    className="text-xs text-brand-700 underline font-semibold hover:text-brand-900 flex-shrink-0"
                   >
                     View Candidate List
                   </button>
                 </div>
               ) : null}
 
-              {rosterData.schedule.status === 'PUBLISHED' ? (
-                <Alert tone="info">
-                  Results for this examination schedule are published. Marks cannot be modified.
-                </Alert>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table
-                      className="w-full text-left text-sm"
-                      role="table"
-                      aria-label="Student Marks Entry Table"
-                    >
-                      <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
-                        <tr>
-                          <th scope="col" className="px-3 py-2">
-                            Admission No
-                          </th>
-                          <th scope="col" className="px-3 py-2">
-                            Student Name
-                          </th>
-                          <th scope="col" className="px-3 py-2">
-                            Roll No
-                          </th>
-                          <th scope="col" className="px-3 py-2">
-                            Status
-                          </th>
-                          <th scope="col" className="px-3 py-2">
-                            Marks Obtained
-                          </th>
-                          <th scope="col" className="px-3 py-2">
-                            Remarks
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {rosterData.students.map((st) => {
-                          const entry = marksEntries[st.student_id] ?? {
-                            status: 'ENTERED',
-                            marks_obtained: '',
-                            remarks: '',
-                          };
-                          const isEntered = entry.status === 'ENTERED';
-                          const isCandidateIneligible =
-                            (rosterData.candidate_list?.status === 'APPROVED' ||
-                              rosterData.candidate_list?.status === 'FROZEN') &&
-                            st.final_status === 'NOT_ELIGIBLE';
+              {rosterData.schedule.status === 'PUBLISHED' && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex items-center justify-between">
+                  <span>
+                    <strong>Results Published:</strong> Marks are published and visible to students. To modify a published score, click <strong>Amend Result</strong> on any student row below to submit an authorized revision.
+                  </span>
+                </div>
+              )}
 
-                          return (
-                            <tr
-                              key={st.student_id}
-                              className={`hover:bg-surface-muted/20 ${isCandidateIneligible ? 'opacity-60 bg-red-50/20' : ''}`}
-                            >
-                              <td className="px-3 py-2 font-mono text-xs">{st.admission_number}</td>
-                              <td className="px-3 py-2 font-medium">
+              {rosterData.schedule.status === 'SUBMITTED' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center justify-between">
+                  <span>
+                    <strong>Marks Submitted:</strong> Paper is locked for administrative review. To modify a submitted mark, click <strong>Correct Mark</strong> below.
+                  </span>
+                </div>
+              )}
+
+              <div className="overflow-x-auto border border-border rounded-lg shadow-2xs">
+                <table
+                  className="w-full text-left text-sm"
+                  role="table"
+                  aria-label="Student Marks Entry Table"
+                >
+                  <thead className="bg-surface-muted text-xs font-bold uppercase tracking-wider text-muted border-b border-border">
+                    <tr>
+                      <th scope="col" className="px-4 py-3">
+                        Admission No
+                      </th>
+                      <th scope="col" className="px-4 py-3">
+                        Student Name
+                      </th>
+                      <th scope="col" className="px-4 py-3">
+                        Roll No
+                      </th>
+                      <th scope="col" className="px-4 py-3">
+                        Status
+                      </th>
+                      <th scope="col" className="px-4 py-3">
+                        Marks Obtained
+                      </th>
+                      <th scope="col" className="px-4 py-3">
+                        Remarks
+                      </th>
+                      {(rosterData.schedule.status === 'SUBMITTED' ||
+                        rosterData.schedule.status === 'PUBLISHED') && (
+                        <th scope="col" className="px-4 py-3 text-right">
+                          Action
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-surface">
+                    {rosterData.students.map((st) => {
+                      const entry = marksEntries[st.student_id] ?? {
+                        status: 'ENTERED',
+                        marks_obtained: '',
+                        remarks: '',
+                      };
+                      const isEntered = entry.status === 'ENTERED';
+                      const isCandidateIneligible =
+                        (rosterData.candidate_list?.status === 'APPROVED' ||
+                          rosterData.candidate_list?.status === 'FROZEN') &&
+                        st.final_status === 'NOT_ELIGIBLE';
+                      const isLocked =
+                        rosterData.schedule.status === 'SUBMITTED' ||
+                        rosterData.schedule.status === 'PUBLISHED';
+
+                      return (
+                        <tr
+                          key={st.student_id}
+                          className={`hover:bg-surface-muted/20 transition-colors ${
+                            isCandidateIneligible ? 'opacity-60 bg-red-50/20' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-3 font-mono text-xs text-muted font-medium">
+                            {st.admission_number}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-800 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                                {st.student_name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <span className="font-semibold text-foreground text-sm">
                                 {st.student_name}
-                                {st.final_status === 'ELIGIBLE' && (
-                                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-green-100 text-green-800">
-                                    Eligible
-                                  </span>
-                                )}
-                                {st.final_status === 'NOT_ELIGIBLE' && (
-                                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-800">
-                                    Ineligible
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-muted">{st.roll_number ?? '—'}</td>
-                              <td className="px-3 py-2">
-                                <select
-                                  aria-label={`Status for ${st.student_name}`}
-                                  value={entry.status}
-                                  disabled={isCandidateIneligible}
-                                  onChange={(e) =>
-                                    setMarksEntries((prev) => ({
-                                      ...prev,
-                                      [st.student_id]: {
-                                        ...entry,
-                                        status: e.target.value as MarkStatus,
-                                      },
-                                    }))
-                                  }
-                                  className="h-8 px-2 text-xs rounded border border-input bg-surface disabled:opacity-50"
-                                >
-                                  <option value="ENTERED">Entered</option>
-                                  <option value="ABSENT">Absent</option>
-                                  <option value="EXEMPT">Exempt</option>
-                                  <option value="WITHHELD">Withheld</option>
-                                </select>
-                              </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={rosterData.schedule.max_marks}
-                                  step="0.5"
-                                  aria-label={`Marks for ${st.student_name}`}
-                                  disabled={!isEntered || isCandidateIneligible}
-                                  placeholder={
-                                    isCandidateIneligible
-                                      ? 'Ineligible'
-                                      : isEntered
-                                        ? '0 - 100'
-                                        : 'N/A'
-                                  }
-                                  value={
-                                    isEntered && !isCandidateIneligible ? entry.marks_obtained : ''
-                                  }
-                                  onChange={(e) =>
-                                    setMarksEntries((prev) => ({
-                                      ...prev,
-                                      [st.student_id]: {
-                                        ...entry,
-                                        marks_obtained: e.target.value,
-                                      },
-                                    }))
-                                  }
-                                  className="h-8 w-24 px-2 text-xs rounded border border-input bg-surface disabled:opacity-50"
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  aria-label={`Remarks for ${st.student_name}`}
-                                  placeholder={
-                                    isCandidateIneligible
-                                      ? 'Candidate ineligible on approved candidate list'
-                                      : 'Optional remarks'
-                                  }
-                                  disabled={isCandidateIneligible}
-                                  value={entry.remarks}
-                                  onChange={(e) =>
-                                    setMarksEntries((prev) => ({
-                                      ...prev,
-                                      [st.student_id]: {
-                                        ...entry,
-                                        remarks: e.target.value,
-                                      },
-                                    }))
-                                  }
-                                  className="h-8 w-full max-w-xs px-2 text-xs rounded border border-input bg-surface disabled:opacity-50"
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                              </span>
+                              {st.final_status === 'ELIGIBLE' && (
+                                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800">
+                                  Eligible
+                                </span>
+                              )}
+                              {st.final_status === 'NOT_ELIGIBLE' && (
+                                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-800">
+                                  Ineligible
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-muted text-xs">
+                            {st.roll_number ? (
+                              <span className="px-2 py-0.5 rounded bg-surface-muted font-mono font-medium text-foreground">
+                                #{st.roll_number}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <select
+                              aria-label={`Status for ${st.student_name}`}
+                              value={entry.status}
+                              disabled={isCandidateIneligible || isLocked}
+                              onChange={(e) =>
+                                setMarksEntries((prev) => ({
+                                  ...prev,
+                                  [st.student_id]: {
+                                    ...entry,
+                                    status: e.target.value as MarkStatus,
+                                  },
+                                }))
+                              }
+                              className="h-8 px-2 text-xs rounded-md border border-input bg-surface disabled:opacity-60 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            >
+                              <option value="ENTERED">Entered</option>
+                              <option value="ABSENT">Absent</option>
+                              <option value="EXEMPT">Exempt</option>
+                              <option value="WITHHELD">Withheld</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="number"
+                              min="0"
+                              max={rosterData.schedule.max_marks}
+                              step="0.5"
+                              aria-label={`Marks for ${st.student_name}`}
+                              disabled={!isEntered || isCandidateIneligible || isLocked}
+                              placeholder={
+                                isCandidateIneligible
+                                  ? 'Ineligible'
+                                  : isEntered
+                                    ? `0 - ${rosterData.schedule.max_marks}`
+                                    : 'N/A'
+                              }
+                              value={
+                                isEntered && !isCandidateIneligible ? entry.marks_obtained : ''
+                              }
+                              onChange={(e) =>
+                                setMarksEntries((prev) => ({
+                                  ...prev,
+                                  [st.student_id]: {
+                                    ...entry,
+                                    marks_obtained: e.target.value,
+                                  },
+                                }))
+                              }
+                              className="h-8 w-28 px-2.5 text-xs rounded-md border border-input bg-surface font-semibold text-foreground disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="text"
+                              aria-label={`Remarks for ${st.student_name}`}
+                              placeholder={
+                                isCandidateIneligible
+                                  ? 'Candidate ineligible on approved candidate list'
+                                  : 'Optional remarks'
+                              }
+                              disabled={isCandidateIneligible || isLocked}
+                              value={entry.remarks}
+                              onChange={(e) =>
+                                setMarksEntries((prev) => ({
+                                  ...prev,
+                                  [st.student_id]: {
+                                    ...entry,
+                                    remarks: e.target.value,
+                                  },
+                                }))
+                              }
+                              className="h-8 w-full max-w-xs px-2.5 text-xs rounded-md border border-input bg-surface disabled:opacity-60 text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </td>
+                          {isLocked && (
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                variant="secondary"
+                                disabled={isCandidateIneligible}
+                                onClick={() => {
+                                  setCorrectionTarget({
+                                    student_id: st.student_id,
+                                    student_name: st.student_name,
+                                    admission_number: st.admission_number,
+                                    roll_number: st.roll_number ?? null,
+                                    current_marks:
+                                      st.marks_obtained !== null && st.marks_obtained !== undefined
+                                        ? st.marks_obtained
+                                        : '—',
+                                    status: (st.mark_status as MarkStatus) || 'ENTERED',
+                                    is_amendment: rosterData.schedule.status === 'PUBLISHED',
+                                  });
+                                  setCorrectionNewMarks(
+                                    st.marks_obtained !== null && st.marks_obtained !== undefined
+                                      ? String(st.marks_obtained)
+                                      : '',
+                                  );
+                                  setCorrectionReason('');
+                                  setCorrectionEvidenceUrl('');
+                                }}
+                              >
+                                {rosterData.schedule.status === 'PUBLISHED'
+                                  ? 'Amend Result'
+                                  : 'Correct Mark'}
+                              </Button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+              {rosterData.schedule.status !== 'SUBMITTED' &&
+                rosterData.schedule.status !== 'PUBLISHED' && (
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                     <Button
                       variant="secondary"
                       disabled={submittingMarks}
@@ -1621,8 +1914,7 @@ export function ExaminationsPage() {
                       Submit Marks
                     </Button>
                   </div>
-                </>
-              )}
+                )}
             </div>
           )}
         </div>
@@ -1633,55 +1925,64 @@ export function ExaminationsPage() {
       {/* ------------------------------------------------------------- */}
       {tab === 'publish' && canPublish && (
         <Card title="Examination Papers Awaiting Review & Publication">
-          <p className="text-xs text-muted mb-4">
-            Only authorized academic administrators (HOD, Registrar, Campus Admin) can publish
-            results. Teachers record marks, but cannot self-publish.
-          </p>
+          <div className="p-3.5 bg-primary/5 border border-primary/20 rounded-lg text-xs text-foreground mb-4 leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="font-bold text-primary block mb-0.5">Results Approval Authority:</span>
+              <span>
+                Principal Final Authority is enabled by school governance policy. The Principal may review and publish examination results directly, including subjects they teach. All actions are logged in the immutable audit trail.
+              </span>
+            </div>
+            <span className="font-mono text-[11px] bg-surface border border-border px-2 py-0.5 rounded font-semibold text-muted flex-shrink-0">
+              PRINCIPAL_FINAL_AUTHORITY
+            </span>
+          </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto border border-border rounded-lg shadow-2xs">
             <table
               className="w-full text-left text-sm"
               role="table"
               aria-label="Review and Publish Table"
             >
-              <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
+              <thead className="bg-surface-muted text-xs font-bold uppercase tracking-wider text-muted border-b border-border">
                 <tr>
-                  <th scope="col" className="px-3 py-2">
+                  <th scope="col" className="px-4 py-3">
                     Course Paper
                   </th>
-                  <th scope="col" className="px-3 py-2">
+                  <th scope="col" className="px-4 py-3">
                     Exam Date
                   </th>
-                  <th scope="col" className="px-3 py-2">
+                  <th scope="col" className="px-4 py-3">
                     Status
                   </th>
-                  <th scope="col" className="px-3 py-2">
+                  <th scope="col" className="px-4 py-3">
                     Marks Submitted At
                   </th>
-                  <th scope="col" className="px-3 py-2 text-right">
+                  <th scope="col" className="px-4 py-3 text-right">
                     Action
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border bg-surface">
                 {schedules.map((sc) => (
-                  <tr key={sc.id} className="hover:bg-surface-muted/20">
-                    <td className="px-3 py-2 font-medium">
+                  <tr key={sc.id} className="hover:bg-surface-muted/20 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-foreground text-sm">
                       {sc.course_code ? `${sc.course_code}: ` : ''}
                       {sc.course_title || 'Paper'}
                     </td>
-                    <td className="px-3 py-2 text-muted">{sc.exam_date}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 text-muted text-xs">{formatFriendlyDate(sc.exam_date)}</td>
+                    <td className="px-4 py-3">
                       <Badge>{sc.status}</Badge>
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted">
+                    <td className="px-4 py-3 text-xs text-muted">
                       {sc.marks_submitted_at
                         ? new Date(sc.marks_submitted_at).toLocaleDateString()
                         : 'Pending Submission'}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-4 py-3 text-right">
                       {sc.status === 'PUBLISHED' ? (
-                        <span className="text-xs font-medium text-green-700">Published</span>
+                        <span className="inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-md bg-emerald-100 text-emerald-800">
+                          Published
+                        </span>
                       ) : (
                         <Button
                           variant="primary"
@@ -1709,61 +2010,60 @@ export function ExaminationsPage() {
       {/* 5. MARKS REGISTER TAB (CLASS REGISTER & SUMMARY STATISTICS)    */}
       {/* ------------------------------------------------------------- */}
       {tab === 'register' && canReadResults && !isStudent && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {loading && <Spinner />}
 
           {!loading && !registerData && (
-            <div className="card p-8 text-center text-muted">
-              Select an examination and scheduled paper to view the marks register and class
-              statistics.
+            <div className="card p-12 text-center text-muted border border-dashed border-border rounded-xl">
+              <p className="text-sm font-medium">Select an examination and scheduled paper to view the marks register and class statistics.</p>
             </div>
           )}
 
           {!loading && registerData && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* Statistics Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Total</p>
-                  <p className="text-xl font-bold text-foreground">
+                <div className="card p-3.5 text-center bg-surface border border-border shadow-2xs">
+                  <p className="text-[11px] text-muted uppercase font-bold">Total</p>
+                  <p className="text-xl font-black text-foreground mt-0.5">
                     {registerData.statistics.total_students}
                   </p>
                 </div>
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Appeared</p>
-                  <p className="text-xl font-bold text-foreground">
+                <div className="card p-3.5 text-center bg-surface border border-border shadow-2xs">
+                  <p className="text-[11px] text-muted uppercase font-bold">Appeared</p>
+                  <p className="text-xl font-black text-foreground mt-0.5">
                     {registerData.statistics.appeared}
                   </p>
                 </div>
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Absent</p>
-                  <p className="text-xl font-bold text-red-600">{registerData.statistics.absent}</p>
+                <div className="card p-3.5 text-center bg-red-50/40 border border-red-200 shadow-2xs">
+                  <p className="text-[11px] text-red-700 uppercase font-bold">Absent</p>
+                  <p className="text-xl font-black text-red-600 mt-0.5">{registerData.statistics.absent}</p>
                 </div>
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Exempt</p>
-                  <p className="text-xl font-bold text-foreground">
+                <div className="card p-3.5 text-center bg-surface border border-border shadow-2xs">
+                  <p className="text-[11px] text-muted uppercase font-bold">Exempt</p>
+                  <p className="text-xl font-black text-foreground mt-0.5">
                     {registerData.statistics.exempt}
                   </p>
                 </div>
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Passed</p>
-                  <p className="text-xl font-bold text-green-700">
+                <div className="card p-3.5 text-center bg-emerald-50/40 border border-emerald-200 shadow-2xs">
+                  <p className="text-[11px] text-emerald-800 uppercase font-bold">Passed</p>
+                  <p className="text-xl font-black text-emerald-700 mt-0.5">
                     {registerData.statistics.passed}
                   </p>
                 </div>
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Failed</p>
-                  <p className="text-xl font-bold text-red-700">{registerData.statistics.failed}</p>
+                <div className="card p-3.5 text-center bg-red-50/40 border border-red-200 shadow-2xs">
+                  <p className="text-[11px] text-red-800 uppercase font-bold">Failed</p>
+                  <p className="text-xl font-black text-red-700 mt-0.5">{registerData.statistics.failed}</p>
                 </div>
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Avg Marks</p>
-                  <p className="text-xl font-bold text-foreground">
+                <div className="card p-3.5 text-center bg-surface border border-border shadow-2xs">
+                  <p className="text-[11px] text-muted uppercase font-bold">Avg Marks</p>
+                  <p className="text-xl font-black text-foreground mt-0.5">
                     {registerData.statistics.average_marks}
                   </p>
                 </div>
-                <div className="card p-3 text-center">
-                  <p className="text-xs text-muted uppercase font-semibold">Pass %</p>
-                  <p className="text-xl font-bold text-brand-700">
+                <div className="card p-3.5 text-center bg-brand-50/40 border border-brand-200 shadow-2xs">
+                  <p className="text-[11px] text-brand-800 uppercase font-bold">Pass %</p>
+                  <p className="text-xl font-black text-brand-700 mt-0.5">
                     {registerData.statistics.pass_percentage}%
                   </p>
                 </div>
@@ -1771,57 +2071,80 @@ export function ExaminationsPage() {
 
               {/* Marks Register Sheet */}
               <Card title="Class Marks Sheet">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto border border-border rounded-lg shadow-2xs">
                   <table
                     className="w-full text-left text-sm"
                     role="table"
                     aria-label="Class Register Table"
                   >
-                    <thead className="bg-surface-muted/50 text-xs font-semibold uppercase text-muted">
+                    <thead className="bg-surface-muted text-xs font-bold uppercase tracking-wider text-muted border-b border-border">
                       <tr>
-                        <th scope="col" className="px-3 py-2">
+                        <th scope="col" className="px-4 py-3">
                           Admission No
                         </th>
-                        <th scope="col" className="px-3 py-2">
+                        <th scope="col" className="px-4 py-3">
                           Student Name
                         </th>
-                        <th scope="col" className="px-3 py-2">
+                        <th scope="col" className="px-4 py-3">
                           Roll No
                         </th>
-                        <th scope="col" className="px-3 py-2">
+                        <th scope="col" className="px-4 py-3">
                           Status
                         </th>
-                        <th scope="col" className="px-3 py-2">
+                        <th scope="col" className="px-4 py-3">
                           Marks Obtained
                         </th>
-                        <th scope="col" className="px-3 py-2">
+                        <th scope="col" className="px-4 py-3">
                           Result
                         </th>
-                        <th scope="col" className="px-3 py-2">
+                        <th scope="col" className="px-4 py-3">
                           Remarks
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-border bg-surface">
                       {registerData.marks.map((m) => (
-                        <tr key={m.student_id} className="hover:bg-surface-muted/20">
-                          <td className="px-3 py-2 font-mono text-xs">{m.admission_number}</td>
-                          <td className="px-3 py-2 font-medium">{m.student_name}</td>
-                          <td className="px-3 py-2 text-muted">{m.roll_number ?? '—'}</td>
-                          <td className="px-3 py-2">
+                        <tr key={m.student_id} className="hover:bg-surface-muted/20 transition-colors">
+                          <td className="px-4 py-3 font-mono text-xs text-muted font-medium">{m.admission_number}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-800 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                                {m.student_name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <span className="font-semibold text-foreground text-sm">{m.student_name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-muted text-xs">
+                            {m.roll_number ? (
+                              <span className="px-2 py-0.5 rounded bg-surface-muted font-mono font-medium text-foreground">
+                                #{m.roll_number}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
                             <Badge>{m.status}</Badge>
                           </td>
-                          <td className="px-3 py-2 font-semibold">
+                          <td className="px-4 py-3 font-bold text-foreground">
                             {m.marks_obtained !== null && m.marks_obtained !== undefined
                               ? m.marks_obtained
                               : '—'}
                           </td>
-                          <td className="px-3 py-2">
-                            {m.is_passing === true && <Badge>Passed</Badge>}
-                            {m.is_passing === false && <Badge>Failed</Badge>}
+                          <td className="px-4 py-3">
+                            {m.is_passing === true && (
+                              <span className="inline-flex items-center px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-800">
+                                Passed
+                              </span>
+                            )}
+                            {m.is_passing === false && (
+                              <span className="inline-flex items-center px-2 py-0.5 text-xs font-bold rounded bg-red-100 text-red-800">
+                                Failed
+                              </span>
+                            )}
                             {m.is_passing === null && <span className="text-muted text-xs">—</span>}
                           </td>
-                          <td className="px-3 py-2 text-muted text-xs">{m.remarks ?? '—'}</td>
+                          <td className="px-4 py-3 text-muted text-xs">{m.remarks ?? '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1843,21 +2166,21 @@ export function ExaminationsPage() {
           {loading && <Spinner />}
 
           {!loading && studentResults.length === 0 && (
-            <p className="text-sm text-muted py-6 text-center">
+            <p className="text-sm text-muted py-8 text-center bg-surface-muted/20 rounded-xl border border-dashed border-border">
               No published examination results are available at this time.
             </p>
           )}
 
           {!loading && studentResults.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {studentResults.map((res) => (
-                <div key={res.mark_id} className="card p-4 border border-border bg-surface">
-                  <div className="flex items-start justify-between">
+                <div key={res.mark_id} className="card p-5 border border-border bg-surface shadow-xs rounded-xl flex flex-col justify-between space-y-4">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-surface-muted text-foreground border border-border">
                         {res.course_code}
                       </span>
-                      <h3 className="text-base font-bold text-foreground">{res.course_title}</h3>
+                      <h3 className="text-base font-bold text-foreground mt-1.5">{res.course_title}</h3>
                       <p className="text-xs text-muted mt-0.5">
                         {res.exam_name} ({res.exam_type})
                       </p>
@@ -1865,22 +2188,22 @@ export function ExaminationsPage() {
                     <Badge>{res.is_passing ? 'Passed' : 'Failed'}</Badge>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                  <div className="pt-3 border-t border-border flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted">Marks Obtained</p>
-                      <p className="text-xl font-extrabold text-foreground">
+                      <p className="text-xs text-muted font-medium">Marks Obtained</p>
+                      <p className="text-2xl font-black text-foreground">
                         {res.marks_obtained !== null ? res.marks_obtained : '—'}
                         <span className="text-xs font-normal text-muted"> / {res.max_marks}</span>
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-muted">Pass Marks</p>
-                      <p className="text-sm font-medium text-muted">{res.pass_marks}</p>
+                      <p className="text-xs text-muted font-medium">Pass Marks</p>
+                      <p className="text-sm font-bold text-foreground">{res.pass_marks}</p>
                     </div>
                   </div>
 
                   {res.remarks && (
-                    <p className="mt-3 text-xs text-muted bg-surface-muted/30 p-2 rounded">
+                    <p className="text-xs text-muted bg-surface-muted/30 p-2.5 rounded-lg border border-border/50">
                       Note: {res.remarks}
                     </p>
                   )}
@@ -1924,59 +2247,55 @@ export function ExaminationsPage() {
                 value={policyName}
                 onChange={(e) => setPolicyName(e.target.value)}
                 required
+                hint="Descriptive title for this schedule-level eligibility rule."
               />
 
-              <div className="grid grid-cols-2 gap-3">
-                <TextField
-                  type="number"
-                  label="Min Attendance %"
-                  value={minAttendance}
-                  onChange={(e) => setMinAttendance(e.target.value)}
-                  min="0"
-                  max="100"
-                  required
+              <div className="space-y-3 pt-2">
+                <PolicySettingRow
+                  label="Enforce minimum attendance requirement"
+                  description="Candidate session attendance will be verified against the required percentage prior to allowing examination entry."
+                  checked={checkAttendance}
+                  onChange={setCheckAttendance}
+                  badge="Core Rule"
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    <TextField
+                      type="number"
+                      label="Min Attendance %"
+                      value={minAttendance}
+                      onChange={(e) => setMinAttendance(e.target.value)}
+                      min="0"
+                      max="100"
+                      required={checkAttendance}
+                      hint="Percentage of held sessions required."
+                    />
+                    <TextField
+                      type="number"
+                      label="Cutoff Days Prior"
+                      value={attendanceCutoffDays}
+                      onChange={(e) => setAttendanceCutoffDays(e.target.value)}
+                      min="0"
+                      max="365"
+                      required={checkAttendance}
+                      hint="Days prior to exam to evaluate attendance."
+                    />
+                  </div>
+                </PolicySettingRow>
+
+                <PolicySettingRow
+                  label="Flag late or mid-term enrolments for review (NEEDS_REVIEW)"
+                  description="Students enrolled after classes commenced will be flagged for explicit coordinator review rather than disqualified."
+                  checked={allowLateEnrolmentReview}
+                  onChange={setAllowLateEnrolmentReview}
                 />
-                <TextField
-                  type="number"
-                  label="Cutoff Days Prior"
-                  value={attendanceCutoffDays}
-                  onChange={(e) => setAttendanceCutoffDays(e.target.value)}
-                  min="0"
-                  max="365"
-                  required
+
+                <PolicySettingRow
+                  label="Check fee clearance requirement"
+                  description="Verify that students have cleared applicable tuition and examination fees prior to hall ticket issuance."
+                  checked={checkFees}
+                  onChange={setCheckFees}
+                  badge="Finance Rule"
                 />
-              </div>
-
-              <div className="space-y-2 pt-1 border-t border-border">
-                <label className="flex items-center gap-2 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={checkAttendance}
-                    onChange={(e) => setCheckAttendance(e.target.checked)}
-                    className="h-4 w-4 rounded border-input text-brand-600 focus:ring-brand-500"
-                  />
-                  <span>Enforce minimum attendance requirement</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={allowLateEnrolmentReview}
-                    onChange={(e) => setAllowLateEnrolmentReview(e.target.checked)}
-                    className="h-4 w-4 rounded border-input text-brand-600 focus:ring-brand-500"
-                  />
-                  <span>Flag late or mid-term enrolments for review (NEEDS_REVIEW)</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={checkFees}
-                    onChange={(e) => setCheckFees(e.target.checked)}
-                    className="h-4 w-4 rounded border-input text-brand-600 focus:ring-brand-500"
-                  />
-                  <span>Check fee clearance (Future finance module condition)</span>
-                </label>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
@@ -2169,6 +2488,128 @@ export function ExaminationsPage() {
                 </Button>
                 <Button type="submit" variant="primary" disabled={savingOverride}>
                   {savingOverride ? 'Applying...' : 'Apply Override'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Principal Mark Correction / Amendment Modal */}
+      {correctionTarget && (
+        <div className="modal-backdrop" style={modalOverlayStyle}>
+          <div
+            className="modal-card"
+            style={modalCardStyle}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="correction-dialog-title"
+          >
+            <h3 id="correction-dialog-title" className="text-lg font-bold mb-1 text-foreground">
+              {correctionTarget.is_amendment
+                ? `Amend Published Result — ${correctionTarget.student_name}`
+                : `Correct Submitted Mark — ${correctionTarget.student_name}`}
+            </h3>
+            <p className="text-xs text-muted mb-4 font-mono">
+              Admission: {correctionTarget.admission_number}
+              {correctionTarget.roll_number ? ` | Roll No: #${correctionTarget.roll_number}` : ''} | Current Mark: {correctionTarget.current_marks} / {rosterData?.schedule.max_marks ?? 50}
+            </p>
+
+            <div className={`p-3 rounded-lg border text-xs mb-4 ${
+              correctionTarget.is_amendment
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200'
+                : 'bg-brand-500/10 border-brand-500/30 text-brand-900 dark:text-brand-200'
+            }`}>
+              <span className="font-bold block mb-1">
+                {correctionTarget.is_amendment
+                  ? 'Official Result Amendment & Republication'
+                  : 'Principal Authorized Mark Correction'}
+              </span>
+              <p>
+                {correctionTarget.is_amendment
+                  ? 'You are amending an officially published result. This action recalculates pass/fail outcome and class statistics, and records an immutable audit log (exam.marks.amend_published).'
+                  : 'You are correcting a submitted mark under Principal academic authority. This action records an immutable audit log (exam.marks.correct) with your mandatory justification.'}
+              </p>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                void handleApplyCorrection(e);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label
+                  htmlFor="correction-new-marks"
+                  className="block text-xs font-semibold text-foreground mb-1"
+                >
+                  New Marks Obtained (Max: {rosterData?.schedule.max_marks ?? 50})
+                </label>
+                <input
+                  id="correction-new-marks"
+                  type="number"
+                  step="any"
+                  min="0"
+                  max={rosterData?.schedule.max_marks ?? 100}
+                  value={correctionNewMarks}
+                  onChange={(e) => setCorrectionNewMarks(e.target.value)}
+                  required
+                  placeholder="Enter corrected score"
+                  className="w-full h-9 px-3 text-sm rounded-md border border-input bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="correction-reason"
+                  className="block text-xs font-semibold text-foreground mb-1"
+                >
+                  Mandatory Justification / Reason (Min 5 chars)
+                </label>
+                <textarea
+                  id="correction-reason"
+                  rows={3}
+                  value={correctionReason}
+                  onChange={(e) => setCorrectionReason(e.target.value)}
+                  placeholder="e.g. Recalculation after re-checking Section B answering sheet (Ref #PRIN-REV-04)"
+                  required
+                  minLength={5}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-input bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="correction-evidence-url"
+                  className="block text-xs font-semibold text-foreground mb-1"
+                >
+                  Supporting Document / Evidence URL (Optional)
+                </label>
+                <input
+                  id="correction-evidence-url"
+                  type="text"
+                  value={correctionEvidenceUrl}
+                  onChange={(e) => setCorrectionEvidenceUrl(e.target.value)}
+                  placeholder="https://records.school.internal/corrections/eval-scan.pdf"
+                  className="w-full h-9 px-3 text-sm rounded-md border border-input bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={submittingCorrection}
+                  onClick={() => setCorrectionTarget(null)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={submittingCorrection}>
+                  {submittingCorrection
+                    ? 'Saving...'
+                    : correctionTarget.is_amendment
+                      ? 'Submit & Republish'
+                      : 'Save Correction'}
                 </Button>
               </div>
             </form>

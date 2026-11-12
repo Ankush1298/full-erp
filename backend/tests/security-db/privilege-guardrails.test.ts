@@ -322,6 +322,9 @@ describe('identity and session tables: least privilege that keeps sign-in workin
       await adminQuery<{ id: string }>(`SELECT id FROM platform.auth_sessions LIMIT 1`)
     )[0]?.id;
     const attempts: Array<[string, string, unknown[]]> = [
+      ['table select identities', `SELECT * FROM platform.identities`, []],
+      ['select password hash', `SELECT password_hash FROM platform.identities WHERE id = $1`, [id]],
+      ['table select auth_sessions', `SELECT * FROM platform.auth_sessions`, []],
       ['delete identity', `DELETE FROM platform.identities WHERE id = $1`, [id]],
       [
         'set password hash',
@@ -334,6 +337,7 @@ describe('identity and session tables: least privilege that keeps sign-in workin
     ];
     if (sid) {
       attempts.push(
+        ['select token hash', `SELECT token_hash FROM platform.auth_sessions WHERE id = $1`, [sid]],
         ['delete session', `DELETE FROM platform.auth_sessions WHERE id = $1`, [sid]],
         [
           're-point session identity',

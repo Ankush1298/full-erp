@@ -73,6 +73,19 @@ describe('Platform CLI (Unit)', () => {
       expect(parsed.flags['duration-hours']).toBe('2');
     });
 
+    it('parses staff:invite-link flags correctly', () => {
+      const parsed = parseArgs([
+        'staff:invite-link',
+        '--tenant',
+        'anesa-demo-school',
+        '--email',
+        'teacher@anesa.org',
+      ]);
+      expect(parsed.command).toBe('staff:invite-link');
+      expect(parsed.flags['tenant']).toBe('anesa-demo-school');
+      expect(parsed.flags['email']).toBe('teacher@anesa.org');
+    });
+
     it('throws helpful usage error when no command or --help is given', () => {
       expect(() => parseArgs([])).toThrow(/Usage:/);
       expect(() => parseArgs(['--help'])).toThrow(/Usage:/);
@@ -315,6 +328,23 @@ describe('Platform CLI (Unit)', () => {
         expect(text, f).not.toContain('support-grant-local-key');
         expect(text, f).not.toMatch(/grantToken/);
       }
+    });
+
+    it('the CLI refuses to run without PLATFORM_DATABASE_URL and does not silently fall back to DATABASE_ADMIN_URL', () => {
+      const r = spawnSync(
+        'npx',
+        ['tsx', 'tools/platform/cli.ts', 'tenant:seed', '--tenant', 'apex-tech'],
+        {
+          cwd: resolve(__dirname, '../..'),
+          env: {
+            PATH: process.env['PATH'] ?? '',
+            DATABASE_ADMIN_URL: 'postgresql://postgres:secret@localhost:5432/db',
+          },
+          encoding: 'utf8',
+        },
+      );
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain('PLATFORM_DATABASE_URL is required');
     });
 
     it('createSupportGrant issues nothing: it always throws, whatever it is given', () => {

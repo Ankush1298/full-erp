@@ -248,9 +248,9 @@ export class ReportingService {
       conditions.push(`te.term_id = $${params.length}`);
     }
     if (query.status === 'ACTIVE') {
-      conditions.push(`s.status = 'ACTIVE'`);
+      conditions.push(`s.status IN ('ACTIVE', 'ADMITTED')`);
     } else if (query.status === 'INACTIVE') {
-      conditions.push(`s.status != 'ACTIVE'`);
+      conditions.push(`s.status NOT IN ('ACTIVE', 'ADMITTED')`);
     }
 
     const sql = `
@@ -274,7 +274,7 @@ export class ReportingService {
         FROM app.students s
         JOIN app.users u ON u.organization_id = s.organization_id AND u.id = s.user_id
         LEFT JOIN app.campuses c ON c.organization_id = s.organization_id AND (c.id = s.campus_id OR s.campus_id IS NULL)
-        LEFT JOIN app.term_enrollments te ON te.organization_id = s.organization_id AND te.student_id = s.id AND te.status IN ('REGISTERED', 'ENROLLED')
+        LEFT JOIN app.term_enrollments te ON te.organization_id = s.organization_id AND te.student_id = s.id AND te.status IN ('REGISTERED', 'ENROLLED', 'ACTIVE')
         LEFT JOIN app.cohort_periods cp ON cp.organization_id = te.organization_id AND cp.id = te.cohort_period_id
         LEFT JOIN app.cohorts co ON co.organization_id = cp.organization_id AND co.id = cp.cohort_id
         LEFT JOIN app.programs p ON p.organization_id = co.organization_id AND p.id = co.program_id
@@ -287,7 +287,9 @@ export class ReportingService {
     const students = res.rows;
 
     const totalStudents = students.length;
-    const activeStudents = students.filter((s) => s.enrolment_status === 'ACTIVE').length;
+    const activeStudents = students.filter(
+      (s) => s.enrolment_status === 'ACTIVE' || s.enrolment_status === 'ADMITTED',
+    ).length;
     const campusesCount = new Set(students.map((s) => s.campus_id).filter(Boolean)).size;
 
     let csv: string | undefined;

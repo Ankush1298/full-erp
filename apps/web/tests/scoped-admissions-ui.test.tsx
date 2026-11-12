@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { renderApp } from './helpers/render';
@@ -94,5 +94,101 @@ describe('Scoped Admissions UI: Institution-Aware Terminology', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register student' })).toBeInTheDocument();
+  });
+
+  it('4. SCHOOL mode: admits pupil without User Account ID UUID and validates pupil name', async () => {
+    let capturedPayload: Record<string, unknown> | null = null;
+    let capturedHeaders: Record<string, string> | null = null;
+    const { b, user, view } = setupWithInstitution('SCHOOL');
+    const originalFetch = b.fetch;
+    b.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/v1/students') && init?.method === 'POST') {
+        capturedPayload = JSON.parse(init.body as string) as Record<string, unknown>;
+        capturedHeaders = init.headers as Record<string, string>;
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: { id: '01900000-0000-7000-8000-000000000099' },
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return originalFetch(input, init);
+    };
+
+    view();
+
+    // Verify Pupil name field is present and required; User ID is optional
+    const newAdmHeading = await screen.findByRole('heading', { level: 2, name: 'New admission' });
+    const card = newAdmHeading.closest('.card') as HTMLElement;
+    const cardEl = within(card);
+
+    expect(cardEl.getByLabelText(/Pupil name/i)).toBeInTheDocument();
+    expect(cardEl.getByLabelText(/Pupil name/i)).toBeRequired();
+    expect(cardEl.getByLabelText(/User account ID \(UUID\)/i)).not.toBeRequired();
+
+    // 1. Validation test: empty form submission requires pupil name, not user ID
+    await user.click(cardEl.getByRole('button', { name: 'Confirm admission' }));
+    expect(await cardEl.findByText('Pupil name is required.')).toBeInTheDocument();
+    expect(cardEl.queryByText('User account ID is required.')).not.toBeInTheDocument();
+
+    // 2. Successful admission without user ID
+    await user.type(cardEl.getByLabelText(/Pupil name/i), 'Aarav Patel');
+    await user.type(cardEl.getByLabelText(/Admission number/i), 'SCH-2026-001');
+    await user.click(cardEl.getByRole('button', { name: 'Confirm admission' }));
+
+    // Verify success banner appears
+    expect(
+      await cardEl.findByText(
+        /Pupil successfully admitted \(ID: 01900000-0000-7000-8000-000000000099\)/,
+      ),
+    ).toBeInTheDocument();
+
+    // Verify backend received student creation payload WITHOUT userId and WITH Idempotency-Key header
+    expect(capturedPayload).not.toBeNull();
+    expect(capturedPayload?.['name']).toBe('Aarav Patel');
+    expect(capturedPayload?.['admissionNumber']).toBe('SCH-2026-001');
+    expect(capturedPayload?.['userId']).toBeUndefined();
+    expect(capturedHeaders?.['Idempotency-Key']).toBeDefined();
+    expect(capturedHeaders?.['Idempotency-Key']).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+  });
+
+  it('5. SCHOOL mode: displays actionable explanation when server returns HTTP 428 precondition error', async () => {
+    const { b, user, view } = setupWithInstitution('SCHOOL');
+    const originalFetch = b.fetch;
+    b.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/v1/students') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: 'IDEMPOTENCY_KEY_REQUIRED',
+              message: 'The Idempotency-Key header is required.',
+            },
+          }),
+          { status: 428, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return originalFetch(input, init);
+    };
+
+    view();
+
+    const newAdmHeading = await screen.findByRole('heading', { level: 2, name: 'New admission' });
+    const card = newAdmHeading.closest('.card') as HTMLElement;
+    const cardEl = within(card);
+
+    await user.type(cardEl.getByLabelText(/Pupil name/i), 'Meera Sen');
+    await user.type(cardEl.getByLabelText(/Admission number/i), 'SCH-2026-002');
+    await user.click(cardEl.getByRole('button', { name: 'Confirm admission' }));
+
+    // Verify actionable message appears, NOT generic 'API validation (428)'
+    expect(
+      await cardEl.findByText(/A required transaction identifier \(Idempotency-Key\) was missing/),
+    ).toBeInTheDocument();
+    expect(cardEl.queryByText(/API validation \(428\)/i)).not.toBeInTheDocument();
   });
 });

@@ -17,17 +17,9 @@ import {
   assertLocalTokenOutput,
   issueFirstAdminInvitation,
   issueFirstAdminMfaTicket,
+  issueStaffInvitationLink,
   revokeFirstAdminInvitation,
 } from './first-admin.js';
-
-function requiredEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) {
-    console.error(`Error: environment variable ${name} is required.`);
-    process.exit(1);
-  }
-  return v;
-}
 
 async function main(argv: readonly string[]): Promise<void> {
   let parsed: { command: string; flags: Record<string, string> };
@@ -46,9 +38,12 @@ async function main(argv: readonly string[]): Promise<void> {
 
   const connectionString =
     process.env['PLATFORM_DATABASE_URL'] ||
-    process.env['DATABASE_ADMIN_URL'] ||
-    process.env['MIGRATION_DATABASE_URL'] ||
-    requiredEnv('DATABASE_ADMIN_URL');
+    (() => {
+      console.error(
+        'Error: PLATFORM_DATABASE_URL is required. Silent fallback to DATABASE_ADMIN_URL or superuser privileges is disabled for platform isolation (doc 48 §1.3).',
+      );
+      process.exit(1);
+    })();
 
   const client = new pg.Client({ connectionString });
   await client.connect();
@@ -145,10 +140,32 @@ async function main(argv: readonly string[]): Promise<void> {
       console.log(`  User ID:    ${res.userId}`);
       console.log(`  Expires:    ${res.expiresAt}`);
       console.log(`  Ticket:     ${res.ticket}`);
+    } else if (command === 'staff:invite-link') {
+      const tenant = flags['tenant'];
+      if (!tenant) throw new Error('--tenant is required for staff:invite-link.');
+      const email = flags['email'];
+      if (!email) throw new Error('--email is required for staff:invite-link.');
+      assertLocalTokenOutput(connectionString, process.env);
+      const hours = flags['hours'] ? Number(flags['hours']) : undefined;
+      const res = await issueStaffInvitationLink(client, {
+        tenant,
+        email,
+        ...(hours !== undefined ? { ttlHours: hours } : {}),
+        ...(flags['reason'] ? { reason: flags['reason'] } : {}),
+      });
+      console.log('Staff activation link (shown once; share directly with staff member):');
+      console.log(`  Tenant ID:   ${res.tenantId}`);
+      console.log(`  User ID:     ${res.userId}`);
+      console.log(`  Name:        ${res.displayName}`);
+      console.log(`  Email:       ${res.email}`);
+      console.log(
+        `  Expires:     ${res.expiresAt}${res.reissued ? '  (an earlier unused invitation was withdrawn)' : ''}`,
+      );
+      console.log(`  Accept Link: ${res.acceptUrl}`);
     } else {
       console.error(`Unknown command: ${command}`);
       console.error(
-        'Supported commands: tenant:create, tenant:seed, tenant:suspend, support:grant, admin:invite, admin:invite-revoke, admin:mfa-ticket',
+        'Supported commands: tenant:create, tenant:seed, tenant:suspend, support:grant, admin:invite, admin:invite-revoke, admin:mfa-ticket, staff:invite-link',
       );
       process.exit(1);
     }

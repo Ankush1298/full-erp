@@ -335,6 +335,7 @@ describe('no accidental probe or debug objects', () => {
         'get_identity_memberships',
         'lock_invitation',
         'mfa_enrollment_tickets_guard',
+        'mint_invitation_mfa_ticket',
         'reject_audit_mutation',
         'reject_student_program_event_mutation',
         'role_assignments_guard',
@@ -383,6 +384,11 @@ describe('no accidental probe or debug objects', () => {
         'exam_marks_guard',
         'exam_candidates_guard',
         'fee_receipts_immutable_guard',
+        'lock_identity_by_email',
+        'lookup_identity_by_email',
+        'lookup_identity_by_id',
+        'lookup_session_by_id',
+        'lookup_session_by_token',
       ].sort(),
     );
     const rels = await adminQuery<{ relname: string }>(

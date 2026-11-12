@@ -1415,6 +1415,103 @@ describe('holidays: campus and organization-wide calendars', () => {
       ).statusCode,
     ).toBe(404);
   });
+
+  it('smart annual holiday suggestions catalogue and bulk approval', async () => {
+    // 1. GET /academics/holidays/suggestions
+    const sugRes = await call(
+      'GET',
+      s.admin,
+      `/academics/holidays/suggestions?country=IN&state=BR&from=2026-04-01&to=2027-03-31`,
+    );
+    expect(sugRes.statusCode, sugRes.body).toBe(200);
+    const suggestions = dataOf<
+      Array<{
+        id: string;
+        holidayDate: string;
+        name: string;
+        category: string;
+        verificationStatus: string;
+        source: string;
+        alreadyDeclared: boolean;
+      }>
+    >(sugRes);
+    expect(suggestions.length).toBeGreaterThan(15);
+
+    // Verified fixed national & state days present
+    const names = suggestions.map((s) => s.name);
+    expect(names).toContain('Independence Day');
+    expect(names).toContain('Bihar Diwas (Bihar Day)');
+    expect(names).toContain('Chhath Puja (Evening Arghya)');
+
+    // 2. Student has read access to suggestions
+    const studentSug = await call(
+      'GET',
+      s.student,
+      `/academics/holidays/suggestions?country=IN&state=BR&from=2026-04-01&to=2027-03-31`,
+    );
+    expect(studentSug.statusCode).toBe(200);
+
+    // 3. Student cannot bulk create (needs academic.term.manage)
+    const studentBulk = await call('POST', s.student, '/academics/holidays/bulk', {
+      reason: 'Attempted bulk approval',
+      holidays: [{ holidayDate: '2026-08-15', name: 'Independence Day', kind: 'HOLIDAY' }],
+    });
+    expect(studentBulk.statusCode).toBe(403);
+
+    // 4. Campus-scoped admin cannot bulk create organization-wide holidays
+    const campusOrgBulk = await call('POST', s.campusAdmin, '/academics/holidays/bulk', {
+      reason: 'Attempted org-wide bulk',
+      holidays: [{ holidayDate: '2026-08-15', name: 'Independence Day', kind: 'HOLIDAY' }],
+    });
+    expect(campusOrgBulk.statusCode).toBe(403);
+
+    // 5. Admin bulk approves annual holidays for campus T
+    const bulk1 = await call('POST', s.admin, '/academics/holidays/bulk', {
+      campusId: T.campusId,
+      reason: 'Annual school holiday approval 2026-2027',
+      holidays: [
+        { holidayDate: '2026-08-15', name: 'Independence Day', kind: 'HOLIDAY' },
+        { holidayDate: '2026-10-02', name: 'Mahatma Gandhi Jayanti', kind: 'HOLIDAY' },
+        { holidayDate: '2026-11-14', name: 'Chhath Puja (Evening Arghya)', kind: 'HOLIDAY' },
+      ],
+    });
+    expect(bulk1.statusCode, bulk1.body).toBe(201);
+    const res1 = dataOf<{ createdCount: number; skippedCount: number; createdIds: string[] }>(
+      bulk1,
+    );
+    expect(res1.createdCount).toBe(3);
+    expect(res1.skippedCount).toBe(0);
+    expect(res1.createdIds).toHaveLength(3);
+
+    // 6. Repeated bulk import skips duplicates safely without error
+    const bulk2 = await call('POST', s.admin, '/academics/holidays/bulk', {
+      campusId: T.campusId,
+      reason: 'Repeated import check',
+      holidays: [
+        { holidayDate: '2026-08-15', name: 'Independence Day', kind: 'HOLIDAY' }, // duplicate
+        { holidayDate: '2026-12-25', name: 'Christmas Day', kind: 'HOLIDAY' }, // new
+      ],
+    });
+    expect(bulk2.statusCode, bulk2.body).toBe(201);
+    const res2 = dataOf<{
+      createdCount: number;
+      skippedCount: number;
+      skipped: Array<{ name: string; reason: string }>;
+    }>(bulk2);
+    expect(res2.createdCount).toBe(1);
+    expect(res2.skippedCount).toBe(1);
+    expect(res2.skipped[0]?.reason).toBe('Already declared');
+
+    // 7. Verify suggestions now show alreadyDeclared: true for the imported items
+    const sugAfter = await call(
+      'GET',
+      s.admin,
+      `/academics/holidays/suggestions?country=IN&state=BR&campusId=${T.campusId}&from=2026-04-01&to=2027-03-31`,
+    );
+    const listAfter = dataOf<Array<{ name: string; alreadyDeclared: boolean }>>(sugAfter);
+    const indep = listAfter.find((h) => h.name === 'Independence Day');
+    expect(indep?.alreadyDeclared).toBe(true);
+  });
 });
 
 // =============================================================================================

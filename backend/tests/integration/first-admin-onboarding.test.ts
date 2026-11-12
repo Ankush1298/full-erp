@@ -15,6 +15,7 @@ import {
   OnboardingError,
   issueFirstAdminInvitation,
   issueFirstAdminMfaTicket,
+  issueStaffInvitationLink,
   revokeFirstAdminInvitation,
 } from '../../tools/platform/first-admin.js';
 import { createTenant } from '../../tools/platform/platform-cli.js';
@@ -431,6 +432,48 @@ describe('MFA: operator ticket, step-up, enrolment, then normal administrative a
       payload: { email: b.email, password: GOOD, tenant: a.slug },
     });
     expect(cross.statusCode).toBe(401);
+  });
+
+  it('local staff invitation workflow: ordinary staff invited in the school can receive an activation link without becoming platform admins', async () => {
+    const s = await newSchool();
+    // Insert ordinary staff member into app.users in INVITED status
+    const staffId = uuidv7();
+    const staffEmail = `teacher-${RUN}@campus.test`;
+    await op.query(
+      `INSERT INTO app.users (id, organization_id, email, display_name, status)
+       VALUES ($1, $2, $3, 'Staff Teacher', 'INVITED')`,
+      [staffId, s.id, staffEmail],
+    );
+    // Assign FACULTY role
+    const facultyRole = await op.query<{ id: string }>(
+      `SELECT id FROM app.roles WHERE organization_id = $1 AND name = 'FACULTY'`,
+      [s.id],
+    );
+    if (facultyRole.rows[0]) {
+      await op.query(
+        `INSERT INTO app.role_assignments (id, organization_id, user_id, role_id, scope_type)
+         VALUES ($1, $2, $3, $4, 'ORGANIZATION')`,
+        [uuidv7(), s.id, staffId, facultyRole.rows[0].id],
+      );
+    }
+
+    // Issue invitation link via staff:invite-link tool
+    const res = await issueStaffInvitationLink(op, { tenant: s.slug, email: staffEmail });
+    secrets.push(res.token);
+    expect(res.acceptUrl).toContain('/accept-invite');
+    expect(res.acceptUrl).toContain(res.token);
+    expect(res.email).toBe(staffEmail);
+
+    // Accept invite
+    const acc = await accept(res.token, GOOD);
+    expect(acc.statusCode).toBe(200);
+
+    // Log in as ordinary staff
+    const staffSess = await login(staffEmail, s.slug);
+    const me = (await get('/auth/me', staffSess)).json<{ tenant_id: string; roles: string[] }>();
+    expect(me.tenant_id).toBe(s.id);
+    expect(me.roles).toContain('FACULTY');
+    expect(me.roles).not.toContain('COLLEGE_ADMIN');
   });
 });
 

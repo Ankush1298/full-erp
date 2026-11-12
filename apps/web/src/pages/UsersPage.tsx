@@ -23,11 +23,14 @@ import { can } from '../features/auth/identity';
 import { useStepUp } from '../features/auth/StepUp';
 import { userErrorMessage, userLoadMessage } from '../lib/api/messages';
 import {
+  adminResetUserMfa,
   fetchUsers,
   inviteUser,
+  issueMfaEnrollmentTicket,
   reactivateUser,
   suspendUser,
   USER_STATUSES,
+  type IssueMfaTicketResult,
   type User,
   type UserStatus,
 } from '../lib/api/user-api';
@@ -90,6 +93,7 @@ export function UsersPage() {
 
   const canInvite = Boolean(identity && can(identity, 'user.account.invite'));
   const canSuspend = Boolean(identity && can(identity, 'user.account.suspend'));
+  const canResetMfa = Boolean(identity && can(identity, 'user.account.reset_mfa'));
 
   const [users, setUsers] = useState<User[]>([]);
   const [nextAfter, setNextAfter] = useState<string | null>(null);
@@ -101,7 +105,11 @@ export function UsersPage() {
   const [searchFilter, setSearchFilter] = useState('');
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [activeModal, setActiveModal] = useState<'invite' | 'suspend' | 'reactivate' | null>(null);
+  const [activeModal, setActiveModal] = useState<
+    'invite' | 'suspend' | 'reactivate' | 'reset_mfa' | 'issue_ticket' | null
+  >(null);
+  const [ticketResult, setTicketResult] = useState<IssueMfaTicketResult | null>(null);
+  const [ticketCopied, setTicketCopied] = useState(false);
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('');
@@ -191,11 +199,34 @@ export function UsersPage() {
     setNotice(null);
   };
 
+  const openResetMfaModal = (user: User) => {
+    setSelectedUser(user);
+    setActiveModal('reset_mfa');
+    setMutationReason('');
+    setMutationError(null);
+    setActionError(null);
+    setNotice(null);
+    setTicketResult(null);
+  };
+
+  const openIssueTicketModal = (user: User) => {
+    setSelectedUser(user);
+    setActiveModal('issue_ticket');
+    setMutationReason('');
+    setMutationError(null);
+    setActionError(null);
+    setNotice(null);
+    setTicketResult(null);
+    setTicketCopied(false);
+  };
+
   const closeModal = () => {
     setActiveModal(null);
     setMutationReason('');
     setMutationError(null);
     setInviteErrors({});
+    setTicketResult(null);
+    setTicketCopied(false);
   };
 
   // Submit invitation
@@ -333,6 +364,82 @@ export function UsersPage() {
       // Never silently retry on conflict; notify and refresh
       setActionError(userErrorMessage(err));
       loadUsers(undefined, statusFilter);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  // Submit MFA Reset
+  const submitResetMfa = async (e: FormEvent): Promise<void> => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    if (identity && identity.userId === selectedUser.id) {
+      setMutationError('You cannot reset MFA for your own account.');
+      return;
+    }
+
+    const trimmedReason = mutationReason.trim();
+    if (trimmedReason.length < MIN_REASON) {
+      setMutationError(`Give a reason of at least ${MIN_REASON} characters.`);
+      return;
+    }
+    setMutationError(null);
+
+    setPending(true);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      const result = await runWithStepUp(
+        () => adminResetUserMfa(client, selectedUser.id, trimmedReason),
+        'PASSWORD_MFA',
+      );
+      closeModal();
+      setNotice({
+        tone: 'success',
+        message: `MFA reset successfully for ${selectedUser.displayName} (${selectedUser.email}). ${result.factorsRevoked} factor(s) and ${result.sessionsRevoked} session(s) revoked. User is provisioned to re-enroll MFA on next login.`,
+      });
+      loadUsers(undefined, statusFilter);
+    } catch (err: unknown) {
+      setActionError(userErrorMessage(err));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  // Submit Issue Re-enrollment Ticket
+  const submitIssueTicket = async (e: FormEvent): Promise<void> => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    if (identity && identity.userId === selectedUser.id) {
+      setMutationError('You cannot issue an enrollment ticket for your own account.');
+      return;
+    }
+
+    const trimmedReason = mutationReason.trim();
+    if (trimmedReason.length < MIN_REASON) {
+      setMutationError(`Give a reason of at least ${MIN_REASON} characters.`);
+      return;
+    }
+    setMutationError(null);
+
+    setPending(true);
+    setActionError(null);
+
+    try {
+      const result = await runWithStepUp(
+        () => issueMfaEnrollmentTicket(client, selectedUser.id, trimmedReason),
+        'PASSWORD_MFA',
+      );
+      setTicketResult(result);
+      setNotice({
+        tone: 'success',
+        message: `A 24-hour MFA enrollment ticket has been generated for ${selectedUser.displayName}.`,
+      });
+    } catch (err: unknown) {
+      setActionError(userErrorMessage(err));
     } finally {
       setPending(false);
     }
@@ -523,6 +630,142 @@ export function UsersPage() {
         </Card>
       ) : null}
 
+      {/* Reset MFA Confirmation Panel */}
+      {activeModal === 'reset_mfa' && selectedUser ? (
+        <Card title={`Reset Multi-Factor Authentication: ${selectedUser.displayName}`}>
+          <form
+            onSubmit={(e) => void submitResetMfa(e)}
+            noValidate
+            aria-label="Reset MFA for user"
+            className="access-panel"
+          >
+            <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
+              Resetting MFA will immediately revoke all registered authenticators, emergency
+              recovery codes, and live sessions for {selectedUser.displayName} ({selectedUser.email}
+              ).
+            </p>
+            <p className="field-hint" style={{ marginBottom: 'var(--space-3)' }}>
+              A single-use 24-hour re-enrollment ticket will automatically be provisioned. When{' '}
+              {selectedUser.displayName} signs in next, they will be prompted to configure their new
+              authenticator app.
+            </p>
+            {isSelf ? (
+              <Alert tone="error">
+                You cannot reset MFA for your own account. Ask another administrator to perform this
+                action.
+              </Alert>
+            ) : null}
+            <TextField
+              label="Reason for MFA reset"
+              name="reason"
+              value={mutationReason}
+              onChange={(e) => setMutationReason(e.target.value)}
+              hint="Required for security audit compliance (minimum 5 characters, e.g., 'Staff lost mobile phone')."
+              error={mutationError ?? undefined}
+              disabled={pending || isSelf}
+              required
+            />
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+              <Button type="submit" variant="primary" pending={pending} disabled={isSelf}>
+                Confirm MFA reset
+              </Button>
+              <Button type="button" variant="secondary" disabled={pending} onClick={closeModal}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
+      ) : null}
+
+      {/* Issue Re-enrollment Ticket Panel */}
+      {activeModal === 'issue_ticket' && selectedUser ? (
+        <Card title={`Issue MFA Enrollment Ticket: ${selectedUser.displayName}`}>
+          {ticketResult ? (
+            <div className="access-panel">
+              <Alert tone="success">
+                Enrollment ticket generated successfully for {selectedUser.displayName}.
+              </Alert>
+              <p className="field-hint" style={{ marginTop: 'var(--space-2)' }}>
+                Ticket ID: <code>{ticketResult.ticketId}</code>
+                <br />
+                Expires at: <strong>{formatWhen(ticketResult.expiresAt)}</strong>
+              </p>
+              <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+                <label
+                  htmlFor="ticket-token-display"
+                  style={{ display: 'block', fontWeight: 600, marginBottom: 'var(--space-1)' }}
+                >
+                  64-character Ticket Token
+                </label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                  <input
+                    id="ticket-token-display"
+                    type="text"
+                    readOnly
+                    value={ticketResult.ticket}
+                    style={{
+                      fontFamily: 'var(--font-mono, monospace)',
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      fontSize: '0.9rem',
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(ticketResult.ticket);
+                      setTicketCopied(true);
+                      setTimeout(() => setTicketCopied(false), 3000);
+                    }}
+                  >
+                    {ticketCopied ? 'Copied!' : 'Copy'}
+                  </Button>
+                </div>
+              </div>
+              <Button type="button" variant="primary" onClick={closeModal}>
+                Done
+              </Button>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => void submitIssueTicket(e)}
+              noValidate
+              aria-label="Issue MFA Enrollment Ticket"
+              className="access-panel"
+            >
+              <p className="field-hint" style={{ marginBottom: 'var(--space-3)' }}>
+                Issues a single-use 24-hour ticket authorizing {selectedUser.displayName} to enroll
+                or re-enroll multi-factor authentication.
+              </p>
+              {isSelf ? (
+                <Alert tone="error">
+                  You cannot issue an enrollment ticket for your own account.
+                </Alert>
+              ) : null}
+              <TextField
+                label="Reason for ticket issuance"
+                name="reason"
+                value={mutationReason}
+                onChange={(e) => setMutationReason(e.target.value)}
+                hint="Required for audit compliance (minimum 5 characters)."
+                error={mutationError ?? undefined}
+                disabled={pending || isSelf}
+                required
+              />
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+                <Button type="submit" variant="primary" pending={pending} disabled={isSelf}>
+                  Generate ticket
+                </Button>
+                <Button type="button" variant="secondary" disabled={pending} onClick={closeModal}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      ) : null}
+
       {/* User Directory */}
       <Card title="User directory">
         <div
@@ -586,6 +829,7 @@ export function UsersPage() {
                   <th scope="col">Name</th>
                   <th scope="col">Email</th>
                   <th scope="col">Status</th>
+                  <th scope="col">MFA</th>
                   <th scope="col">Created</th>
                   <th scope="col">Actions</th>
                 </tr>
@@ -616,6 +860,30 @@ export function UsersPage() {
                       <td>{u.email}</td>
                       <td>
                         <StatusBadge status={u.status} />
+                      </td>
+                      <td>
+                        {u.mfaEnrolled ? (
+                          <span
+                            className="badge badge--success"
+                            style={{
+                              backgroundColor: 'var(--color-success-bg, #e6f4ea)',
+                              color: 'var(--color-success-text, #137333)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Enrolled
+                          </span>
+                        ) : (
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: 'var(--color-surface-hover, #f1f3f4)',
+                              color: 'var(--color-text-secondary, #5f6368)',
+                            }}
+                          >
+                            Not enrolled
+                          </span>
+                        )}
                       </td>
                       <td>{formatWhen(u.createdAt)}</td>
                       <td>
@@ -698,12 +966,64 @@ export function UsersPage() {
             <dd>
               <StatusBadge status={selectedUser.status} />
             </dd>
+            <dt style={{ fontWeight: 600 }}>Two-Factor (MFA):</dt>
+            <dd>
+              {selectedUser.mfaEnrolled ? (
+                <span
+                  className="badge badge--success"
+                  style={{
+                    backgroundColor: 'var(--color-success-bg, #e6f4ea)',
+                    color: 'var(--color-success-text, #137333)',
+                    fontWeight: 600,
+                  }}
+                >
+                  Enrolled
+                </span>
+              ) : (
+                <span
+                  className="badge"
+                  style={{
+                    backgroundColor: 'var(--color-surface-hover, #f1f3f4)',
+                    color: 'var(--color-text-secondary, #5f6368)',
+                  }}
+                >
+                  Not enrolled
+                </span>
+              )}
+            </dd>
             <dt style={{ fontWeight: 600 }}>Created at:</dt>
             <dd>{formatWhen(selectedUser.createdAt)}</dd>
             <dt style={{ fontWeight: 600 }}>Account version:</dt>
             <dd>{selectedUser.version}</dd>
           </dl>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 'var(--space-2)',
+              marginTop: 'var(--space-4)',
+              flexWrap: 'wrap',
+            }}
+          >
+            {canResetMfa && !isSelf ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => openResetMfaModal(selectedUser)}
+                  title={`Reset MFA factors and sessions for ${selectedUser.displayName}`}
+                >
+                  Reset MFA
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => openIssueTicketModal(selectedUser)}
+                  title={`Issue single-use MFA enrollment ticket for ${selectedUser.displayName}`}
+                >
+                  Issue MFA ticket
+                </Button>
+              </>
+            ) : null}
             {canSuspend && selectedUser.status === 'ACTIVE' ? (
               <Button
                 type="button"

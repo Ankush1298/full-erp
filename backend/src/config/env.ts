@@ -86,6 +86,14 @@ const EnvSchema = z.object({
   CLAMAV_HOST: z.string().optional(),
   CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
   CLAMAV_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(30000),
+  // SMTP configuration for outgoing emails (invitations, notifications).
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_SECURE: booleanString,
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  APP_WEB_ORIGIN: z.string().optional(),
 });
 
 /** Parses APP_ORIGINS: exact origins only (scheme://host[:port]), no paths, no wildcards. */
@@ -236,6 +244,72 @@ function parseClamAv(
   };
 }
 
+/** SMTP configuration for outgoing email delivery. Present only when configured. */
+export interface SmtpConfig {
+  readonly host: string;
+  readonly port: number;
+  readonly secure: boolean;
+  readonly user?: string | undefined;
+  readonly password?: Secret | undefined;
+  readonly from: string;
+  readonly webOrigin?: string | undefined;
+}
+
+const CRLF_RE = /[\r\n]/;
+const EMAIL_RE = /^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/;
+
+function parseSmtp(
+  e: {
+    SMTP_HOST?: string | undefined;
+    SMTP_PORT: number;
+    SMTP_SECURE: boolean;
+    SMTP_USER?: string | undefined;
+    SMTP_PASSWORD?: string | undefined;
+    SMTP_FROM?: string | undefined;
+    APP_WEB_ORIGIN?: string | undefined;
+  },
+  problems: string[],
+): SmtpConfig | undefined {
+  if (e.SMTP_HOST === undefined || e.SMTP_HOST.trim().length === 0) return undefined;
+  const host = e.SMTP_HOST.trim();
+  if (CRLF_RE.test(host)) {
+    problems.push('SMTP_HOST: must not contain newline characters');
+  }
+  if (!e.SMTP_FROM || !EMAIL_RE.test(e.SMTP_FROM) || CRLF_RE.test(e.SMTP_FROM)) {
+    problems.push(
+      'SMTP_FROM: required and must be a valid email address without newlines when SMTP_HOST is set',
+    );
+  }
+  if (e.SMTP_USER && !e.SMTP_PASSWORD) {
+    problems.push('SMTP_PASSWORD: required when SMTP_USER is set');
+  }
+  if (e.SMTP_PASSWORD && !e.SMTP_USER) {
+    problems.push('SMTP_USER: required when SMTP_PASSWORD is set');
+  }
+  if (e.APP_WEB_ORIGIN) {
+    try {
+      const u = new URL(e.APP_WEB_ORIGIN);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        problems.push('APP_WEB_ORIGIN: must be an http:// or https:// URL');
+      }
+    } catch {
+      problems.push('APP_WEB_ORIGIN: must be a valid URL');
+    }
+  }
+
+  const secure = e.SMTP_SECURE || e.SMTP_PORT === 465;
+
+  return {
+    host,
+    port: e.SMTP_PORT,
+    secure,
+    ...(e.SMTP_USER ? { user: e.SMTP_USER } : {}),
+    ...(e.SMTP_PASSWORD ? { password: new Secret(e.SMTP_PASSWORD) } : {}),
+    from: e.SMTP_FROM ?? '',
+    ...(e.APP_WEB_ORIGIN ? { webOrigin: e.APP_WEB_ORIGIN } : {}),
+  };
+}
+
 /**
  * `<KEYS>` is `<keyId>:<key>` entries separated by commas (no whitespace is trimmed); `<ACTIVE>` names the key used for
  * new data, every other key only reads. Both variables or neither: absent means the ring is absent and nothing else
@@ -334,6 +408,8 @@ export interface AppConfig {
   readonly storage?: StorageConfig;
   /** ClamAV daemon configuration. Always present in production; absent elsewhere = scanner fails closed. */
   readonly clamav?: ClamAvConfig;
+  /** SMTP configuration for outgoing email delivery. Present only when configured. */
+  readonly smtp?: SmtpConfig;
 }
 
 export class ConfigError extends Error {
@@ -395,6 +471,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   const storage = parseStorage(e, problems);
   const clamav = parseClamAv(e, problems);
+  const smtp = parseSmtp(e, problems);
   if (e.STUDENT_DIRECTORY_LIST_ENABLED && !cursor) {
     problems.push(
       'STUDENT_DIRECTORY_LIST_ENABLED: requires valid CURSOR_KEYS and CURSOR_ACTIVE_KEY_ID',
@@ -462,5 +539,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     ...(importMatching ? { importMatching } : {}),
     ...(storage ? { storage } : {}),
     ...(clamav ? { clamav } : {}),
+    ...(smtp ? { smtp } : {}),
   };
 }

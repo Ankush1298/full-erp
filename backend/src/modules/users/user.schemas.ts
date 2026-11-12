@@ -22,6 +22,7 @@ export const UserDtoSchema = Type.Object(
     status: Type.Union(USER_STATUSES.map((s) => Type.Literal(s))),
     version: Type.Integer({ minimum: 1 }),
     createdAt: Type.String(),
+    mfaEnrolled: Type.Optional(Type.Boolean()),
   },
   { additionalProperties: false },
 );

@@ -92,6 +92,36 @@ export const ListEmployeesQuerySchema = Type.Object(
 );
 export type ListEmployeesQuery = Static<typeof ListEmployeesQuerySchema>;
 
+/** Minimum personal data returned for the faculty selector UI (doc 11 §5.4). */
+export const EmployeeSearchResultSchema = Type.Object(
+  {
+    id: UuidV7Schema,
+    employeeCode: Type.String(),
+    displayName: Type.String(),
+    email: Type.Optional(Type.String()),
+    campusId: Type.Optional(Type.Union([UuidV7Schema, Type.Null()])),
+    campusName: Type.Union([Type.String(), Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+export type EmployeeSearchResultDto = Static<typeof EmployeeSearchResultSchema>;
+
+/** Query parameters for the employee search / faculty selector. `q` is a free-text search (name, code, email). */
+export const EmployeeSearchQuerySchema = Type.Object(
+  {
+    q: Type.Optional(Type.String({ maxLength: 100 })),
+    campusId: Type.Optional(UuidV7Schema),
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
+  },
+  { additionalProperties: false },
+);
+export type EmployeeSearchQuery = Static<typeof EmployeeSearchQuerySchema>;
+
+export const EmployeeSearchResponseSchema = Type.Object(
+  { success: Type.Literal(true), data: Type.Array(EmployeeSearchResultSchema) },
+  { additionalProperties: false },
+);
+
 export const CreateEmployeeResponseSchema = Type.Object(
   {
     success: Type.Literal(true),

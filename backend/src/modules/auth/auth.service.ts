@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { AppError } from '../../shared/errors/http-errors.js';
 import {
   INSTITUTION_TYPE_KEY,
@@ -200,6 +201,17 @@ export class AuthService {
         throw err;
       }
 
+      // Single-use 24-hour onboarding enrollment ticket for invited staff/principals
+      const onboardingTicketId = uuidv7();
+      const rawTicket = randomBytes(32).toString('hex');
+      const ticketCodeHash = createHash('sha256').update(rawTicket).digest('hex');
+
+      await tx.query('SELECT platform.mint_invitation_mfa_ticket($1, $2, $3)', [
+        tokenHash,
+        onboardingTicketId,
+        ticketCodeHash,
+      ]);
+
       // The function set the transaction-local context from the invitation row; the user is ACTIVE now.
       const ctx = issueTrustedContext({
         tenantId: invitation.organization_id,
@@ -274,7 +286,7 @@ export class AuthService {
       }
 
       const identity = await tx.query<{ status: string }>(
-        'SELECT status FROM platform.identities WHERE id = $1',
+        'SELECT status FROM platform.lookup_identity_by_id($1)',
         [session.identity_id],
       );
       if (identity.rows[0]?.status !== 'ACTIVE') {

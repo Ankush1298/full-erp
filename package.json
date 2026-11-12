@@ -28,7 +28,8 @@
     "test:security:db": "pnpm --filter @campusos/backend run test:security:db",
     "db:bootstrap": "pnpm --filter @campusos/backend run db:bootstrap",
     "db:migrate": "pnpm --filter @campusos/backend run db:migrate",
-    "platform:cli": "pnpm --filter @campusos/backend run platform:cli"
+    "platform:cli": "pnpm --filter @campusos/backend run platform:cli",
+    "dev:invites": "pnpm --filter @campusos/backend run dev:invites"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

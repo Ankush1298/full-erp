@@ -29,7 +29,7 @@ export function parseArgs(argv: readonly string[]): {
   const command = argv[0];
   if (!command || command === '--help' || command === '-h') {
     throw new Error(
-      'Usage: tsx tools/platform/cli.ts <tenant:create|tenant:seed|tenant:suspend|admin:invite|admin:invite-revoke|admin:mfa-ticket> [options]',
+      'Usage: tsx tools/platform/cli.ts <tenant:create|tenant:seed|tenant:suspend|admin:invite|admin:invite-revoke|admin:mfa-ticket|staff:invite-link> [options]',
     );
   }
 

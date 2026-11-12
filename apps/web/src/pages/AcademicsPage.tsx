@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { TextField } from '../components/ui/TextField';
 import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -13,6 +14,7 @@ import { can } from '../features/auth/identity';
 import {
   DEFAULT_TERMINOLOGY,
   assignClassTeacher,
+  bulkCreateHolidays,
   createAcademicYear,
   createCourse,
   createElectiveGroup,
@@ -30,13 +32,16 @@ import {
   fetchAcademicYears,
   fetchClassTeachers,
   fetchCohortPeriods,
+  fetchCohorts,
   fetchCourses,
   fetchElectiveGroups,
   fetchEnrollmentRegistrations,
   fetchFacultyAssignments,
+  fetchHolidaySuggestions,
   fetchHolidays,
   fetchOfferingRegistrations,
   fetchOfferings,
+  fetchPrograms,
   fetchRoster,
   fetchSections,
   fetchSetupChecklist,
@@ -57,12 +62,15 @@ import {
   type AcademicYear,
   type ChecklistItem,
   type ClassTeacher,
+  type Cohort,
   type CohortPeriod,
   type Course,
   type ElectiveGroup,
   type FacultyAssignment,
   type Holiday,
+  type HolidaySuggestion,
   type Offering,
+  type Program,
   type Registration,
   type RosterEntry,
   type Section,
@@ -71,7 +79,13 @@ import {
   type TermEnrollment,
   type Terminology,
 } from '../lib/api/academics-api';
+import {
+  fetchStudentTimeline,
+  openStudentProgram,
+  type StudentTimeline,
+} from '../lib/api/students-api';
 import { fetchCampuses, fetchRooms, type CampusItem } from '../lib/api/organisation-api';
+import { isValidTimeZone, todayInZone } from '../lib/campus-time';
 import type { ApiClient } from '../lib/api/client';
 import { isApiError } from '../lib/api/errors';
 import { academicsErrorMessage } from '../lib/api/messages';
@@ -97,6 +111,49 @@ type Tab =
   | 'setup';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Current calendar date (YYYY-MM-DD). If a valid IANA timezone is provided,
+ * returns today in that campus timezone; otherwise uses the environment's
+ * local calendar date (via en-CA locale, avoiding UTC midnight skew).
+ */
+export const todayIso = (timeZone?: string): string => {
+  if (timeZone && isValidTimeZone(timeZone)) {
+    return todayInZone(timeZone);
+  }
+  return new Date().toLocaleDateString('en-CA');
+};
+
+/**
+ * An assignment is ended if it has an explicit validTo date strictly before asOfDate.
+ * Since validTo is inclusive (doc 37), an assignment with validTo = 2026-11-09
+ * remains active through the end of 2026-11-09, and only becomes ended on 2026-11-10.
+ */
+export function isAssignmentEnded(
+  assignment: { validTo: string | null },
+  asOfDate: string,
+): boolean {
+  return assignment.validTo !== null && assignment.validTo < asOfDate;
+}
+
+/**
+ * An assignment is active as of asOfDate if validFrom <= asOfDate and (validTo is null or >= asOfDate).
+ */
+export function isAssignmentActive(
+  assignment: { validFrom: string; validTo: string | null },
+  asOfDate: string,
+): boolean {
+  if (assignment.validFrom > asOfDate) return false;
+  if (assignment.validTo !== null && assignment.validTo < asOfDate) return false;
+  return true;
+}
+
+/**
+ * A timetable slot is ended if it has an explicit effectiveTo date strictly before asOfDate.
+ */
+export function isSlotEnded(slot: { effectiveTo: string | null }, asOfDate: string): boolean {
+  return slot.effectiveTo !== null && slot.effectiveTo < asOfDate;
+}
 
 /**
  * Fixed wording for a refusal the page can explain from what it already shows (a full offering, a closed window, a
@@ -950,16 +1007,27 @@ function ClassTeachersPanel({
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boolean }) {
+function EnrolmentTab({
+  client,
+  canManage,
+  canAssignProgram = false,
+}: {
+  client: ApiClient;
+  canManage: boolean;
+  canAssignProgram?: boolean;
+}) {
   const L = useLabels();
   const periodLabel = usePeriodLabel();
   const periods = useList<CohortPeriod>(useCallback(() => fetchCohortPeriods(client), [client]));
   const cohortOf = (cohortPeriodId: string) =>
     periods.items.find((p) => p.id === cohortPeriodId)?.cohortId;
   const sections = useList<Section>(useCallback(() => fetchSections(client), [client]));
+  const programs = useList<Program>(useCallback(() => fetchPrograms(client), [client]));
+  const cohorts = useList<Cohort>(useCallback(() => fetchCohorts(client), [client]));
   const [studentId, setStudentId] = useState('');
   const [loaded, setLoaded] = useState<string | null>(null);
   const [rows, setRows] = useState<TermEnrollment[]>([]);
+  const [timeline, setTimeline] = useState<StudentTimeline | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [idErr, setIdErr] = useState<string | null>(null);
@@ -968,15 +1036,25 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
     (id: string) => {
       setLoading(true);
       setLoadError(null);
-      fetchStudentEnrollments(client, id)
-        .then((r) => {
-          setRows(r);
-          setLoaded(id);
-        })
-        .catch((e: unknown) => {
-          setRows([]);
-          setLoaded(null);
-          setLoadError(academicsErrorMessage(e));
+      void Promise.allSettled([
+        fetchStudentEnrollments(client, id),
+        fetchStudentTimeline(client, id),
+      ])
+        .then(([enrResult, tlResult]) => {
+          if (enrResult.status === 'fulfilled') {
+            setRows(enrResult.value);
+            setLoaded(id);
+          } else {
+            setRows([]);
+            setLoaded(null);
+            setLoadError(academicsErrorMessage(enrResult.reason));
+            return;
+          }
+          if (tlResult.status === 'fulfilled') {
+            setTimeline(tlResult.value);
+          } else {
+            setTimeline(null);
+          }
         })
         .finally(() => setLoading(false));
     },
@@ -985,6 +1063,8 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
   const action = useAction(() => {
     if (loaded) reload(loaded);
     sections.reload();
+    programs.reload();
+    cohorts.reload();
   });
 
   const load = (e: FormEvent) => {
@@ -995,6 +1075,62 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
     }
     setIdErr(null);
     reload(studentId.trim());
+  };
+
+  const [progId, setProgId] = useState('');
+  const [cohortId, setCohortId] = useState('');
+  const [progStartDate, setProgStartDate] = useState('');
+  const [progReason, setProgReason] = useState('Regular admission programme placement');
+  const [progErr, setProgErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (timeline?.today) {
+      setProgStartDate((prev) => prev || timeline.today);
+    } else {
+      setProgStartDate((prev) => prev || new Date().toISOString().slice(0, 10));
+    }
+  }, [timeline]);
+
+  const handleProgChange = (id: string) => {
+    setProgId(id);
+    const matching = cohorts.items.filter((c) => c.programId === id && c.status === 'ACTIVE');
+    setCohortId(matching[0]?.id ?? '');
+  };
+
+  const submitProgram = async (e: FormEvent) => {
+    e.preventDefault();
+    if (
+      !loaded ||
+      !progId ||
+      !cohortId ||
+      !DATE.test(progStartDate) ||
+      progReason.trim().length < 5
+    ) {
+      setProgErr(
+        `Choose a ${lower(L.program)}, a ${lower(L.cohort)}, a valid start date (YYYY-MM-DD) and a reason of at least 5 characters.`,
+      );
+      return;
+    }
+    setProgErr(null);
+    const key = crypto.randomUUID();
+    const ok = await action.run(
+      () =>
+        openStudentProgram(
+          client,
+          loaded,
+          {
+            programId: progId,
+            cohortId,
+            startDate: progStartDate,
+            reason: progReason.trim(),
+          },
+          key,
+        ),
+      `Student assigned to ${lower(L.program)} and ${lower(L.cohort)}.`,
+    );
+    if (ok) {
+      reload(loaded);
+    }
   };
 
   const [cp, setCp] = useState('');
@@ -1012,6 +1148,7 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
     setEnrolErr(null);
     // One Idempotency-Key per submission: a double click or a retry replays instead of creating a second enrolment.
     const key = crypto.randomUUID();
+    const activeProg = timeline?.position?.programme;
     if (
       await action.run(
         () =>
@@ -1026,6 +1163,11 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
             key,
           ),
         'Student enrolled for the term.',
+        timeline && !activeProg
+          ? {
+              conflict: `The student has no active ${lower(L.program)} enrolment. Assign them to a ${lower(L.program)} first.`,
+            }
+          : undefined,
       )
     ) {
       setRoll('');
@@ -1115,6 +1257,97 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
         </Button>
       </form>
       {loadError && <Alert tone="error">{loadError}</Alert>}
+      {loaded && !loading && (
+        <>
+          {timeline?.position?.programme ? (
+            <Card title={`Active ${lower(L.program)} enrolment`}>
+              <dl className="defs">
+                <dt>{L.program}</dt>
+                <dd>
+                  <strong>{timeline.position.programme.name}</strong> (
+                  {timeline.position.programme.code})
+                </dd>
+                <dt>{L.cohort}</dt>
+                <dd>{timeline.position.programme.cohortName}</dd>
+                <dt>Start date</dt>
+                <dd>{timeline.position.programme.startDate}</dd>
+              </dl>
+            </Card>
+          ) : timeline && timeline.position.programme === null ? (
+            <Card title="Programme admission required">
+              <p className="muted">
+                This student is admitted to the institution but has not been assigned to an active{' '}
+                {lower(L.program)} and {lower(L.cohort)} yet. An active programme enrolment is
+                required before term enrolment can be completed.
+              </p>
+              {canAssignProgram ? (
+                <form
+                  onSubmit={(e) => void submitProgram(e)}
+                  noValidate
+                  aria-label="Assign to programme"
+                >
+                  <h3>
+                    Assign {lower(L.program)} &amp; {lower(L.cohort)}
+                  </h3>
+                  {progErr && <Alert tone="error">{progErr}</Alert>}
+                  <div className="field">
+                    <label htmlFor="assign-prog">{L.program}</label>
+                    <select
+                      id="assign-prog"
+                      value={progId}
+                      onChange={(e) => handleProgChange(e.target.value)}
+                    >
+                      <option value="">Select {lower(L.program)}…</option>
+                      {programs.items.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="assign-cohort">{L.cohort}</label>
+                    <select
+                      id="assign-cohort"
+                      value={cohortId}
+                      onChange={(e) => setCohortId(e.target.value)}
+                    >
+                      <option value="">Select {lower(L.cohort)}…</option>
+                      {cohorts.items
+                        .filter((c) => (!progId || c.programId === progId) && c.status === 'ACTIVE')
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.admissionYear})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <TextField
+                    label="Programme start date"
+                    placeholder="YYYY-MM-DD"
+                    value={progStartDate}
+                    onChange={(e) => setProgStartDate(e.target.value)}
+                  />
+                  <TextField
+                    label="Reason for assignment"
+                    value={progReason}
+                    onChange={(e) => setProgReason(e.target.value)}
+                    maxLength={500}
+                  />
+                  <Button type="submit" pending={action.pending}>
+                    Assign {lower(L.program)}
+                  </Button>
+                </form>
+              ) : (
+                <Alert tone="info">
+                  You do not have permission to assign programmes. Please contact a campus
+                  administrator or registrar.
+                </Alert>
+              )}
+            </Card>
+          ) : null}
+        </>
+      )}
       {loaded && !loading && rows.length === 0 && (
         <Card title="No enrolments">
           <p className="muted">This student has no term enrolments yet.</p>
@@ -1150,6 +1383,11 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
                 <option value="">Select…</option>
                 {periods.items
                   .filter((p) => p.status === 'ACTIVE')
+                  .filter(
+                    (p) =>
+                      !timeline?.position?.programme?.cohortId ||
+                      p.cohortId === timeline.position.programme.cohortId,
+                  )
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       {periodLabel(p.cohortId)} {p.periodNo} ({p.id.slice(-6)})
@@ -1232,6 +1470,12 @@ function EnrolmentTab({ client, canManage }: { client: ApiClient; canManage: boo
               <Button type="submit" pending={action.pending}>
                 Place student
               </Button>
+              <p className="muted" style={{ fontSize: '0.8125rem', marginTop: 'var(--space-2)' }}>
+                Note: Placing a student in a {lower(L.section)} does not automatically register them
+                for courses. To register placed students for courses configured with the
+                AUTO_FROM_SECTION policy, navigate to the Offerings tab, open the section offering,
+                and click &ldquo;Register students from section&rdquo;.
+              </p>
             </form>
           )}
           {rows.some((r) => r.status === 'ACTIVE' || r.status === 'DETAINED') && (
@@ -1368,6 +1612,14 @@ function OfferingsTab({
   );
 
   const termPeriods = cohortPeriods.items.filter((cp) => cp.termId === termId);
+  const [campuses, setCampuses] = useState<CampusItem[]>([]);
+  useEffect(() => {
+    fetchCampuses(client)
+      .then(setCampuses)
+      .catch(() => setCampuses([]));
+  }, [client]);
+  const campusTimezone = term ? campuses.find((c) => c.id === term.campusId)?.timezone : undefined;
+  const today = todayIso(campusTimezone);
   const [rooms, setRooms] = useState<Record<string, string>>({});
   useEffect(() => {
     setRooms({});
@@ -1454,6 +1706,12 @@ function OfferingsTab({
     if (!termId) return;
     if (!offeringForm.courseId) {
       setOfferingFormErr(`Choose a ${lower(L.course)}.`);
+      return;
+    }
+    if (offeringForm.registrationPolicy === 'AUTO_FROM_SECTION' && !offeringForm.sectionId) {
+      setOfferingFormErr(
+        `A ${lower(L.section)} is required when registration policy is AUTO_FROM_SECTION.`,
+      );
       return;
     }
     const capNum = offeringForm.capacity.trim() ? Number(offeringForm.capacity) : undefined;
@@ -1564,7 +1822,10 @@ function OfferingsTab({
     if (open) show(open);
   });
   const [endingSlotId, setEndingSlotId] = useState<string | null>(null);
-  const [slotEndDate, setSlotEndDate] = useState(todayIso());
+  const [slotEndDate, setSlotEndDate] = useState(today);
+  useEffect(() => {
+    setSlotEndDate(today);
+  }, [today]);
 
   const handleAddSlot = async (e: FormEvent) => {
     e.preventDefault();
@@ -1572,7 +1833,7 @@ function OfferingsTab({
     const weekday = Number(slotForm.weekday);
     const start = slotForm.startTime.trim();
     const end = slotForm.endTime.trim();
-    const from = slotForm.effectiveFrom.trim() || (term?.startDate ?? todayIso());
+    const from = slotForm.effectiveFrom.trim() || (term?.startDate ?? today);
     const to = slotForm.effectiveTo.trim();
 
     if (
@@ -1628,7 +1889,7 @@ function OfferingsTab({
   const blankTeacher = {
     employeeId: '',
     teachingRole: 'PRIMARY' as FacultyAssignment['teachingRole'],
-    validFrom: todayIso(),
+    validFrom: today,
     validTo: '',
     reason: '',
   };
@@ -1638,7 +1899,10 @@ function OfferingsTab({
     if (open) show(open);
   });
   const [endingFaId, setEndingFaId] = useState<string | null>(null);
-  const [faEndDate, setFaEndDate] = useState(todayIso());
+  const [faEndDate, setFaEndDate] = useState(today);
+  useEffect(() => {
+    setFaEndDate(today);
+  }, [today]);
   const [faEndReason, setFaEndReason] = useState('');
 
   const handleAssignTeacher = async (e: FormEvent) => {
@@ -1864,7 +2128,12 @@ function OfferingsTab({
                     </select>
                   </div>
                   <div className="field">
-                    <label htmlFor="create-offering-period">{L.period} (optional)</label>
+                    <label htmlFor="create-offering-period">
+                      {L.period}{' '}
+                      {offeringForm.registrationPolicy === 'AUTO_FROM_SECTION'
+                        ? '(required for AUTO_FROM_SECTION)'
+                        : '(optional)'}
+                    </label>
                     <select
                       id="create-offering-period"
                       value={offeringForm.cohortPeriodId}
@@ -1877,7 +2146,11 @@ function OfferingsTab({
                         })
                       }
                     >
-                      <option value="">None (all students in {lower(L.term)})</option>
+                      <option value="">
+                        {offeringForm.registrationPolicy === 'AUTO_FROM_SECTION'
+                          ? `Select a ${lower(L.period)}…`
+                          : `None (all students in ${lower(L.term)})`}
+                      </option>
                       {termPeriods.map((cp) => (
                         <option key={cp.id} value={cp.id}>
                           {periodLabel(cp.cohortId)} {cp.periodNo} ({cp.id.slice(-6)})
@@ -1885,10 +2158,25 @@ function OfferingsTab({
                       ))}
                     </select>
                   </div>
+                  {offeringForm.registrationPolicy === 'AUTO_FROM_SECTION' &&
+                    !offeringForm.cohortPeriodId && (
+                      <p
+                        className="muted"
+                        style={{ fontSize: '0.8125rem', marginTop: '-var(--space-2)' }}
+                      >
+                        Select a {lower(L.period)} first to choose which {lower(L.section)}{' '}
+                        registers into this offering.
+                      </p>
+                    )}
                   {offeringForm.cohortPeriodId && (
                     <>
                       <div className="field">
-                        <label htmlFor="create-offering-section">{L.section} (optional)</label>
+                        <label htmlFor="create-offering-section">
+                          {L.section}{' '}
+                          {offeringForm.registrationPolicy === 'AUTO_FROM_SECTION'
+                            ? '(required for AUTO_FROM_SECTION)'
+                            : '(optional)'}
+                        </label>
                         <select
                           id="create-offering-section"
                           value={offeringForm.sectionId}
@@ -1896,7 +2184,11 @@ function OfferingsTab({
                             setOfferingForm({ ...offeringForm, sectionId: e.target.value })
                           }
                         >
-                          <option value="">All sections in {lower(L.period)}</option>
+                          <option value="">
+                            {offeringForm.registrationPolicy === 'AUTO_FROM_SECTION'
+                              ? `Select a ${lower(L.section)}…`
+                              : `All sections in ${lower(L.period)}`}
+                          </option>
                           {sections.items
                             .filter((s) => s.cohortPeriodId === offeringForm.cohortPeriodId)
                             .map((s) => (
@@ -1984,7 +2276,11 @@ function OfferingsTab({
                       <td>{o.codeSnapshot}</td>
                       <td>{o.titleSnapshot}</td>
                       <td>
-                        {sectionName(o.sectionId)}
+                        {o.sectionId
+                          ? sectionName(o.sectionId)
+                          : o.cohortPeriodId
+                            ? `All sections in ${lower(L.period)}`
+                            : 'All students'}
                         {o.groupLabel ? ` (${o.groupLabel})` : ''}
                       </td>
                       <td>{o.offeringKind}</td>
@@ -2035,8 +2331,12 @@ function OfferingsTab({
                 </dd>
                 <dt>Audience / {L.section}</dt>
                 <dd>
-                  {sectionName(open.sectionId)}
-                  {open.groupLabel ? ` (${open.groupLabel})` : ''}
+                  {open.sectionId
+                    ? sectionName(open.sectionId)
+                    : open.cohortPeriodId
+                      ? `All sections in ${lower(L.period)}`
+                      : `All students in ${lower(L.term)}`}
+                  {open.groupLabel ? ` (Group: ${open.groupLabel})` : ''}
                 </dd>
                 <dt>Kind & Policy</dt>
                 <dd>
@@ -2167,7 +2467,9 @@ function OfferingsTab({
                         <strong>{WEEKDAYS[sl.weekday - 1]}</strong> {sl.startTime}-{sl.endTime}
                         {sl.roomId ? `, room ${rooms[sl.roomId] ?? 'booked'}` : ', no room'}
                         {' · '}from {sl.effectiveFrom}
-                        {sl.effectiveTo ? ` to ${sl.effectiveTo} (ended)` : ''}
+                        {sl.effectiveTo
+                          ? ` to ${sl.effectiveTo}${isSlotEnded(sl, today) ? ' (ended)' : ''}`
+                          : ''}
                         {canManage &&
                           !isTermLocked &&
                           !sl.effectiveTo &&
@@ -2278,7 +2580,7 @@ function OfferingsTab({
                         >
                           <option value="">None assigned</option>
                           {detail.teachers
-                            .filter((fa) => !fa.validTo)
+                            .filter((fa) => !isAssignmentEnded(fa, today))
                             .map((fa) => (
                               <option key={fa.id} value={fa.id}>
                                 {TEACHING_ROLE[fa.teachingRole]} ({fa.employeeId.slice(-8)})
@@ -2292,7 +2594,7 @@ function OfferingsTab({
                         onChange={(e) =>
                           setSlotForm({ ...slotForm, effectiveFrom: e.target.value })
                         }
-                        placeholder={term?.startDate ?? todayIso()}
+                        placeholder={term?.startDate ?? today}
                       />
                       <TextField
                         label="Effective to (optional, YYYY-MM-DD)"
@@ -2322,7 +2624,9 @@ function OfferingsTab({
                         <li key={a.id} style={{ marginBottom: 'var(--space-2)' }}>
                           <strong>{TEACHING_ROLE[a.teachingRole]}</strong> · employee{' '}
                           {a.employeeId.slice(-8)} · from {a.validFrom}
-                          {a.validTo ? ` to ${a.validTo} (ended)` : ''}
+                          {a.validTo
+                            ? ` to ${a.validTo}${isAssignmentEnded(a, today) ? ' (ended)' : ''}`
+                            : ''}
                           {canAssign &&
                             !isTermLocked &&
                             !a.validTo &&
@@ -2460,6 +2764,20 @@ function OfferingsTab({
                       <span> Capacity limit: {open.capacity}.</span>
                     )}
                   </p>
+
+                  {canRegister &&
+                    open.registrationPolicy === 'AUTO_FROM_SECTION' &&
+                    !open.sectionId && (
+                      <div style={{ marginBottom: 'var(--space-3)' }}>
+                        <Alert tone="info">
+                          This course offering has registration policy AUTO_FROM_SECTION, but was
+                          created without an associated {lower(L.section)}. Automatic section roster
+                          synchronization requires an offering bound to a specific{' '}
+                          {lower(L.section)}. To register students by section, create a new offering
+                          bound to a specific {lower(L.section)}.
+                        </Alert>
+                      </div>
+                    )}
 
                   {/* From-section auto-registration */}
                   {canRegister &&
@@ -2628,7 +2946,6 @@ const toInstant = (v: string): string | null => {
 };
 const showInstant = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-const todayIso = () => new Date().toISOString().slice(0, 10);
 
 /** Whether the group takes choices right now, as far as the page can tell; the server decides at save time. */
 function windowOpen(g: ElectiveGroup, now = Date.now()): boolean {
@@ -3546,6 +3863,7 @@ function HolidaysTab({
 }) {
   const L = useLabels();
   const terms = useList<Term>(useCallback(() => fetchTerms(client), [client]));
+  const years = useList<AcademicYear>(useCallback(() => fetchAcademicYears(client), [client]));
   const [campuses, setCampuses] = useState<CampusItem[]>([]);
   useEffect(() => {
     if (canCampuses)
@@ -3569,6 +3887,139 @@ function HolidaysTab({
         t.startDate <= date &&
         date <= t.endDate,
     );
+
+  // Smart Annual Holiday Suggestions workflow
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [suggestCountry, setSuggestCountry] = useState('IN');
+  const [suggestState, setSuggestState] = useState('BR');
+  const [suggestYearId, setSuggestYearId] = useState('');
+  const [suggestScope, setSuggestScope] = useState('');
+  const [suggestCategory, setSuggestCategory] = useState<string>('ALL');
+
+  interface EditableSuggestion extends HolidaySuggestion {
+    selected: boolean;
+    customName: string;
+    customDate: string;
+    customKind: Holiday['kind'];
+  }
+  const [suggestItems, setSuggestItems] = useState<EditableSuggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestErr, setSuggestErr] = useState<string | null>(null);
+  const [bulkReason, setBulkReason] = useState('Annual Indian school holiday calendar approval');
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [confirmProvisional, setConfirmProvisional] = useState(false);
+
+  useEffect(() => {
+    if (!suggestYearId && years.items.length > 0) {
+      const active = years.items.find((y) => y.status === 'ACTIVE') ?? years.items[0];
+      if (active) setSuggestYearId(active.id);
+    }
+  }, [years.items, suggestYearId]);
+
+  const loadSuggestions = async () => {
+    setSuggestLoading(true);
+    setSuggestErr(null);
+    setBulkNotice(null);
+    setConfirmProvisional(false);
+    try {
+      const data = await fetchHolidaySuggestions(client, {
+        country: suggestCountry,
+        state: suggestState,
+        ...(suggestYearId ? { academicYearId: suggestYearId } : {}),
+        ...(suggestScope ? { campusId: suggestScope } : {}),
+      });
+      setSuggestItems(
+        data.map((d) => ({
+          ...d,
+          selected: !d.alreadyDeclared,
+          customName: d.name,
+          customDate: d.holidayDate,
+          customKind: d.kind,
+        })),
+      );
+    } catch {
+      setSuggestErr(
+        'Could not load holiday suggestions. Please check your connection and parameters.',
+      );
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const approveBulk = async () => {
+    const selected = suggestItems.filter((i) => i.selected);
+    if (selected.length === 0 || bulkReason.trim().length < 5) {
+      setSuggestErr('Select at least one holiday and enter a reason of at least 5 characters.');
+      return;
+    }
+    const provisionalSelected = selected.filter((i) => i.verificationStatus !== 'VERIFIED');
+    if (provisionalSelected.length > 0 && !confirmProvisional) {
+      setSuggestErr(
+        `Your selection includes ${provisionalSelected.length} provisional or unverified holidays without published official gazette confirmation. Please confirm their inclusion before proceeding.`,
+      );
+      return;
+    }
+    setBulkSubmitting(true);
+    setSuggestErr(null);
+    try {
+      const campusId = suggestScope || undefined;
+      const res = await bulkCreateHolidays(client, {
+        ...(campusId ? { campusId } : {}),
+        reason: bulkReason.trim(),
+        holidays: selected.map((s) => ({
+          holidayDate: s.customDate,
+          name: s.customName.trim(),
+          kind: s.customKind,
+        })),
+      });
+      setBulkNotice(
+        `Successfully approved and saved ${res.createdCount} holidays (${res.skippedCount} skipped as already declared or locked).`,
+      );
+      holidays.reload();
+      setConfirmProvisional(false);
+      setSuggestItems((prev) =>
+        prev.map((item) => {
+          if (item.selected) {
+            return { ...item, selected: false, alreadyDeclared: true };
+          }
+          return item;
+        }),
+      );
+    } catch (e: unknown) {
+      if (isApiError(e)) {
+        if (e.status === 400) {
+          setSuggestErr(
+            'Some holiday details could not be validated. Please check the entered dates, names, kind values or campus scope.',
+          );
+        } else if (e.status === 403) {
+          setSuggestErr(
+            'You do not have permission to approve holidays for this campus or organization.',
+          );
+        } else if (e.status === 409) {
+          setSuggestErr(
+            'One or more selected holidays conflict with existing academic calendar records.',
+          );
+        } else {
+          setSuggestErr(academicsErrorMessage(e));
+        }
+      } else {
+        setSuggestErr(e instanceof Error ? e.message : 'Failed to approve holidays in bulk.');
+      }
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
+  const displayedSuggestions = suggestItems.filter((item) => {
+    if (suggestCategory === 'ALL') return true;
+    return item.category === suggestCategory;
+  });
+
+  const selectedCount = suggestItems.filter((i) => i.selected).length;
+  const alreadyDeclaredCount = suggestItems.filter((i) => i.alreadyDeclared).length;
+  const verifiedCount = suggestItems.filter((i) => i.verificationStatus === 'VERIFIED').length;
+  const provisionalCount = suggestItems.filter((i) => i.verificationStatus !== 'VERIFIED').length;
 
   const [campusFilter, setCampusFilter] = useState('');
   const [range, setRange] = useState({ from: '', to: '' });
@@ -3675,7 +4126,427 @@ function HolidaysTab({
   return (
     <>
       <Feedback error={action.error} notice={action.notice} />
-      <h2>Holiday calendar</h2>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 'var(--space-2)',
+          marginBottom: 'var(--space-2)',
+        }}
+      >
+        <h2>Holiday calendar</h2>
+        {canManage && (
+          <Button
+            type="button"
+            variant={showSuggest ? 'secondary' : 'primary'}
+            onClick={() => setShowSuggest(!showSuggest)}
+          >
+            {showSuggest
+              ? 'Hide Annual Suggestions'
+              : 'Load Annual Holiday Calendar (India / Bihar)'}
+          </Button>
+        )}
+      </div>
+
+      {canManage && showSuggest && (
+        <Card title="Annual Holiday Suggestions (Official Catalogue)" headingLevel={3}>
+          <p className="field-hint">
+            Review and approve an entire academic year of Indian national, Bihar state, gazetted
+            festivals and institutional non-teaching days in one action.
+          </p>
+
+          {suggestErr && <Alert tone="error">{suggestErr}</Alert>}
+          {bulkNotice && <Alert tone="success">{bulkNotice}</Alert>}
+
+          <form
+            aria-labelledby="smart-holiday-heading"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void loadSuggestions();
+            }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 'var(--space-3)',
+              alignItems: 'end',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
+            <div className="field">
+              <label htmlFor="suggest-country">Country</label>
+              <select
+                id="suggest-country"
+                value={suggestCountry}
+                onChange={(e) => setSuggestCountry(e.target.value)}
+              >
+                <option value="IN">India (Central Gazetted)</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="suggest-state">State / School Calendar</label>
+              <select
+                id="suggest-state"
+                value={suggestState}
+                onChange={(e) => setSuggestState(e.target.value)}
+              >
+                <option value="BR">Bihar (State & Education Board)</option>
+                <option value="ALL">All-India (National Gazetted Only)</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="suggest-year">Academic Year</label>
+              <select
+                id="suggest-year"
+                value={suggestYearId}
+                onChange={(e) => setSuggestYearId(e.target.value)}
+              >
+                {years.items.length === 0 && <option value="">No academic years configured</option>}
+                {years.items.map((y) => (
+                  <option key={y.id} value={y.id}>
+                    {y.label} ({y.startDate} to {y.endDate})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="suggest-scope">Applies to</label>
+              <select
+                id="suggest-scope"
+                value={suggestScope}
+                onChange={(e) => setSuggestScope(e.target.value)}
+              >
+                <option value="">Whole organization</option>
+                {campusIds.map((id) => (
+                  <option key={id} value={id}>
+                    {campusName(id)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Button type="submit" variant="primary" pending={suggestLoading}>
+                {suggestLoading ? 'Loading…' : 'Load Suggested Holidays'}
+              </Button>
+            </div>
+          </form>
+
+          {suggestItems.length > 0 && (
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 'var(--space-3)',
+                  flexWrap: 'wrap',
+                  marginBottom: 'var(--space-3)',
+                  alignItems: 'center',
+                }}
+              >
+                <span className="badge">Total: {suggestItems.length}</span>
+                <span className="badge" style={{ backgroundColor: '#e0f2fe', color: '#0369a1' }}>
+                  Selected: {selectedCount}
+                </span>
+                <span className="badge" style={{ backgroundColor: '#f3f4f6', color: '#4b5563' }}>
+                  Already Declared: {alreadyDeclaredCount}
+                </span>
+                <span className="badge" style={{ backgroundColor: '#dcfce7', color: '#15803d' }}>
+                  Verified Gazette: {verifiedCount}
+                </span>
+                {provisionalCount > 0 && (
+                  <span className="badge" style={{ backgroundColor: '#fef3c7', color: '#b45309' }}>
+                    Provisional / Unverified: {provisionalCount}
+                  </span>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 'var(--space-2)',
+                  flexWrap: 'wrap',
+                  marginBottom: 'var(--space-3)',
+                  alignItems: 'center',
+                }}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() =>
+                    setSuggestItems((prev) =>
+                      prev.map((i) => ({ ...i, selected: !i.alreadyDeclared })),
+                    )
+                  }
+                >
+                  Select all unimported
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() =>
+                    setSuggestItems((prev) => prev.map((i) => ({ ...i, selected: false })))
+                  }
+                >
+                  Deselect all
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() =>
+                    setSuggestItems((prev) =>
+                      prev.map((i) => ({
+                        ...i,
+                        selected: !i.alreadyDeclared && i.verificationStatus === 'VERIFIED',
+                      })),
+                    )
+                  }
+                >
+                  Select verified only
+                </Button>
+                <div
+                  style={{
+                    marginLeft: 'auto',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)',
+                  }}
+                >
+                  <label htmlFor="suggest-cat-filter" style={{ fontSize: '0.875rem' }}>
+                    Category:
+                  </label>
+                  <select
+                    id="suggest-cat-filter"
+                    value={suggestCategory}
+                    onChange={(e) => setSuggestCategory(e.target.value)}
+                    style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }}
+                  >
+                    <option value="ALL">All Categories</option>
+                    <option value="NATIONAL">National</option>
+                    <option value="STATE">State</option>
+                    <option value="FESTIVAL">Festival</option>
+                    <option value="RESTRICTED">Restricted</option>
+                    <option value="INSTITUTIONAL">Institutional</option>
+                  </select>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  overflowX: 'auto',
+                  maxHeight: '420px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <table className="data-table" aria-label="Suggested annual holidays">
+                  <thead>
+                    <tr>
+                      <th scope="col" style={{ width: '40px' }}>
+                        <span className="sr-only">Select</span>
+                      </th>
+                      <th scope="col">Date</th>
+                      <th scope="col">Holiday Name</th>
+                      <th scope="col">Kind</th>
+                      <th scope="col">Category</th>
+                      <th scope="col">Verification</th>
+                      <th scope="col">Official Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedSuggestions.map((item) => (
+                      <tr key={item.id} style={{ opacity: item.alreadyDeclared ? 0.6 : 1 }}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={item.selected}
+                            disabled={item.alreadyDeclared}
+                            aria-label={`Select ${item.customName}`}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSuggestItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id ? { ...i, selected: checked } : i,
+                                ),
+                              );
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.customDate}
+                            disabled={item.alreadyDeclared}
+                            aria-label={`Date for ${item.customName}`}
+                            style={{ width: '110px', fontSize: '0.875rem' }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSuggestItems((prev) =>
+                                prev.map((i) => (i.id === item.id ? { ...i, customDate: val } : i)),
+                              );
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.customName}
+                            disabled={item.alreadyDeclared}
+                            aria-label={`Name for ${item.customName}`}
+                            style={{ minWidth: '180px', fontSize: '0.875rem' }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSuggestItems((prev) =>
+                                prev.map((i) => (i.id === item.id ? { ...i, customName: val } : i)),
+                              );
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={item.customKind}
+                            disabled={item.alreadyDeclared}
+                            aria-label={`Kind for ${item.customName}`}
+                            style={{ fontSize: '0.8125rem' }}
+                            onChange={(e) => {
+                              const val = e.target.value as Holiday['kind'];
+                              setSuggestItems((prev) =>
+                                prev.map((i) => (i.id === item.id ? { ...i, customKind: val } : i)),
+                              );
+                            }}
+                          >
+                            <option value="HOLIDAY">Holiday</option>
+                            <option value="NON_TEACHING_DAY">Non-teaching</option>
+                            <option value="EVENT">Event</option>
+                          </select>
+                        </td>
+                        <td>
+                          <StatusBadge
+                            status={item.category.toLowerCase()}
+                            label={item.category}
+                            tone={
+                              item.category === 'NATIONAL'
+                                ? 'info'
+                                : item.category === 'STATE'
+                                  ? 'success'
+                                  : 'neutral'
+                            }
+                          />
+                        </td>
+                        <td>
+                          {item.alreadyDeclared ? (
+                            <StatusBadge
+                              status="completed"
+                              label="Already Declared"
+                              tone="neutral"
+                            />
+                          ) : item.verificationStatus === 'VERIFIED' ? (
+                            <StatusBadge status="verified" label="Verified" tone="success" />
+                          ) : item.verificationStatus === 'PROVISIONAL' ? (
+                            <StatusBadge status="review" label="Provisional" tone="warning" />
+                          ) : (
+                            <StatusBadge status="attention" label="Unverified" tone="warning" />
+                          )}
+                          {item.notes && (
+                            <div
+                              style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                marginTop: '2px',
+                              }}
+                            >
+                              {item.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '0.75rem', color: '#4b5563', maxWidth: '200px' }}>
+                          {item.source}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {suggestItems.some((i) => i.selected && i.verificationStatus !== 'VERIFIED') && (
+                <div
+                  style={{
+                    marginTop: 'var(--space-3)',
+                    padding: 'var(--space-2) var(--space-3)',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                      fontSize: '0.875rem',
+                      color: '#92400e',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={confirmProvisional}
+                      onChange={(e) => setConfirmProvisional(e.target.checked)}
+                      aria-label="Confirm inclusion of provisional or unverified holidays"
+                    />
+                    <span>
+                      I explicitly confirm the inclusion of{' '}
+                      <strong>
+                        {
+                          suggestItems.filter(
+                            (i) => i.selected && i.verificationStatus !== 'VERIFIED',
+                          ).length
+                        }
+                      </strong>{' '}
+                      provisional / unverified holidays (pending year-specific government
+                      notification).
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <div
+                style={{
+                  marginTop: 'var(--space-4)',
+                  display: 'flex',
+                  gap: 'var(--space-3)',
+                  alignItems: 'flex-end',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ flex: '1 1 300px' }}>
+                  <TextField
+                    label="Reason for annual approval"
+                    value={bulkReason}
+                    onChange={(e) => setBulkReason(e.target.value)}
+                    maxLength={500}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  pending={bulkSubmitting}
+                  disabled={selectedCount === 0 || bulkReason.trim().length < 5}
+                  onClick={() => void approveBulk()}
+                >
+                  Approve and Save {selectedCount} Holidays
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setShowSuggest(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
       <form
         noValidate
         aria-label="Filter holidays"
@@ -4163,7 +5034,11 @@ export function AcademicsPage() {
           />
         )}
         {tab === 'enrolment' && canEnrolRead && (
-          <EnrolmentTab client={client} canManage={canEnrol} />
+          <EnrolmentTab
+            client={client}
+            canManage={canEnrol}
+            canAssignProgram={Boolean(identity && can(identity, 'student.program.assign'))}
+          />
         )}
         {tab === 'electives' && canProgramRead && (
           <ElectivesTab

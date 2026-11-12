@@ -38,6 +38,7 @@ import { createStorageDriver, type StorageDriver } from './shared/storage/index.
 import { registerUserRoutes } from './modules/users/user.routes.js';
 import {
   DisabledInvitationMailer,
+  SmtpInvitationMailer,
   type InvitationMailer,
 } from './shared/email/invitation-mailer.js';
 import {
@@ -201,7 +202,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.register(registerUserRoutes, {
     prefix: '/api/v1',
     db: deps.db,
-    mailer: deps.invitationMailer ?? new DisabledInvitationMailer(),
+    mailer:
+      deps.invitationMailer ??
+      (config.smtp ? new SmtpInvitationMailer(config.smtp) : new DisabledInvitationMailer()),
     inviteLimiter:
       deps.inviteLimiter ??
       new FixedWindowLimiter({ limit: 30, windowMs: 60 * 60_000, maxKeys: 10_000 }),

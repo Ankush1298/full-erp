@@ -102,6 +102,10 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'fee.receipt.record', sensitivity: 'SENSITIVE' },
   { code: 'fee.receipt.read', sensitivity: 'SENSITIVE' },
   { code: 'fee.receipt.reverse', sensitivity: 'CRITICAL' },
+  { code: 'fee.gateway.read', sensitivity: 'SENSITIVE' },
+  { code: 'fee.gateway.manage', sensitivity: 'CRITICAL' },
+  { code: 'fee.payment.initiate', sensitivity: 'NORMAL' },
+  { code: 'fee.refund.initiate', sensitivity: 'CRITICAL' },
 ];
 
 export const PERMISSION_CODES: ReadonlySet<string> = new Set(PERMISSION_CATALOG.map((p) => p.code));

@@ -112,6 +112,9 @@ describe('migrations from a clean database', () => {
       '0045',
       '0046',
       '0047',
+      '0048',
+      '0049',
+      '0050',
     ]);
     expect(m.every((x) => /^[0-9a-f]{64}$/.test(x.checksum))).toBe(true);
   });
@@ -167,6 +170,9 @@ describe('migrations from a clean database', () => {
       '0045',
       '0046',
       '0047',
+      '0048',
+      '0049',
+      '0050',
     ]);
     const ledger = await one<{ version: string; checksum: string; applied_by: string }>(
       db.admin,
@@ -220,6 +226,9 @@ describe('migrations from a clean database', () => {
       '0045',
       '0046',
       '0047',
+      '0048',
+      '0049',
+      '0050',
     ]);
     expect(new Set(ledger.map((l) => l.applied_by))).toEqual(new Set(['app_migrator']));
     expect(ledger.map((l) => l.checksum.trim())).toEqual(loadMigrations().map((m) => m.checksum));
@@ -273,6 +282,9 @@ describe('migrations from a clean database', () => {
       '0045',
       '0046',
       '0047',
+      '0048',
+      '0049',
+      '0050',
     ]);
   });
 
@@ -410,6 +422,9 @@ describe('migrations from a clean database', () => {
       '0045',
       '0046',
       '0047',
+      '0048',
+      '0049',
+      '0050',
     ]);
     expect(await fingerprint(again.admin)).toBe(schemaBefore);
     await seedFixtures(again.admin); // seeds cleanly into the re-created schema

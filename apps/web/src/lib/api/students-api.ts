@@ -239,7 +239,7 @@ export const CreateStudentResponseSchema = z.object({
 });
 
 export interface CreateStudentPayload {
-  userId: string;
+  userId?: string;
   admissionNumber: string;
   admissionDate: string;
   reason: string;
@@ -255,11 +255,37 @@ export async function createStudent(
   payload: CreateStudentPayload,
   idempotencyKey?: string,
 ): Promise<{ id: string }> {
-  const headers: Record<string, string> = {};
-  if (idempotencyKey) {
-    headers['Idempotency-Key'] = idempotencyKey;
-  }
+  const headers: Record<string, string> = {
+    'Idempotency-Key': idempotencyKey || crypto.randomUUID(),
+  };
   const res = await client.post('/v1/students', {
+    schema: CreateStudentResponseSchema,
+    body: payload,
+    headers,
+  });
+  return res.data;
+}
+
+export interface OpenStudentProgramPayload {
+  programId: string;
+  cohortId: string;
+  startDate: string;
+  reason: string;
+}
+
+/** POST /v1/students/:id/programs (student.program.assign). Opens a regular program enrolment. */
+export async function openStudentProgram(
+  client: ApiClient,
+  studentId: string,
+  payload: OpenStudentProgramPayload,
+  idempotencyKey?: string,
+): Promise<{ id: string }> {
+  const ik =
+    idempotencyKey ||
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined);
+  const headers: Record<string, string> = {};
+  if (ik) headers['Idempotency-Key'] = ik;
+  const res = await client.post(`/v1/students/${encodeURIComponent(studentId)}/programs`, {
     schema: CreateStudentResponseSchema,
     body: payload,
     headers,

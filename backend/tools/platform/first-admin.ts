@@ -3,6 +3,7 @@ import { recordOperationalAudit } from '../../src/shared/audit/index.js';
 import { issueFirstAdminBootstrapTicket } from '../../src/shared/authorization/mfa-bootstrap.js';
 import type { SqlExecutor } from '../../src/shared/authorization/seed.js';
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
+import { EMAIL_REGEX } from './platform-cli.js';
 
 /**
  * Operator-only first-administrator onboarding (doc 45 gaps G1 and G3; runbook docs/runbooks/first-administrator-onboarding.md).
@@ -272,4 +273,118 @@ export function assertLocalTokenOutput(
       'LOCAL_ONLY',
       'Token output is allowed only for a database on this machine.',
     );
+}
+
+export interface StaffInvitationResult {
+  tenantId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  invitationId: string;
+  expiresAt: string;
+  token: string;
+  acceptUrl: string;
+  reissued: boolean;
+}
+
+/**
+ * Local development only: Retrieves or re-issues an activation token for an ordinary staff member
+ * who was already invited by the Principal in the web application (Users -> Invite User).
+ * Requires assertLocalTokenOutput guards (non-production, local host, explicit permission).
+ */
+export async function issueStaffInvitationLink(
+  db: SqlExecutor,
+  input: { tenant: string; email: string; ttlHours?: number; reason?: string },
+): Promise<StaffInvitationResult> {
+  const ttl = input.ttlHours ?? FIRST_ADMIN_INVITE_DEFAULT_HOURS;
+  if (!Number.isInteger(ttl) || ttl < 1 || ttl > FIRST_ADMIN_INVITE_MAX_HOURS)
+    throw new OnboardingError(
+      'INVALID_TTL',
+      `The invitation lifetime must be 1 to ${FIRST_ADMIN_INVITE_MAX_HOURS} hours.`,
+    );
+  const email = input.email?.trim().toLowerCase();
+  if (!email || !EMAIL_REGEX.test(email))
+    throw new OnboardingError('INVALID_EMAIL', 'A valid email address is required.');
+
+  return inTransaction(db, async () => {
+    const tenant = await lockActiveTenant(db, input.tenant);
+
+    const candidates = await db.query(
+      `SELECT u.id, u.display_name, u.status FROM app.users u
+        WHERE u.organization_id = $1 AND u.email = $2`,
+      [tenant.id, email],
+    );
+
+    const user = candidates.rows[0] as
+      { id: string; display_name: string; status: string } | undefined;
+    if (!user) {
+      throw new OnboardingError(
+        'USER_NOT_FOUND',
+        `No user found with email "${email}" in organization "${tenant.name}". Please invite the user first via the web application (Users -> Invite User).`,
+      );
+    }
+
+    if (user.status !== 'INVITED') {
+      throw new OnboardingError(
+        'USER_ALREADY_ACTIVE',
+        `User "${email}" is in status "${user.status}", not "INVITED". Only pending invited users can receive an activation link.`,
+      );
+    }
+
+    // Revoke any prior unused token for this user in this tenant
+    const revoked = await db.query(
+      `UPDATE app.invite_tokens SET revoked_at = now()
+        WHERE organization_id = $1 AND user_id = $2 AND used_at IS NULL AND revoked_at IS NULL
+        RETURNING id`,
+      [tenant.id, user.id],
+    );
+    const reissued = revoked.rows.length > 0;
+
+    const rawToken = randomBytes(32).toString('base64url');
+    const invitationId = uuidv7();
+
+    const inserted = await db.query(
+      `INSERT INTO app.invite_tokens
+         (id, organization_id, user_id, purpose, token_hash, created_by, expires_at)
+       VALUES ($1, $2, $3, 'ACCOUNT_INVITE', $4, $5, now() + make_interval(hours => $6::int))
+       RETURNING expires_at`,
+      [
+        invitationId,
+        tenant.id,
+        user.id,
+        createHash('sha256').update(rawToken).digest('hex'),
+        user.id,
+        ttl,
+      ],
+    );
+
+    const expiresAt = (inserted.rows[0] as { expires_at: Date }).expires_at.toISOString();
+
+    await recordOperationalAudit(db, {
+      organizationId: tenant.id,
+      action: 'platform.staff.invite_link_issue',
+      resourceType: 'user',
+      resourceId: user.id,
+      riskTier: 2,
+      reasonText: input.reason ?? 'Local staff invitation link issue (dev/manual test)',
+      metadata: { invitationId, reissued },
+    });
+
+    const acceptLink = new URL('http://localhost:5173/accept-invite');
+    acceptLink.searchParams.set('token', rawToken);
+    acceptLink.searchParams.set('email', email);
+    const acceptUrl = acceptLink.toString();
+
+    return {
+      tenantId: tenant.id,
+      userId: user.id,
+      email,
+      displayName: user.display_name,
+      invitationId,
+      expiresAt,
+      token: rawToken,
+      acceptUrl,
+      reissued,
+    };
+  });
 }

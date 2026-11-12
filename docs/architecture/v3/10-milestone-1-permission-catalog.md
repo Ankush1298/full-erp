@@ -111,6 +111,10 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | 72 | `fee.receipt.record` (record offline payments and allocate to student dues) | S | – | – | – | – | – | G | G | – |
 | 73 | `fee.receipt.read` (view payment receipts and daily collection registers) | S | S | – | – | – | – | G | G | G |
 | 74 | `fee.receipt.reverse` (reverse a posted receipt with reason and step-up authentication) | C | – | – | – | – | – | – | G | – |
+| 75 | `fee.gateway.read` (view configured payment gateways, active provider status, and masked credentials) | S | – | – | – | – | – | G | G | G |
+| 76 | `fee.gateway.manage` (configure payment gateway merchant keys, secrets, test/live mode, and webhooks) | C | – | – | – | – | – | – | G | – |
+| 77 | `fee.payment.initiate` (initiate online checkout session and payment attempt for student dues) | N | S | – | – | – | – | G | G | G |
+| 78 | `fee.refund.initiate` (initiate payment gateway refund for online transaction) | C | – | – | – | – | – | – | G | – |
 
 ¹ FACULTY `student.profile.read` is `A` (assigned). In M1 it was not seeded and only the resolver contract was tested with a stub; Milestone 3 Batch 3 (doc 33 §2, X-12) seeds it with the real resolver: an ACTIVE teacher reads a student only while one of the teacher's faculty assignments and the student's course registration on the same PUBLISHED/CLOSED offering are both valid today. Existing tenants need their roles re-seeded (runbook `m3b3-electives-registrations-rollout.md`).
 

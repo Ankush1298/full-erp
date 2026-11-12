@@ -14,6 +14,7 @@ import {
   logout as apiLogout,
   type LoginInput,
 } from '../../lib/api/auth-api';
+import { fetchMfaStatus } from '../../lib/api/mfa-api';
 import type { ApiClient } from '../../lib/api/client';
 import { isApiError } from '../../lib/api/errors';
 import { toIdentity, type Identity } from './identity';
@@ -88,13 +89,23 @@ export function AuthProvider({ client, children }: { client: ApiClient; children
     const controller = new AbortController();
     setState((s) => (s.status === 'loading' ? s : { ...s, status: 'loading' }));
     fetchMe(client, controller.signal).then(
-      (me) => {
+      async (me) => {
+        let mfaRequired = false;
+        try {
+          const mfa = await fetchMfaStatus(client, controller.signal);
+          if ((mfa.required && !mfa.sessionVerified) || (mfa.enrolled && !mfa.sessionVerified)) {
+            mfaRequired = true;
+          }
+        } catch {
+          // Ignore if MFA check fails or controller aborted; fallback to unflagged
+        }
+        if (controller.signal.aborted) return;
         sessionActive.current = true;
         setState({
           status: 'authenticated',
           identity: toIdentity(me),
           notice: null,
-          mfaRequired: false,
+          mfaRequired,
         });
       },
       (err: unknown) => {
@@ -117,12 +128,21 @@ export function AuthProvider({ client, children }: { client: ApiClient; children
       await apiLogin(client, input);
       try {
         const me = await fetchMe(client); // identity and capabilities come from the backend, not the form
+        let mfaRequired = false;
+        try {
+          const mfa = await fetchMfaStatus(client);
+          if ((mfa.required && !mfa.sessionVerified) || (mfa.enrolled && !mfa.sessionVerified)) {
+            mfaRequired = true;
+          }
+        } catch {
+          // fallback
+        }
         sessionActive.current = true;
         setState({
           status: 'authenticated',
           identity: toIdentity(me),
           notice: null,
-          mfaRequired: false,
+          mfaRequired,
         });
       } catch (err) {
         if (!(isApiError(err) && err.kind === 'forbidden')) throw err;

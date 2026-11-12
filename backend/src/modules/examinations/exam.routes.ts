@@ -4,6 +4,7 @@ import { extractAuditMeta, requireContext } from '../academics/common.js';
 import { ExamService } from './exam.service.js';
 import { EligibilityService } from './eligibility.service.js';
 import {
+  CorrectMarksSchema,
   CreateExaminationSchema,
   CreateScheduleSchema,
   ListExaminationsQuerySchema,
@@ -13,7 +14,9 @@ import {
 import {
   ApproveCandidateListInputSchema,
   GenerateCandidatesInputSchema,
+  ListPoliciesQuerySchema,
   OverrideCandidateInputSchema,
+  PolicyPreviewImpactInputSchema,
   SaveEligibilityPolicyInputSchema,
 } from './eligibility.schemas.js';
 import { registerExamResolvers } from './assigned-resolver.js';
@@ -138,6 +141,36 @@ export const registerExamRoutes: FastifyPluginAsync<{
     },
   );
 
+  // Authorized correction of a submitted mark
+  app.post<{ Params: { scheduleId: string } }>(
+    '/api/v1/examinations/schedules/:scheduleId/marks/correct',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = CorrectMarksSchema.parse(req.body);
+      const meta = extractAuditMeta(req);
+      const res = await db.withTenant(ctx, (tx) =>
+        ExamService.correctMark(tx, ctx, req.params.scheduleId, body, meta),
+      );
+      reply.send({ data: res });
+    },
+  );
+
+  // Authorized amendment of an already published result
+  app.post<{ Params: { scheduleId: string } }>(
+    '/api/v1/examinations/schedules/:scheduleId/marks/amend',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = CorrectMarksSchema.parse({ ...(req.body as object), is_amendment: true });
+      const meta = extractAuditMeta(req);
+      const res = await db.withTenant(ctx, (tx) =>
+        ExamService.correctMark(tx, ctx, req.params.scheduleId, body, meta),
+      );
+      reply.send({ data: res });
+    },
+  );
+
   // Publish results for a schedule (Admin maker-checker)
   app.post<{ Params: { scheduleId: string } }>(
     '/api/v1/examinations/schedules/:scheduleId/publish',
@@ -181,6 +214,147 @@ export const registerExamRoutes: FastifyPluginAsync<{
   // ---------------------------------------------------------------------------------------------
   // Slice 2: Examination Eligibility & Candidate Lists
   // ---------------------------------------------------------------------------------------------
+
+  // List policies and templates across scopes
+  app.get(
+    '/api/v1/examinations/policies',
+    { config: { permission: ['exam.manage', 'result.read'] } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const query = ListPoliciesQuerySchema.parse(req.query);
+      const policies = await db.withTenant(ctx, (tx) =>
+        EligibilityService.listPolicies(tx, ctx, query),
+      );
+      reply.send({ data: policies });
+    },
+  );
+
+  // Create policy template
+  app.post(
+    '/api/v1/examinations/policies',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = SaveEligibilityPolicyInputSchema.parse(req.body);
+      const meta = extractAuditMeta(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.savePolicy(tx, ctx, {}, body, meta),
+      );
+      reply.status(201).send({ data: policy });
+    },
+  );
+
+  // Preview policy impact on a schedule without committing changes
+  app.post(
+    '/api/v1/examinations/policies/preview-impact',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = PolicyPreviewImpactInputSchema.parse(req.body);
+      const impact = await db.withTenant(ctx, (tx) =>
+        EligibilityService.previewPolicyImpact(tx, ctx, body),
+      );
+      reply.send({ data: impact });
+    },
+  );
+
+  // Get policy by ID
+  app.get<{ Params: { id: string } }>(
+    '/api/v1/examinations/policies/:id',
+    { config: { permission: ['exam.manage', 'result.read'] } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.getPolicyById(tx, ctx, req.params.id),
+      );
+      reply.send({ data: policy });
+    },
+  );
+
+  // Update policy by ID
+  app.put<{ Params: { id: string } }>(
+    '/api/v1/examinations/policies/:id',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = SaveEligibilityPolicyInputSchema.parse(req.body);
+      const meta = extractAuditMeta(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.savePolicy(tx, ctx, { policyId: req.params.id }, body, meta),
+      );
+      reply.send({ data: policy });
+    },
+  );
+
+  // Duplicate policy template
+  app.post<{ Params: { id: string } }>(
+    '/api/v1/examinations/policies/:id/duplicate',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const meta = extractAuditMeta(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.duplicatePolicy(tx, ctx, req.params.id, meta),
+      );
+      reply.status(201).send({ data: policy });
+    },
+  );
+
+  // Activate policy
+  app.post<{ Params: { id: string } }>(
+    '/api/v1/examinations/policies/:id/activate',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const meta = extractAuditMeta(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.activatePolicy(tx, ctx, req.params.id, meta),
+      );
+      reply.send({ data: policy });
+    },
+  );
+
+  // Archive policy
+  app.post<{ Params: { id: string } }>(
+    '/api/v1/examinations/policies/:id/archive',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const meta = extractAuditMeta(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.archivePolicy(tx, ctx, req.params.id, meta),
+      );
+      reply.send({ data: policy });
+    },
+  );
+
+  // Get examination-level eligibility policy
+  app.get<{ Params: { id: string } }>(
+    '/api/v1/examinations/:id/eligibility-policy',
+    { config: { permission: ['exam.manage', 'result.read'] } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.getOrResolvePolicy(tx, ctx, '', req.params.id),
+      );
+      reply.send({ data: policy });
+    },
+  );
+
+  // Set examination-level eligibility policy
+  app.put<{ Params: { id: string } }>(
+    '/api/v1/examinations/:id/eligibility-policy',
+    { config: { permission: 'exam.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = SaveEligibilityPolicyInputSchema.parse(req.body);
+      const meta = extractAuditMeta(req);
+      const policy = await db.withTenant(ctx, (tx) =>
+        EligibilityService.savePolicy(tx, ctx, { examinationId: req.params.id }, body, meta),
+      );
+      reply.send({ data: policy });
+    },
+  );
 
   // Get eligibility policy for a schedule
   app.get<{ Params: { scheduleId: string } }>(

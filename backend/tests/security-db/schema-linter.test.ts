@@ -114,6 +114,8 @@ describe('schema linter (S-2)', () => {
       'invite_tokens.UPDATE.invite_tokens_acceptance_update',
       'mfa_enrollment_tickets.SELECT.mfa_enrollment_tickets_admin_reset_select',
       'mfa_enrollment_tickets.UPDATE.mfa_enrollment_tickets_admin_reset_update',
+      'mfa_enrollment_tickets.INSERT.mfa_enrollment_tickets_invitation_insert',
+      'mfa_enrollment_tickets.UPDATE.mfa_enrollment_tickets_invitation_update',
       'user_mfa_factors.SELECT.user_mfa_factors_admin_reset_select',
       'user_mfa_factors.UPDATE.user_mfa_factors_admin_reset_update',
       'user_recovery_codes.SELECT.user_recovery_codes_admin_reset_select',
@@ -125,17 +127,19 @@ describe('schema linter (S-2)', () => {
       policyname: string;
       roles: string;
       qual: string | null;
+      with_check: string | null;
     }>(
-      `SELECT tablename, cmd, policyname, roles::text, qual FROM pg_policies WHERE schemaname = 'app' ORDER BY 1,2,3`,
+      `SELECT tablename, cmd, policyname, roles::text, qual, with_check FROM pg_policies WHERE schemaname = 'app' ORDER BY 1,2,3`,
     );
     for (const p of detailed) {
       if (p.roles === '{app_migrator}') {
         const id = `${p.tablename}.${p.cmd}.${p.policyname}`;
         expect(MIGRATOR_PROBES.has(id), `unexpected app_migrator policy ${id}`).toBe(true);
         // every probe compares session_user; the 0028 ones also pin the runtime session explicitly
-        expect(p.qual ?? '', id).toMatch(/session_user/i);
+        const expr = `${p.qual ?? ''} ${p.with_check ?? ''}`;
+        expect(expr, id).toMatch(/session_user/i);
         if (id !== 'users.SELECT.users_context_probe')
-          expect(p.qual ?? '', id).toMatch(/app_runtime/);
+          expect(expr, id).toMatch(/app_runtime/);
         continue;
       }
       expect(p.roles, `${p.tablename}.${p.cmd}`).toBe('{app_runtime}');

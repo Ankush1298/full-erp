@@ -69,6 +69,10 @@ export function AcceptInvitePage() {
               This invitation link is invalid or incomplete. Please check the link from your
               invitation email or contact your administrator.
             </Alert>
+            <p className="muted" style={{ marginTop: 'var(--space-3)' }}>
+              Invitation links expire after 7 days and can only be used once. Please contact your
+              school administrator or Principal to request a new invitation.
+            </p>
             <div style={{ marginTop: 'var(--space-4)', width: '100%' }}>
               <Link to="/login" className="btn btn-secondary btn-block">
                 Go to Sign in
@@ -111,8 +115,19 @@ export function AcceptInvitePage() {
             <p className="muted" style={{ marginTop: 'var(--space-3)' }}>
               You can now sign in using your email address and new password.
             </p>
+            <p className="muted" style={{ marginTop: 'var(--space-2)' }}>
+              Sign in with your email address and new password to complete two-factor authentication
+              (MFA) setup and access your campus workspace.
+            </p>
             <div style={{ marginTop: 'var(--space-4)', width: '100%' }}>
-              <Link to="/login" className="btn btn-primary btn-block">
+              <Link
+                to={
+                  emailHint
+                    ? `/login?email=${encodeURIComponent(emailHint)}&onboarding=true`
+                    : '/login'
+                }
+                className="btn btn-primary btn-block"
+              >
                 Sign in to your account
               </Link>
             </div>

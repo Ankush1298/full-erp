@@ -5,12 +5,14 @@ import type { TrustedContext } from '../../shared/tenancy/trusted-context.js';
 import { recordAudit, type AuditRequestMeta } from '../../shared/audit/index.js';
 import { AuthorizationEngine } from '../../shared/authorization/engine.js';
 import { conflict, ensureTrusted, invalid, mapDbError } from '../academics/common.js';
-import type {
-  CreateExaminationInput,
-  CreateScheduleInput,
-  ListExaminationsQuery,
-  ListSchedulesQuery,
-  SaveMarksInput,
+import {
+  CorrectMarksSchema,
+  type CorrectMarksInput,
+  type CreateExaminationInput,
+  type CreateScheduleInput,
+  type ListExaminationsQuery,
+  type ListSchedulesQuery,
+  type SaveMarksInput,
 } from './exam.schemas.js';
 
 const lower = (s: string): string => s.toLowerCase();
@@ -89,7 +91,7 @@ export class ExamService {
       INSERT INTO app.examinations (
         id, organization_id, campus_id, term_id, name, exam_type, status, starts_on, ends_on, created_by_user_id
       ) VALUES ($1, $2, $3, $4, $5, $6, 'SCHEDULED', $7, $8, $9)
-      RETURNING *
+      RETURNING *, starts_on::text AS starts_on, ends_on::text AS ends_on
     `;
 
     try {
@@ -149,7 +151,7 @@ export class ExamService {
     }
 
     const sql = `
-      SELECT e.*, c.name AS campus_name, t.name AS term_name
+      SELECT e.*, e.starts_on::text AS starts_on, e.ends_on::text AS ends_on, c.name AS campus_name, t.name AS term_name
         FROM app.examinations e
         JOIN app.campuses c ON c.organization_id = e.organization_id AND c.id = e.campus_id
         JOIN app.terms t ON t.organization_id = e.organization_id AND t.id = e.term_id
@@ -171,7 +173,7 @@ export class ExamService {
     if (!isUuidV7(examinationId)) throw invalid('Invalid examination ID.');
 
     const sql = `
-      SELECT e.*, c.name AS campus_name, t.name AS term_name
+      SELECT e.*, e.starts_on::text AS starts_on, e.ends_on::text AS ends_on, c.name AS campus_name, t.name AS term_name
         FROM app.examinations e
         JOIN app.campuses c ON c.organization_id = e.organization_id AND c.id = e.campus_id
         JOIN app.terms t ON t.organization_id = e.organization_id AND t.id = e.term_id
@@ -229,7 +231,7 @@ export class ExamService {
         id, organization_id, examination_id, course_offering_id,
         exam_date, start_time, end_time, max_marks, pass_marks, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'SCHEDULED')
-      RETURNING *
+      RETURNING *, exam_date::text AS exam_date
     `;
 
     try {
@@ -296,6 +298,7 @@ export class ExamService {
 
     const sql = `
       SELECT s.*,
+             s.exam_date::text AS exam_date,
              e.name AS exam_name,
              e.exam_type,
              c.code AS course_code,
@@ -325,6 +328,7 @@ export class ExamService {
 
     const sql = `
       SELECT s.*,
+             s.exam_date::text AS exam_date,
              e.name AS exam_name,
              e.exam_type,
              e.campus_id,
@@ -439,6 +443,38 @@ export class ExamService {
     if (schedule.status === 'CANCELLED') {
       throw conflict('Cannot modify marks for a cancelled examination schedule.');
     }
+    if (schedule.status === 'SUBMITTED') {
+      throw new AppError(
+        409,
+        'MARKS_ALREADY_SUBMITTED',
+        'Marks have already been submitted. Use an authorized marks correction request with justification to update marks.',
+      );
+    }
+
+    // Chronology / early marks safeguard
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (schedule.exam_date && todayStr < schedule.exam_date) {
+      if (!input.allow_early_entry) {
+        throw new AppError(
+          422,
+          'EXAM_DATE_NOT_REACHED',
+          `Cannot enter marks before examination date (${schedule.exam_date}). Administrative override with justification is required for early marks entry.`,
+        );
+      }
+      if (!input.early_entry_reason || input.early_entry_reason.trim().length < 5) {
+        throw new AppError(
+          422,
+          'EARLY_ENTRY_REASON_REQUIRED',
+          'An early entry reason of at least 5 characters is required for marks entry prior to the examination date.',
+        );
+      }
+      await AuthorizationEngine.assert(tx, ctx, 'exam.manage', {
+        organization_id: ctx.tenantId,
+        campus_id: schedule.campus_id,
+        course_offering_id: schedule.course_offering_id,
+        exam_date: schedule.exam_date,
+      });
+    }
 
     // Permission check: teacher assigned or staff with exam.marks.enter
     await AuthorizationEngine.assert(tx, ctx, 'exam.marks.enter', {
@@ -448,22 +484,31 @@ export class ExamService {
       exam_date: schedule.exam_date,
     });
 
-    // Check candidate eligibility if an approved/frozen candidate list exists
-    const approvedListRes = await tx.query<{ id: string }>(
-      `SELECT id FROM app.exam_candidate_lists
-        WHERE organization_id = $1 AND exam_schedule_id = $2 AND status IN ('APPROVED', 'FROZEN')
-        LIMIT 1`,
+    // Check candidate eligibility if a candidate list exists
+    const candListRes = await tx.query<{ id: string; status: string }>(
+      `SELECT id, status FROM app.exam_candidate_lists
+        WHERE organization_id = $1 AND exam_schedule_id = $2
+        ORDER BY created_at DESC LIMIT 1`,
       [ctx.tenantId, lower(scheduleId)],
     );
 
-    if (approvedListRes.rows[0]) {
+    const candList = candListRes.rows[0];
+    if (candList) {
+      if (candList.status !== 'APPROVED' && candList.status !== 'FROZEN') {
+        throw new AppError(
+          422,
+          'CANDIDATE_LIST_NOT_APPROVED',
+          'Candidate list must be approved and frozen before marks can be entered or submitted.',
+        );
+      }
+
       const eligibleCandRes = await tx.query<{ student_id: string }>(
         `SELECT c.student_id
            FROM app.exam_candidates c
           WHERE c.organization_id = $1
             AND c.candidate_list_id = $2
             AND c.final_status = 'ELIGIBLE'`,
-        [ctx.tenantId, approvedListRes.rows[0].id],
+        [ctx.tenantId, candList.id],
       );
       const eligibleStudentIds = new Set(eligibleCandRes.rows.map((r) => r.student_id));
 
@@ -577,6 +622,229 @@ export class ExamService {
     };
   }
 
+  /** Authorized correction of a submitted mark with mandatory audit trail */
+  static async correctMark(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    scheduleId: string,
+    input: CorrectMarksInput,
+    meta?: AuditRequestMeta,
+  ) {
+    ensureTrusted(ctx);
+    AuthorizationEngine.assertStaffActor(ctx);
+
+    const validated = CorrectMarksSchema.parse(input);
+
+    const schedule = await this.getSchedule(tx, ctx, scheduleId);
+
+    if (schedule.status === 'CANCELLED') {
+      throw conflict('Cannot modify marks for a cancelled examination schedule.');
+    }
+
+    if (schedule.status === 'PUBLISHED' && !validated.is_amendment) {
+      throw new AppError(
+        409,
+        'PUBLISHED_AMENDMENT_REQUIRED',
+        'Cannot modify marks for a published examination schedule. An authorized published-result amendment with justification is required.',
+      );
+    }
+
+    await AuthorizationEngine.assert(tx, ctx, 'exam.manage', {
+      organization_id: ctx.tenantId,
+      campus_id: schedule.campus_id,
+      course_offering_id: schedule.course_offering_id,
+      exam_date: schedule.exam_date,
+    });
+
+    const studentId = lower(validated.student_id);
+
+    const existingMarkRes = await tx.query<{
+      id: string;
+      marks_obtained: string | null;
+      status: string;
+      marked_by_user_id: string;
+    }>(
+      `SELECT id, marks_obtained, status, marked_by_user_id
+         FROM app.exam_marks
+        WHERE organization_id = $1 AND exam_schedule_id = $2 AND student_id = $3`,
+      [ctx.tenantId, lower(scheduleId), studentId],
+    );
+
+    const existingMark = existingMarkRes.rows[0];
+    if (!existingMark) {
+      throw resourceNotFound();
+    }
+
+    // Resolve policy governance mode
+    const { EligibilityService } = await import('./eligibility.service.js');
+    const policy = await EligibilityService.getOrResolvePolicy(
+      tx,
+      ctx,
+      scheduleId,
+      schedule.examination_id,
+    );
+    const governanceMode =
+      policy?.approval_rules?.governance_mode ??
+      (policy?.approval_rules?.results_workflow === 'DIRECT_PUBLISH'
+        ? 'PRINCIPAL_FINAL_AUTHORITY'
+        : 'INDEPENDENT_REVIEW');
+
+    const adminIds = await AuthorizationEngine.effectiveAdministratorIds(tx, ctx.tenantId);
+    const isPrincipal = adminIds.includes(ctx.userId);
+
+    // Separation of duties / Maker-checker: if caller originally submitted the mark
+    if (existingMark.marked_by_user_id === ctx.userId) {
+      if (governanceMode === 'PRINCIPAL_FINAL_AUTHORITY' && isPrincipal) {
+        // Principal Final Authority allows Principal to correct marks they personally submitted
+      } else if (!validated.evidence_exception && !validated.evidence_url) {
+        throw new AppError(
+          403,
+          'MAKER_CHECKER_VIOLATION',
+          'Separation of duties required: An independent reviewer or verifiable evidence is required to correct marks you submitted.',
+        );
+      }
+    }
+
+    const maxMarks = Number(schedule.max_marks);
+    const passMarks = Number(schedule.pass_marks);
+    const isAbsentOrExempt =
+      validated.status === 'ABSENT' || validated.status === 'EXEMPT' || validated.status === 'WITHHELD';
+    const marksVal = isAbsentOrExempt ? null : validated.marks_obtained;
+
+    if (validated.status === 'ENTERED') {
+      const val = Number(marksVal);
+      if (Number.isNaN(val) || val < 0 || val > maxMarks) {
+        throw invalid(
+          `Marks obtained (${val}) cannot exceed maximum marks (${maxMarks}) or be negative.`,
+        );
+      }
+    }
+
+    const isPassing =
+      marksVal !== null && marksVal !== undefined ? Number(marksVal) >= passMarks : false;
+
+    // Transactional published-result amendment
+    if (schedule.status === 'PUBLISHED' && validated.is_amendment) {
+      await tx.query(
+        `UPDATE app.exam_schedules
+            SET status = 'SUBMITTED'
+          WHERE organization_id = $1 AND id = $2`,
+        [ctx.tenantId, lower(scheduleId)],
+      );
+
+      await tx.query(
+        `UPDATE app.exam_marks
+            SET marks_obtained = $1,
+                status = $2,
+                is_passing = $3,
+                remarks = $4,
+                marked_by_user_id = $5,
+                marked_at = now()
+          WHERE organization_id = $6 AND exam_schedule_id = $7 AND student_id = $8`,
+        [
+          marksVal,
+          validated.status === 'ENTERED' ? 'SUBMITTED' : validated.status,
+          isPassing,
+          validated.remarks ?? `Amended: ${validated.reason}`,
+          ctx.userId,
+          ctx.tenantId,
+          lower(scheduleId),
+          studentId,
+        ],
+      );
+
+      await tx.query(
+        `UPDATE app.exam_schedules
+            SET status = 'PUBLISHED', published_at = now(), published_by_user_id = $1
+          WHERE organization_id = $2 AND id = $3`,
+        [ctx.userId, ctx.tenantId, lower(scheduleId)],
+      );
+
+      await recordAudit(
+        tx,
+        ctx,
+        {
+          action: 'exam.marks.amend_published',
+          resourceType: 'exam_schedule',
+          resourceId: scheduleId,
+          campusId: schedule.campus_id,
+          riskTier: 2,
+          changes: {
+            student_id: { old: null, new: validated.student_id },
+            marks_obtained: { old: existingMark.marks_obtained, new: marksVal },
+            status: { old: existingMark.status, new: validated.status },
+            reason: { old: null, new: validated.reason },
+            evidence_url: { old: null, new: validated.evidence_url ?? null },
+            evidence_exception: { old: null, new: validated.evidence_exception ?? false },
+            is_amendment: { old: null, new: true },
+            amended_by: { old: null, new: ctx.userId },
+          },
+        },
+        meta ?? {},
+      );
+
+      return {
+        success: true,
+        student_id: validated.student_id,
+        marks_obtained: marksVal,
+        status: validated.status,
+        is_amendment: true,
+        corrected_at: new Date().toISOString(),
+      };
+    }
+
+    // Normal correction for SUBMITTED schedule
+    await tx.query(
+      `UPDATE app.exam_marks
+          SET marks_obtained = $1,
+              status = $2,
+              is_passing = $3,
+              remarks = $4,
+              marked_by_user_id = $5,
+              marked_at = now()
+        WHERE organization_id = $6 AND exam_schedule_id = $7 AND student_id = $8`,
+      [
+        marksVal,
+        validated.status === 'ENTERED' ? 'SUBMITTED' : validated.status,
+        isPassing,
+        validated.remarks ?? `Corrected: ${validated.reason}`,
+        ctx.userId,
+        ctx.tenantId,
+        lower(scheduleId),
+        studentId,
+      ],
+    );
+
+    await recordAudit(
+      tx,
+      ctx,
+      {
+        action: 'exam.marks.correct',
+        resourceType: 'exam_schedule',
+        resourceId: scheduleId,
+        campusId: schedule.campus_id,
+        riskTier: 2,
+        changes: {
+          student_id: { old: null, new: validated.student_id },
+          marks_obtained: { old: existingMark.marks_obtained, new: marksVal },
+          status: { old: existingMark.status, new: validated.status },
+          reason: { old: null, new: validated.reason },
+          evidence_url: { old: null, new: validated.evidence_url ?? null },
+          evidence_exception: { old: null, new: validated.evidence_exception ?? false },
+        },
+      },
+      meta ?? {},
+    );
+
+    return {
+      success: true,
+      student_id: validated.student_id,
+      marks_obtained: marksVal,
+      status: validated.status,
+      corrected_at: new Date().toISOString(),
+    };
+  }
+
   /** Publish results (Admin action with result.publish) */
   static async publishResults(
     tx: TenantTx,
@@ -586,16 +854,113 @@ export class ExamService {
   ) {
     ensureTrusted(ctx);
     AuthorizationEngine.assertStaffActor(ctx);
-    // CRITICAL permission - teachers do not have this
-    await AuthorizationEngine.assert(tx, ctx, 'result.publish');
 
     const schedule = await this.getSchedule(tx, ctx, scheduleId);
 
+    // CRITICAL permission - scoped to tenant, campus, course offering, and date
+    await AuthorizationEngine.assert(tx, ctx, 'result.publish', {
+      organization_id: ctx.tenantId,
+      campus_id: schedule.campus_id,
+      course_offering_id: schedule.course_offering_id,
+      exam_date: schedule.exam_date,
+    });
+
+    // Idempotency: if already PUBLISHED, return existing publication details
     if (schedule.status === 'PUBLISHED') {
-      throw conflict('Results for this examination schedule are already published.');
+      return {
+        success: true,
+        status: 'PUBLISHED',
+        published_at: schedule.published_at ?? new Date().toISOString(),
+      };
     }
     if (schedule.status === 'CANCELLED') {
       throw conflict('Cannot publish results for a cancelled examination schedule.');
+    }
+
+    // Candidate list must be approved/frozen if a candidate list exists
+    const candListRes = await tx.query<{ id: string; status: string }>(
+      `SELECT id, status FROM app.exam_candidate_lists
+        WHERE organization_id = $1 AND exam_schedule_id = $2
+        ORDER BY created_at DESC LIMIT 1`,
+      [ctx.tenantId, lower(scheduleId)],
+    );
+
+    if (candListRes.rows[0] && !['APPROVED', 'FROZEN'].includes(candListRes.rows[0].status)) {
+      throw new AppError(
+        422,
+        'CANDIDATE_LIST_NOT_APPROVED',
+        'Candidate list must be approved and frozen before examination results can be published.',
+      );
+    }
+
+    // Status check: marks must be SUBMITTED
+    if (schedule.status !== 'SUBMITTED') {
+      throw new AppError(
+        422,
+        'MARKS_NOT_SUBMITTED',
+        'Examination marks must be entered and submitted before publishing results.',
+      );
+    }
+
+    // Maker-checker & Governance mode validation:
+    // If the caller submitted the marks:
+    if (
+      schedule.marks_submitted_by_user_id &&
+      schedule.marks_submitted_by_user_id === ctx.userId
+    ) {
+      let isAllowed = false;
+      const { EligibilityService } = await import('./eligibility.service.js');
+      const policy = await EligibilityService.getOrResolvePolicy(
+        tx,
+        ctx,
+        scheduleId,
+        schedule.examination_id,
+      );
+      const governanceMode =
+        policy?.approval_rules?.governance_mode ??
+        (policy?.approval_rules?.results_workflow === 'DIRECT_PUBLISH'
+          ? 'PRINCIPAL_FINAL_AUTHORITY'
+          : 'INDEPENDENT_REVIEW');
+
+      const adminIds = await AuthorizationEngine.effectiveAdministratorIds(tx, ctx.tenantId);
+      const isPrincipal = adminIds.includes(ctx.userId);
+
+      if (governanceMode === 'PRINCIPAL_FINAL_AUTHORITY') {
+        if (isPrincipal) {
+          isAllowed = true;
+        } else {
+          throw new AppError(
+            403,
+            'MAKER_CHECKER_VIOLATION',
+            'Principal Final Authority permits only the Principal to approve and publish their own submitted marks.',
+          );
+        }
+      } else if (governanceMode === 'DELEGATED_APPROVAL') {
+        if (isPrincipal) {
+          isAllowed = true;
+        } else {
+          throw new AppError(
+            403,
+            'MAKER_CHECKER_VIOLATION',
+            'Separation of duties required: Delegated approval requires an independent reviewer for submitted marks.',
+          );
+        }
+      } else {
+        // INDEPENDENT_REVIEW
+        throw new AppError(
+          403,
+          'MAKER_CHECKER_VIOLATION',
+          'Separation of duties required: Marks submitter cannot publish their own marks under the Independent Academic Review policy.',
+        );
+      }
+
+      if (!isAllowed) {
+        throw new AppError(
+          403,
+          'MAKER_CHECKER_VIOLATION',
+          'Separation of duties required: The user who submitted the marks cannot publish results without independent review.',
+        );
+      }
     }
 
     // Check that marks exist
@@ -784,7 +1149,7 @@ export class ExamService {
         m.status AS mark_status,
         m.remarks,
         s.id AS schedule_id,
-        s.exam_date,
+        s.exam_date::text AS exam_date,
         s.max_marks,
         s.pass_marks,
         s.published_at,

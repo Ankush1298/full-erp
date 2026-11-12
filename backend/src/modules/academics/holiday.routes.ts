@@ -4,12 +4,18 @@ import { CreateResponseSchema, IdParamSchema, type IdParam } from './academic.sc
 import { DataResponse, ListResponse } from './calendar.schemas.js';
 import { etag, expectedVersion, extractAuditMeta, requireContext } from './common.js';
 import {
+  BulkCreateHolidaysBodySchema,
+  BulkCreateHolidaysResponseSchema,
   CreateHolidayBodySchema,
   HolidayRecordSchema,
   HolidayService,
+  HolidaySuggestionSchema,
+  HolidaySuggestionsQuerySchema,
   ListHolidaysQuerySchema,
   UpdateHolidayBodySchema,
+  type BulkCreateHolidaysBody,
   type CreateHolidayBody,
+  type HolidaySuggestionsQuery,
   type ListHolidaysQuery,
   type UpdateHolidayBody,
 } from './holiday.service.js';
@@ -31,6 +37,42 @@ export function registerHolidayRoutes(app: FastifyInstance, db: Database): void 
       return reply.status(200).send({ success: true, data });
     },
   );
+
+  app.get<{ Querystring: HolidaySuggestionsQuery }>(
+    '/holidays/suggestions',
+    {
+      config: { permission: 'academic.program.read' },
+      schema: {
+        querystring: HolidaySuggestionsQuerySchema,
+        response: { 200: ListResponse(HolidaySuggestionSchema) },
+      },
+    },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const data = await db.withTenant(ctx, (tx) => HolidayService.suggestions(tx, ctx, req.query));
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  app.post<{ Body: BulkCreateHolidaysBody }>(
+    '/holidays/bulk',
+    {
+      config: { permission: 'academic.term.manage' },
+      schema: {
+        body: BulkCreateHolidaysBodySchema,
+        response: { 201: DataResponse(BulkCreateHolidaysResponseSchema) },
+      },
+    },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const meta = extractAuditMeta(req);
+      const data = await db.withTenant(ctx, (tx) =>
+        HolidayService.bulkCreate(tx, ctx, req.body, meta),
+      );
+      return reply.status(201).send({ success: true, data });
+    },
+  );
+
   app.post<{ Body: CreateHolidayBody }>(
     '/holidays',
     {
@@ -44,6 +86,7 @@ export function registerHolidayRoutes(app: FastifyInstance, db: Database): void 
       return reply.status(201).send({ success: true, data: { id } });
     },
   );
+
   app.patch<{ Params: IdParam; Body: UpdateHolidayBody }>(
     '/holidays/:id',
     {

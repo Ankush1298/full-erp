@@ -252,6 +252,28 @@ export function createFakeBackend(
       /** how GET /academics/terms and GET /students/:id/term-enrollments answer */
       termsMode: 'ok' as 'ok' | 'server',
       enrollmentsMode: 'ok' as 'ok' | 'server',
+      programs: [
+        {
+          id: '01900000-0000-7000-8000-0000000000a1',
+          departmentId: 'd1',
+          periodTypeId: 'pt1',
+          name: 'Primary Class 5',
+          code: 'CLS5',
+          degreeLevel: 'PRIMARY',
+          durationPeriods: 1,
+          status: 'ACTIVE',
+          version: 1,
+        },
+      ] as Array<Record<string, unknown>>,
+      cohorts: [
+        {
+          id: '01900000-0000-7000-8000-0000000000f2',
+          programId: '01900000-0000-7000-8000-0000000000a1',
+          name: 'Class 5 2026',
+          admissionYear: 2026,
+          status: 'ACTIVE',
+        },
+      ] as Array<Record<string, unknown>>,
       /** When set, the next write answers with this status (e.g. 409) and the matching code. */
       failNext: null as null | { status: number; code: string },
       /** doc 33: elective groups by cohort period, registrations, holidays, terminology, setup checklist */
@@ -499,6 +521,7 @@ export function createFakeBackend(
       schedules: [] as Array<Record<string, unknown>>,
       marks: [] as Array<Record<string, unknown>>,
       policies: {} as Record<string, Record<string, unknown>>,
+      policyList: [] as Array<Record<string, unknown>>,
       candidateLists: {} as Record<string, any>,
     },
     attendance: {
@@ -536,6 +559,24 @@ export function createFakeBackend(
       structures: [] as Array<Record<string, unknown>>,
       dues: [] as Array<Record<string, unknown>>,
       receipts: [] as Array<Record<string, unknown>>,
+      gatewayConfigs: [
+        {
+          id: 'gw-1',
+          campus_id: 'camp-1',
+          provider: 'RAZORPAY',
+          mode: 'SANDBOX',
+          is_active: true,
+          merchant_key_masked: 'rzp_test_••••••••1234',
+          has_secret_key: true,
+          has_webhook_secret: true,
+          settings: {},
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ] as Array<Record<string, unknown>>,
+      paymentAttempts: [] as Array<Record<string, unknown>>,
+      refunds: [] as Array<Record<string, unknown>>,
     },
     reports: {
       enrolmentRoster: {
@@ -706,10 +747,21 @@ export function createFakeBackend(
       status,
       headers: { 'content-type': 'application/json', ...headers },
     });
-  const err = (status: number, code: string, headers: Record<string, string> = {}): Response =>
+  const err = (
+    status: number,
+    code: string,
+    headers: Record<string, string> = {},
+    message?: string,
+  ): Response =>
     json(
       status,
-      { error: { code, message: 'server text that must never be shown', requestId: 'req-1' } },
+      {
+        error: {
+          code,
+          message: message ?? 'server text that must never be shown',
+          requestId: 'req-1',
+        },
+      },
       headers,
     );
 
@@ -1019,6 +1071,37 @@ export function createFakeBackend(
       target['status'] = action === 'suspend' ? 'SUSPENDED' : 'ACTIVE';
       target['version'] = (target['version'] as number) + 1;
       return json(200, { success: true, data: target }, { ETag: `"${String(target['version'])}"` });
+    }
+    const userMfaReset = /^\/users\/([^/]+)\/mfa\/reset$/.exec(accessUrl.pathname);
+    if (userMfaReset && method === 'POST') {
+      const early = accessMutation();
+      if (early) return early;
+      const id = decodeURIComponent(userMfaReset[1]!);
+      if (state.session && state.me?.user_id === id) return err(403, 'FORBIDDEN');
+      const target = state.access.users.find((u) => u['id'] === id);
+      if (!target) return err(404, 'NOT_FOUND');
+      target['mfaEnrolled'] = false;
+      return json(200, {
+        success: true,
+        data: { factorsRevoked: 1, codesRevoked: 10, sessionsRevoked: 1 },
+      });
+    }
+    const userMfaTicket = /^\/users\/([^/]+)\/mfa\/enrollment-ticket$/.exec(accessUrl.pathname);
+    if (userMfaTicket && method === 'POST') {
+      const early = accessMutation();
+      if (early) return early;
+      const id = decodeURIComponent(userMfaTicket[1]!);
+      if (state.session && state.me?.user_id === id) return err(403, 'FORBIDDEN');
+      const target = state.access.users.find((u) => u['id'] === id);
+      if (!target) return err(404, 'NOT_FOUND');
+      return json(201, {
+        success: true,
+        data: {
+          ticketId: '01932b12-ticket-test-id',
+          ticket: 'a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0',
+          expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        },
+      });
     }
     const userDetail = /^\/users\/([^/]+)$/.exec(accessUrl.pathname);
     if (userDetail && method === 'GET') {
@@ -1648,6 +1731,46 @@ export function createFakeBackend(
       if (!mine.some((x) => x.id === id)) return err(404, 'RESOURCE_NOT_FOUND');
       return json(200, { success: true, data: st.identifiers[id] ?? [] });
     }
+    const studentProgramMatch = /^\/students\/([^/]+)\/programs$/.exec(path);
+    if (studentProgramMatch && method === 'POST') {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (!state.me.capabilities.includes('student.program.assign')) return err(403, 'FORBIDDEN');
+      if (!headers['idempotency-key']) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');
+      const studentId = studentProgramMatch[1]!;
+      const reqBody =
+        typeof reqInit?.body === 'string'
+          ? (JSON.parse(reqInit.body) as Record<string, unknown>)
+          : {};
+      const prog = state.academics.programs.find((p) => p.id === reqBody.programId);
+      const coh = state.academics.cohorts.find((c) => c.id === reqBody.cohortId);
+      const id = 'sp-1';
+      state.students.timelines[studentId] = {
+        studentId,
+        today: '2026-11-02',
+        timezone: 'Asia/Kolkata',
+        position: {
+          admitted: true,
+          studentStatus: 'ACTIVE',
+          programme: {
+            studentProgramId: id,
+            id: reqBody.programId,
+            name: prog?.name ?? 'Primary Class 5',
+            code: prog?.code ?? 'CLS5',
+            cohortId: reqBody.cohortId,
+            cohortName: coh?.name ?? 'Class 5 2026',
+            entryType: 'REGULAR',
+            startDate: reqBody.startDate,
+            endDate: null,
+          },
+          terms: [],
+        },
+        events: [],
+        undatedOutcomes: [],
+        futureEventsExcluded: 0,
+        limitations: [],
+      };
+      return json(201, { success: true, data: { id } });
+    }
     if (path.startsWith('/examinations')) {
       if (!state.session) return err(401, 'UNAUTHORIZED');
       const exState = state.examinations;
@@ -1655,6 +1778,181 @@ export function createFakeBackend(
         typeof reqInit?.body === 'string'
           ? (JSON.parse(reqInit.body) as Record<string, unknown>)
           : {};
+
+      if (path === '/examinations/policies/preview-impact' && method === 'POST') {
+        const schedId = (reqBody.schedule_id as string) ?? 'sched-1';
+        return json(200, {
+          data: {
+            schedule_id: schedId,
+            total_enrolled: 1,
+            simulated_eligible: 1,
+            simulated_not_eligible: 0,
+            simulated_needs_review: 0,
+            sample_results: [
+              {
+                candidate_id: 'cand-sim-1',
+                student_id: 'stu-1',
+                admission_number: 'ADS2026-001',
+                student_name: 'Rohan Kumar',
+                roll_number: '1',
+                evaluation_status: 'ELIGIBLE',
+                override_status: 'NONE',
+                final_status: 'ELIGIBLE',
+                reasons: ['Attendance requirement met: 95.0% >= 75.0%'],
+                evidence_summary: {
+                  total_sessions: 20,
+                  attended_sessions: 19,
+                  absent_sessions: 1,
+                  excused_sessions: 0,
+                  attendance_percentage: 95,
+                  required_percentage: 75,
+                  cutoff_date: '2026-11-12',
+                  reasons: ['Attendance requirement met: 95.0% >= 75.0%'],
+                },
+              },
+            ],
+          },
+        });
+      }
+
+      const dupMatch = /^\/examinations\/policies\/([^/?]+)\/duplicate$/.exec(path);
+      if (dupMatch && method === 'POST') {
+        const id = dupMatch[1]!;
+        const existing: any = exState.policyList.find((p: any) => p.id === id) ?? {
+          name: 'Policy Copy',
+          min_attendance_percentage: 75,
+          check_attendance: true,
+          check_fees: false,
+          attendance_cutoff_days_prior: 0,
+          allow_late_enrolment_review: true,
+          scope: 'INSTITUTION',
+        };
+        const dup = {
+          ...existing,
+          id: `pol-${Date.now()}`,
+          name: (reqBody.name as string) ?? `${existing.name ?? 'Policy'} (Copy)`,
+          status: 'DRAFT',
+          version: 1,
+        };
+        exState.policyList.push(dup);
+        return json(201, { data: dup });
+      }
+
+      const actMatch = /^\/examinations\/policies\/([^/?]+)\/activate$/.exec(path);
+      if (actMatch && method === 'POST') {
+        const id = actMatch[1]!;
+        const existing: any = exState.policyList.find((p: any) => p.id === id);
+        if (existing) {
+          existing.status = 'ACTIVE';
+          return json(200, { data: existing });
+        }
+        const created = {
+          id,
+          name: 'Active Policy',
+          status: 'ACTIVE',
+          scope: 'INSTITUTION',
+          min_attendance_percentage: 75,
+          check_attendance: true,
+          check_fees: false,
+          attendance_cutoff_days_prior: 0,
+          allow_late_enrolment_review: true,
+          version: 1,
+        };
+        exState.policyList.push(created);
+        return json(200, { data: created });
+      }
+
+      const arcMatch = /^\/examinations\/policies\/([^/?]+)\/archive$/.exec(path);
+      if (arcMatch && method === 'POST') {
+        const id = arcMatch[1]!;
+        const existing: any = exState.policyList.find((p: any) => p.id === id);
+        if (existing) {
+          existing.status = 'ARCHIVED';
+          return json(200, { data: existing });
+        }
+        return json(200, { data: { id, status: 'ARCHIVED' } });
+      }
+
+      const singlePolMatch = /^\/examinations\/policies\/([^/?]+)$/.exec(path);
+      if (singlePolMatch && method === 'GET') {
+        const id = singlePolMatch[1]!;
+        const p = exState.policyList.find((x: any) => x.id === id) ?? {
+          id,
+          name: 'Policy ' + id,
+          scope: 'INSTITUTION',
+          status: 'ACTIVE',
+          min_attendance_percentage: 75,
+          check_attendance: true,
+          check_fees: false,
+          attendance_cutoff_days_prior: 0,
+          allow_late_enrolment_review: true,
+          version: 1,
+        };
+        return json(200, { data: p });
+      }
+
+      if (singlePolMatch && method === 'PUT') {
+        const id = singlePolMatch[1]!;
+        const idx = exState.policyList.findIndex((x: any) => x.id === id);
+        const updated = {
+          id,
+          ...reqBody,
+          version: 1,
+        };
+        if (idx >= 0) {
+          exState.policyList[idx] = updated;
+        } else {
+          exState.policyList.push(updated);
+        }
+        return json(200, { data: updated });
+      }
+
+      if ((path === '/examinations/policies' || path.startsWith('/examinations/policies?')) && method === 'GET') {
+        return json(200, { data: exState.policyList });
+      }
+
+      if (path === '/examinations/policies' && method === 'POST') {
+        const newPol = {
+          id: `pol-${Date.now()}`,
+          scope: 'INSTITUTION',
+          status: 'DRAFT',
+          version: 1,
+          ...reqBody,
+        };
+        exState.policyList.push(newPol);
+        return json(201, { data: newPol });
+      }
+
+      const examPolMatch = /^\/examinations\/([^/?]+)\/eligibility-policy$/.exec(path);
+      if (examPolMatch && method === 'GET') {
+        const examId = examPolMatch[1]!;
+        const p = exState.policies[`exam-${examId}`] ?? {
+          id: `pol-exam-${examId}`,
+          examination_id: examId,
+          scope: 'EXAMINATION',
+          name: 'Exam Policy',
+          min_attendance_percentage: 75,
+          check_attendance: true,
+          check_fees: false,
+          attendance_cutoff_days_prior: 0,
+          allow_late_enrolment_review: true,
+          version: 1,
+        };
+        return json(200, { data: p });
+      }
+
+      if (examPolMatch && method === 'PUT') {
+        const examId = examPolMatch[1]!;
+        const p = {
+          id: `pol-exam-${examId}`,
+          examination_id: examId,
+          scope: 'EXAMINATION',
+          ...reqBody,
+          version: 1,
+        };
+        exState.policies[`exam-${examId}`] = p;
+        return json(200, { data: p });
+      }
 
       const polMatch = /^\/examinations\/schedules\/([^/?]+)\/eligibility-policy$/.exec(path);
       if (polMatch && method === 'GET') {
@@ -2536,6 +2834,213 @@ export function createFakeBackend(
           },
         });
       }
+
+      if (path === '/finance/gateway/config' && method === 'GET') {
+        return json(200, { data: fState.gatewayConfigs });
+      }
+
+      if (path === '/finance/gateway/config' && method === 'POST') {
+        const prov = String(reqBody.provider || 'RAZORPAY');
+        const isAct = reqBody.is_active === true;
+        if (isAct) {
+          fState.gatewayConfigs.forEach((c) => {
+            c.is_active = false;
+          });
+        }
+        const existing = fState.gatewayConfigs.find((c) => c.provider === prov);
+        if (existing) {
+          existing.mode = reqBody.mode || 'SANDBOX';
+          existing.is_active = isAct;
+          existing.merchant_key_masked = String(reqBody.merchant_key || '••••••••1234');
+          existing.has_secret_key = true;
+          existing.has_webhook_secret = !!reqBody.webhook_secret;
+          existing.settings = (reqBody.settings as Record<string, unknown>) || {};
+          existing.updated_at = new Date().toISOString();
+          return json(201, { data: existing });
+        }
+        const newGw = {
+          id: `gw-${fState.gatewayConfigs.length + 1}`,
+          campus_id: reqBody.campus_id ?? null,
+          provider: prov,
+          mode: reqBody.mode || 'SANDBOX',
+          is_active: isAct,
+          merchant_key_masked: String(reqBody.merchant_key || '••••••••1234'),
+          has_secret_key: true,
+          has_webhook_secret: !!reqBody.webhook_secret,
+          settings: (reqBody.settings as Record<string, unknown>) || {},
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        fState.gatewayConfigs.push(newGw);
+        return json(201, { data: newGw });
+      }
+
+      if (path === '/finance/gateway/test' && method === 'POST') {
+        return json(200, {
+          data: {
+            healthy: true,
+            message: `Successfully connected to ${reqBody.provider || 'Gateway'} API`,
+            details: { mode: reqBody.mode || 'SANDBOX' },
+          },
+        });
+      }
+
+      if (path === '/finance/payments/initiate' && method === 'POST') {
+        const amt = Number(reqBody.amount || 500000);
+        const attemptRef = `PAY-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+        const orderRef = `order_${Math.floor(100000 + Math.random() * 900000)}`;
+        const attempt = {
+          id: `att-${fState.paymentAttempts.length + 1}`,
+          campus_id: reqBody.campus_id || 'camp-1',
+          student_id: reqBody.student_id || 'st-1',
+          student_name: 'Asha Student',
+          admission_number: 'ADM-2026-001',
+          student_due_id: reqBody.student_due_id || null,
+          gateway_config_id: 'gw-1',
+          provider: 'RAZORPAY',
+          mode: 'SANDBOX',
+          attempt_reference: attemptRef,
+          order_reference: orderRef,
+          amount: amt,
+          currency: 'INR',
+          status: 'INITIATED',
+          gateway_payment_ref: null,
+          failure_reason: null,
+          receipt_id: null,
+          metadata_json: { due_ids: reqBody.due_ids || [] },
+          initiated_by_user_id: state.me.user_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        fState.paymentAttempts.push(attempt);
+        return json(201, {
+          data: {
+            attempt_id: attempt.id,
+            attempt_reference: attemptRef,
+            order_reference: orderRef,
+            provider: 'RAZORPAY',
+            amount: amt,
+            currency: 'INR',
+            checkout_payload: {
+              key: 'rzp_test_mock',
+              order_id: orderRef,
+              amount: amt,
+            },
+            redirect_url: `https://checkout.example.com/${orderRef}`,
+          },
+        });
+      }
+
+      if (path === '/finance/payments/verify' && method === 'POST') {
+        const ref = String(reqBody.attempt_reference || '');
+        const att = fState.paymentAttempts.find((a) => a.attempt_reference === ref);
+        const amt = att ? Number(att.amount) : 500000;
+        const recId = `rec-online-${fState.receipts.length + 1}`;
+        const recNum = `REC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+        const receipt = {
+          id: recId,
+          campus_id: 'camp-1',
+          student_id: att ? att.student_id : 'st-1',
+          student_name: 'Asha Student',
+          admission_number: 'ADM-2026-001',
+          receipt_number: recNum,
+          payment_date: new Date().toISOString().slice(0, 10),
+          payment_method: 'ONLINE_RAZORPAY',
+          amount: amt,
+          currency: 'INR',
+          reference_number: reqBody.gateway_payment_ref || 'pay_mock123',
+          reconciliation_status: 'CONFIRMED',
+          status: 'POSTED',
+          received_by_user_id: state.me.user_id,
+          remarks: 'Online checkout payment',
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          allocations: [],
+        };
+        fState.receipts.push(receipt);
+        if (att) {
+          att.status = 'SUCCESS';
+          att.gateway_payment_ref = String(reqBody.gateway_payment_ref || 'pay_mock123');
+          att.receipt_id = recId;
+          att.updated_at = new Date().toISOString();
+        }
+        return json(200, {
+          data: {
+            success: true,
+            status: 'SUCCESS',
+            receipt_id: recId,
+            receipt_number: recNum,
+            attempt_reference: ref,
+            amount: amt,
+          },
+        });
+      }
+
+      if (
+        (path === '/finance/payments/attempts' || path.startsWith('/finance/payments/attempts?')) &&
+        method === 'GET'
+      ) {
+        return json(200, { data: fState.paymentAttempts });
+      }
+
+      const refundMatch = /^\/finance\/receipts\/([^/?]+)\/refund$/.exec(path);
+      if (refundMatch && method === 'POST') {
+        const rId = refundMatch[1]!;
+        const rec = fState.receipts.find((r) => r.id === rId);
+        if (!rec) return err(404, 'RESOURCE_NOT_FOUND');
+        const refAmt = Number(reqBody.amount || rec.amount);
+        const refId = `rfnd-${fState.refunds.length + 1}`;
+        const refObj = {
+          id: refId,
+          receipt_id: rId,
+          amount: refAmt,
+          status: 'SUCCESS',
+          gateway_refund_ref: `rfnd_gw_${Date.now()}`,
+          reason: reqBody.reason || 'Test refund',
+        };
+        fState.refunds.push(refObj);
+        if (refAmt >= Number(rec.amount)) {
+          rec.status = 'REVERSED';
+          rec.reversal_reason = `Refunded: ${reqBody.reason || 'Customer request'}`;
+        }
+        return json(200, {
+          data: {
+            refund_id: refId,
+            gateway_refund_ref: refObj.gateway_refund_ref,
+            status: 'SUCCESS',
+            amount: refAmt,
+          },
+        });
+      }
+
+      if (
+        (path === '/finance/reports/reconciliation' ||
+          path.startsWith('/finance/reports/reconciliation?')) &&
+        method === 'GET'
+      ) {
+        return json(200, {
+          data: {
+            total_online_attempts: fState.paymentAttempts.length,
+            total_successful_online_amount: fState.paymentAttempts
+              .filter((a) => a.status === 'SUCCESS')
+              .reduce((sum, a) => sum + (Number(a.amount) || 0), 0),
+            total_successful_online_count: fState.paymentAttempts.filter(
+              (a) => a.status === 'SUCCESS',
+            ).length,
+            total_failed_online_count: fState.paymentAttempts.filter((a) => a.status === 'FAILED')
+              .length,
+            total_offline_receipt_amount: fState.receipts
+              .filter((r) => r.status === 'POSTED' && !String(r.payment_method).startsWith('ONLINE_'))
+              .reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+            total_offline_receipt_count: fState.receipts.filter(
+              (r) => r.status === 'POSTED' && !String(r.payment_method).startsWith('ONLINE_'),
+            ).length,
+            mismatches: [],
+          },
+        });
+      }
     }
     if (path.startsWith('/reports/')) {
       if (!state.session) return err(401, 'UNAUTHORIZED');
@@ -2734,6 +3239,185 @@ export function createFakeBackend(
         if (!ifMatchOk(r) || r.validTo) return err(409, 'CONFLICT');
         return bump(r, { status: reqBody.status, validTo: reqBody.validTo ?? null });
       }
+      if (path.startsWith('/academics/holidays/suggestions')) {
+        const q = new URL(path, 'http://x').searchParams;
+        const from = q.get('from') || '2026-04-01';
+        const to = q.get('to') || '2027-03-31';
+        const campus = q.get('campusId');
+        const state = q.get('state') || 'BR';
+
+        const sampleSuggestions = [
+          {
+            id: 'CAT-REPUBLIC_DAY-2027',
+            holidayDate: '2027-01-26',
+            name: 'Republic Day',
+            kind: 'HOLIDAY',
+            category: 'NATIONAL',
+            jurisdiction: 'India',
+            year: 2027,
+            source: 'Gazette of India (DoPT)',
+            verificationStatus: 'VERIFIED',
+            verifiedDate: '2025-06-15',
+            isGovernmentMandated: true,
+          },
+          {
+            id: 'CAT-INDEPENDENCE_DAY-2026',
+            holidayDate: '2026-08-15',
+            name: 'Independence Day',
+            kind: 'HOLIDAY',
+            category: 'NATIONAL',
+            jurisdiction: 'India',
+            year: 2026,
+            source: 'Gazette of India (DoPT)',
+            verificationStatus: 'VERIFIED',
+            verifiedDate: '2025-06-15',
+            isGovernmentMandated: true,
+          },
+          {
+            id: 'CAT-GANDHI_JAYANTI-2026',
+            holidayDate: '2026-10-02',
+            name: 'Mahatma Gandhi Jayanti',
+            kind: 'HOLIDAY',
+            category: 'NATIONAL',
+            jurisdiction: 'India',
+            year: 2026,
+            source: 'Gazette of India (DoPT)',
+            verificationStatus: 'VERIFIED',
+            verifiedDate: '2025-06-15',
+            isGovernmentMandated: true,
+          },
+          {
+            id: 'CAT-BIHAR_DIWAS-2027',
+            holidayDate: '2027-03-22',
+            name: 'Bihar Diwas (Bihar Day)',
+            kind: 'HOLIDAY',
+            category: 'STATE',
+            jurisdiction: 'Bihar',
+            year: 2027,
+            source: 'Government of Bihar (GAD)',
+            verificationStatus: 'VERIFIED',
+            verifiedDate: '2025-10-15',
+            isGovernmentMandated: true,
+          },
+          {
+            id: 'CAT-CHHATH_PUJA_EVENING-2026',
+            holidayDate: '2026-11-14',
+            name: 'Chhath Puja (Evening Arghya)',
+            kind: 'HOLIDAY',
+            category: 'STATE',
+            jurisdiction: 'Bihar',
+            year: 2026,
+            source: 'Bihar School Holiday Calendar',
+            verificationStatus: 'VERIFIED',
+            verifiedDate: '2025-10-15',
+            isGovernmentMandated: true,
+          },
+          {
+            id: 'CAT-EID_UL_FITR-2027',
+            holidayDate: '2027-03-10',
+            name: 'Eid-ul-Fitr',
+            kind: 'HOLIDAY',
+            category: 'FESTIVAL',
+            jurisdiction: 'India',
+            year: 2027,
+            source: 'DoPT / Moon Sighting Committee',
+            verificationStatus: 'PROVISIONAL',
+            verifiedDate: '2025-06-15',
+            isGovernmentMandated: true,
+            notes: 'Subject to moon sighting',
+          },
+          {
+            id: 'CAT-SUMMER_VACATION-2026',
+            holidayDate: '2026-05-25',
+            name: 'Summer Vacation (School Closure)',
+            kind: 'NON_TEACHING_DAY',
+            category: 'INSTITUTIONAL',
+            jurisdiction: 'Bihar',
+            year: 2026,
+            source: 'Recommended Academic Break',
+            verificationStatus: 'UNVERIFIED',
+            verifiedDate: null,
+            isGovernmentMandated: false,
+            notes: 'Institution discretion',
+          },
+        ];
+
+        const filtered = sampleSuggestions
+          .filter((s) => s.holidayDate >= from && s.holidayDate <= to)
+          .filter((s) => state !== 'ALL' || s.jurisdiction === 'India')
+          .map((s) => ({
+            ...s,
+            alreadyDeclared: a.holidays.some(
+              (h) =>
+                h.status === 'ACTIVE' &&
+                (!campus || h.campusId === null || h.campusId === campus) &&
+                h.holidayDate === s.holidayDate &&
+                String(h.name).toLowerCase() === s.name.toLowerCase(),
+            ),
+          }));
+
+        return list(filtered);
+      }
+      if (path === '/academics/holidays/bulk' && method === 'POST') {
+        const lockedOn = (campusId: unknown, date: unknown) =>
+          a.terms.some(
+            (t) =>
+              t.status === 'LOCKED' &&
+              (campusId === null || campusId === undefined || t.campusId === campusId) &&
+              String(t.startDate) <= String(date) &&
+              String(date) <= String(t.endDate),
+          );
+        const campusId = (reqBody.campusId as string | undefined) ?? null;
+        if (campusId === null && a.campusScopedOnly) return err(403, 'FORBIDDEN');
+        const items =
+          (reqBody.holidays as Array<{ holidayDate: string; name: string; kind: string }>) || [];
+        const createdIds: string[] = [];
+        const skipped: Array<{ holidayDate: string; name: string; reason: string }> = [];
+
+        for (const item of items) {
+          if (lockedOn(campusId, item.holidayDate)) {
+            skipped.push({
+              holidayDate: item.holidayDate,
+              name: item.name,
+              reason: 'Date lies in locked term',
+            });
+            continue;
+          }
+          const dup = a.holidays.some(
+            (h) =>
+              h.status === 'ACTIVE' &&
+              h.campusId === campusId &&
+              h.holidayDate === item.holidayDate &&
+              String(h.name).toLowerCase() === String(item.name).toLowerCase(),
+          );
+          if (dup) {
+            skipped.push({
+              holidayDate: item.holidayDate,
+              name: item.name,
+              reason: 'Already declared',
+            });
+            continue;
+          }
+          const id = `HOLIDAY-${a.holidays.length + 1}`;
+          a.holidays.push({
+            id,
+            campusId,
+            holidayDate: item.holidayDate,
+            name: item.name,
+            kind: item.kind,
+            status: 'ACTIVE',
+            version: 1,
+          });
+          createdIds.push(id);
+        }
+
+        return list({
+          createdCount: createdIds.length,
+          skippedCount: skipped.length,
+          createdIds,
+          skipped,
+        });
+      }
       if (path.startsWith('/academics/holidays')) {
         const lockedOn = (campusId: unknown, date: unknown) =>
           a.terms.some(
@@ -2805,6 +3489,8 @@ export function createFakeBackend(
         });
       }
       if (path === '/academics/cohort-periods') return list(a.periods);
+      if (path === '/academics/programs') return list(a.programs);
+      if (path === '/academics/cohorts') return list(a.cohorts);
       if (path.startsWith('/academics/course-offerings')) {
         if (method === 'GET') {
           if (a.offeringsMode === 'server') return err(500, 'INTERNAL_ERROR');
@@ -3118,6 +3804,12 @@ export function createFakeBackend(
         if (!enr[2] && method === 'GET') return list(rows);
         if (!enr[2] && method === 'POST') {
           if (!headers['idempotency-key']) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');
+          const custom = state.students.timelines[student] as
+            | { position?: { programme?: unknown } }
+            | undefined;
+          if (custom?.position?.programme === null) {
+            return err(409, 'CONFLICT', {}, 'The student has no active program enrolment.');
+          }
           const id = `e-${rows.length + 1}`;
           rows.push({
             id,

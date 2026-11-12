@@ -9,6 +9,7 @@ import { ApiClient } from './lib/api/client';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/app.css';
+import './features/examinations/examinations.css';
 
 const config = loadPublicConfig(import.meta.env);
 const client = new ApiClient({ basePath: config.apiBasePath });
