@@ -111,6 +111,7 @@ describe('MFA frontend experience', () => {
     const b = createFakeBackend({ session: true, me: STAFF });
     b.state.mfa.enrolled = true;
     b.state.mfa.required = false;
+    b.state.mfa.sessionVerified = true;
 
     const user = userEvent.setup();
     renderApp(b, '/account');
@@ -129,11 +130,41 @@ describe('MFA frontend experience', () => {
     const b = createFakeBackend({ session: true, me: ADMIN });
     b.state.mfa.enrolled = true;
     b.state.mfa.required = true;
+    b.state.mfa.sessionVerified = true;
 
     renderApp(b, '/account');
 
     expect(await screen.findByText('Enabled (TOTP)')).toBeInTheDocument();
     expect(screen.getByText('Required for your role')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Disable MFA' })).not.toBeInTheDocument();
+  });
+
+  it('session restoration blocks unverified MFA user from accessing protected shell', async () => {
+    const b = createFakeBackend({ session: true, me: ADMIN });
+    b.state.mfa.required = true;
+    b.state.mfa.enrolled = true;
+    b.state.mfa.sessionVerified = false;
+
+    renderApp(b, '/account');
+
+    // MfaPrompt modal is shown immediately, protected page is blocked
+    expect(
+      await screen.findByRole('heading', { name: /Two-factor authentication/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Required for your role')).not.toBeInTheDocument();
+  });
+
+  it('session restoration requires enrollment setup when user in MFA-required role has no factor', async () => {
+    const b = createFakeBackend({ session: true, me: ADMIN });
+    b.state.mfa.required = true;
+    b.state.mfa.enrolled = false;
+    b.state.mfa.sessionVerified = false;
+
+    renderApp(b, '/account');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Set Up Two-Factor Authentication' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Required for your role')).not.toBeInTheDocument();
   });
 });

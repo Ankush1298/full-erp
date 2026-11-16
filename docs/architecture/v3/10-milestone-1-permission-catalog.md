@@ -111,6 +111,32 @@ Implicit assignments: `students` row ⇒ STUDENT (ORGANIZATION scope, SELF-mode 
 | 72 | `fee.receipt.record` (record offline payments and allocate to student dues) | S | – | – | – | – | – | G | G | – |
 | 73 | `fee.receipt.read` (view payment receipts and daily collection registers) | S | S | – | – | – | – | G | G | G |
 | 74 | `fee.receipt.reverse` (reverse a posted receipt with reason and step-up authentication) | C | – | – | – | – | – | – | G | – |
+| 75 | `fee.gateway.read` (view configured payment gateways, active provider status, and masked credentials) | S | – | – | – | – | – | G | G | G |
+| 76 | `fee.gateway.manage` (configure payment gateway merchant keys, secrets, test/live mode, and webhooks) | C | – | – | – | – | – | – | G | – |
+| 77 | `fee.payment.initiate` (initiate online checkout session and payment attempt for student dues) | N | S | – | – | – | – | G | G | G |
+| 78 | `fee.refund.initiate` (initiate payment gateway refund for online transaction) | C | – | – | – | – | – | – | G | – |
+| 79 | `parent.portal.access` (access parent portal dashboard and linked student summary) | N | – | – | – | – | – | – | – | – |
+| 80 | `parent.student.read` (view verified child student profile and academic standing) | S | – | – | – | – | – | – | – | – |
+| 81 | `parent.attendance.read` (view verified child attendance register and compliance) | S | – | – | – | – | – | – | – | – |
+| 82 | `parent.academics.read` (view verified child timetable and curriculum details) | S | – | – | – | – | – | – | – | – |
+| 83 | `parent.exam.read` (view verified child published examination results and report cards) | S | – | – | – | – | – | – | – | – |
+| 84 | `parent.fee.read` (view verified child outstanding dues and payment receipts) | S | – | – | – | – | – | – | – | – |
+| 85 | `parent.fee.pay` (initiate online payment for verified child outstanding dues) | S | – | – | – | – | – | – | – | – |
+| **Homework, Assignments & Submissions** |
+| 86 | `homework.manage` (create, edit, publish, close homework assignments for authorized course offerings and sections) | S | – | A | – | G | G | G | G | G |
+| 87 | `homework.review` (review submissions, record marks/feedback, request resubmission) | S | – | A | – | G | G | G | G | G |
+| 88 | `homework.read` (read homework assignments and attached instructional materials) | N | S | A | – | G | G | G | G | G |
+| 89 | `homework.submit` (upload work and submit homework for authorized enrollments) | N | S | – | – | – | – | – | – | – |
+| **School Vault & Zero-Access Cryptographic Architecture** |
+| 90 | `vault.authority.manage` (appoint, delegate, and manage Institutional Security Authority) | C | – | – | – | – | – | – | G | – |
+| 91 | `vault.authority.read` (inspect Institutional Security Authority status and security audit log) | S | – | – | – | G | G | G | G | G |
+| 92 | `vault.device.enroll` (enroll and manage up to two hardware-bound device authenticators) | N | S | S | S | S | S | S | S | S |
+| 93 | `vault.device.manage` (revoke, replace, and audit staff hardware authenticators) | C | – | – | – | – | – | – | G | – |
+| 94 | `vault.recovery.initiate` (initiate 2-of-3 institutional recovery ceremony and epoch rotation) | C | – | – | – | – | – | – | G | – |
+| 95 | `vault.grant.issue` (issue scoped Capability Wrapping Key grants to authorized devices) | C | – | – | – | – | – | – | G | – |
+| 96 | `vault.record.read` (read zero-access encrypted payload envelopes for authorized scopes) | S | S | A | – | G | G | G | G | G |
+| 97 | `vault.record.write` (write zero-access encrypted payload envelopes for authorized scopes) | S | S | A | – | G | G | G | G | G |
+| 98 | `adult.consent.manage` (record and verify adult student guardian privacy authorization) | S | S | – | – | – | – | G | G | G |
 
 ¹ FACULTY `student.profile.read` is `A` (assigned). In M1 it was not seeded and only the resolver contract was tested with a stub; Milestone 3 Batch 3 (doc 33 §2, X-12) seeds it with the real resolver: an ACTIVE teacher reads a student only while one of the teacher's faculty assignments and the student's course registration on the same PUBLISHED/CLOSED offering are both valid today. Existing tenants need their roles re-seeded (runbook `m3b3-electives-registrations-rollout.md`).
 

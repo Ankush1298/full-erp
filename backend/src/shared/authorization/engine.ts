@@ -143,6 +143,41 @@ export class AuthorizationEngine {
     return res.rows.map((r) => r.user_id);
   }
 
+  private static guardianUserIdColumnSupported: boolean | null = null;
+
+  /** Reset cache for test isolation */
+  static resetSchemaCompatibilityCache(): void {
+    this.guardianUserIdColumnSupported = null;
+  }
+
+  /**
+   * Safe schema compatibility probe for pre-0051 databases where app.guardians does not have user_id.
+   * Returns true if app.guardians has user_id; false if pre-0051.
+   * Fails closed: if column is missing, guardian linking is considered unavailable without throwing 42703.
+   */
+  static async hasGuardianUserIdColumn(tx: TenantTx): Promise<boolean> {
+    if (this.guardianUserIdColumnSupported === true) {
+      return true;
+    }
+    const res = await tx.query<{ has_col: boolean }>(
+      `SELECT EXISTS (
+        SELECT 1
+          FROM pg_attribute a
+          JOIN pg_class c ON c.oid = a.attrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'app'
+           AND c.relname = 'guardians'
+           AND a.attname = 'user_id'
+           AND NOT a.attisdropped
+      ) AS "has_col"`,
+    );
+    const exists = res.rows[0]?.has_col === true;
+    if (exists) {
+      this.guardianUserIdColumnSupported = true;
+    }
+    return exists;
+  }
+
   /**
    * What the actor can do, for UI rendering only (menus). Resolved server-side per request from the
    * same effective-assignment rule as every decision; it is NOT an authorization decision: each
@@ -172,9 +207,38 @@ export class AuthorizationEngine {
         ORDER BY rp.permission_code`,
       [ctx.tenantId, ctx.userId],
     );
+
+    let isParent = false;
+    const hasUserIdCol = await this.hasGuardianUserIdColumn(tx);
+    if (hasUserIdCol) {
+      const guardianCheck = await tx.query<{ id: string }>(
+        'SELECT id FROM app.guardians WHERE organization_id = $1 AND user_id = $2 AND deleted_at IS NULL LIMIT 1',
+        [ctx.tenantId, ctx.userId],
+      );
+      isParent = (guardianCheck.rowCount ?? 0) > 0;
+    }
+    const roleCodes = roles.rows.map((r) => r.code);
+    const capabilities = caps.rows.map((c) => c.permission_code);
+
+    if (isParent) {
+      if (!roleCodes.includes('PARENT')) roleCodes.push('PARENT');
+      const parentPerms = [
+        'parent.portal.access',
+        'parent.student.read',
+        'parent.attendance.read',
+        'parent.academics.read',
+        'parent.exam.read',
+        'parent.fee.read',
+        'parent.fee.pay',
+      ];
+      for (const p of parentPerms) {
+        if (!capabilities.includes(p)) capabilities.push(p);
+      }
+    }
+
     return {
-      roleCodes: roles.rows.map((r) => r.code),
-      capabilities: caps.rows.map((c) => c.permission_code),
+      roleCodes,
+      capabilities,
     };
   }
 
@@ -213,6 +277,16 @@ export class AuthorizationEngine {
   ): Promise<boolean> {
     if (!isTrustedContext(ctx)) return false;
     requireKnownPermission(permission);
+    if (permission.startsWith('parent.')) {
+      const hasUserIdCol = await this.hasGuardianUserIdColumn(tx);
+      if (hasUserIdCol) {
+        const g = await tx.query(
+          'SELECT 1 FROM app.guardians WHERE organization_id = $1 AND user_id = $2 AND deleted_at IS NULL LIMIT 1',
+          [ctx.tenantId, ctx.userId],
+        );
+        if ((g.rowCount ?? 0) > 0) return true;
+      }
+    }
     return (await this.loadGrants(tx, ctx, permission)).length > 0;
   }
 
@@ -263,6 +337,18 @@ export class AuthorizationEngine {
       throw new AppError(500, 'UNTRUSTED_CONTEXT', 'Database access requires a trusted context.');
     }
     requireKnownPermission(permission);
+
+    if (permission.startsWith('parent.')) {
+      const hasUserIdCol = await this.hasGuardianUserIdColumn(tx);
+      if (hasUserIdCol) {
+        const g = await tx.query(
+          'SELECT 1 FROM app.guardians WHERE organization_id = $1 AND user_id = $2 AND deleted_at IS NULL LIMIT 1',
+          [ctx.tenantId, ctx.userId],
+        );
+        if ((g.rowCount ?? 0) > 0) return;
+      }
+      throw new AppError(403, 'FORBIDDEN', 'Access denied: Guardian link required.');
+    }
 
     const grants = await this.loadGrants(tx, ctx, permission);
     if (!resource) {

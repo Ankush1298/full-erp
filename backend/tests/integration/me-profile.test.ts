@@ -62,6 +62,7 @@ describe('GET /auth/me profile', () => {
     expect(b.roles).toEqual(['STUDENT']);
     expect(b.capabilities).toEqual([
       'academic.program.read',
+      'adult.consent.manage',
       'assistant.conversation.read',
       'assistant.use',
       'attendance.record.read',
@@ -74,7 +75,10 @@ describe('GET /auth/me profile', () => {
       'document.upload',
       'enrollment.term.read',
       'fee.dues.read',
+      'fee.payment.initiate',
       'fee.receipt.read',
+      'homework.read',
+      'homework.submit',
       'notification.preference.manage',
       'notification.read',
       'org.structure.read',
@@ -84,6 +88,9 @@ describe('GET /auth/me profile', () => {
       'student.guardian.read',
       'student.profile.read',
       'student.profile.read_sensitive',
+      'vault.device.enroll',
+      'vault.record.read',
+      'vault.record.write',
     ]);
     expect(b.capabilities).not.toContain('role.assignment.grant');
     expect(b.csrf_token).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -119,6 +126,9 @@ describe('GET /auth/me profile', () => {
       'enrollment.term.read',
       'exam.manage',
       'exam.marks.enter',
+      'homework.manage',
+      'homework.read',
+      'homework.review',
       'notification.preference.manage',
       'notification.read',
       'org.structure.read',
@@ -131,6 +141,10 @@ describe('GET /auth/me profile', () => {
       'student.guardian.read',
       'student.profile.read',
       'user.account.read',
+      'vault.authority.read',
+      'vault.device.enroll',
+      'vault.record.read',
+      'vault.record.write',
     ]);
   });
 

@@ -66,8 +66,11 @@ export const MfaRecoveryCodesResponseSchema = z.object({
   data: MfaRecoveryCodesDataSchema,
 });
 
-export async function fetchMfaStatus(client: ApiClient): Promise<MfaStatus> {
-  const res = await client.get('/me/mfa', { schema: MfaStatusResponseSchema });
+export async function fetchMfaStatus(client: ApiClient, signal?: AbortSignal): Promise<MfaStatus> {
+  const res = await client.get('/me/mfa', {
+    schema: MfaStatusResponseSchema,
+    ...(signal ? { signal } : {}),
+  });
   return res.data;
 }
 

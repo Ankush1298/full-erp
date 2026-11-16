@@ -69,16 +69,24 @@ describe('invitation tokens: hashed at rest, never logged, handed only to the ma
     expect(get(USER_ROUTES)).not.toMatch(/log\.\w+\(\s*\{\s*err\b/);
   });
 
-  it('the default mailer sends nothing and fails closed; the in-memory one is the only other implementation', () => {
+  it('the default mailer sends nothing and fails closed; approved mailers are in-memory and reviewed SMTP', () => {
     const m = get(MAILER);
     expect(m).toMatch(
       /class DisabledInvitationMailer[\s\S]*?Promise\.reject\(new MailerNotConfiguredError\(\)\)/,
     );
-    expect([...m.matchAll(/implements InvitationMailer/g)]).toHaveLength(2);
+    expect([...m.matchAll(/implements InvitationMailer/g)]).toHaveLength(3);
     expect(get('src/app.ts')).toMatch(
-      /deps\.invitationMailer \?\? new DisabledInvitationMailer\(\)/,
+      /deps\.invitationMailer \?\?\s*\(config\.smtp \? new SmtpInvitationMailer\(config\.smtp\) : new DisabledInvitationMailer\(\)\)/,
     );
-    expect(m).not.toMatch(/process\.env|createTransport|smtp|fetch\(/i);
+    // Mailer takes validated config from AppConfig / env.ts and never reads process.env directly
+    expect(m).not.toMatch(/\bprocess\.env\b/);
+    // Enforces TLS and strict STARTTLS
+    expect(m).toMatch(/class SmtpInvitationMailer/);
+    expect(m).toMatch(/requireTLS:\s*!isExplicitTls/);
+    expect(m).toMatch(/rejectUnauthorized:\s*true/);
+    expect(m).toMatch(/minVersion:\s*['"]TLSv1\.2['"]/);
+    // Never does raw HTTP fetch
+    expect(m).not.toMatch(/\bfetch\(/i);
   });
 });
 

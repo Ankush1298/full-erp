@@ -293,14 +293,51 @@ export class MfaService {
         if (mfaRequired) {
           if (active && active.verified_enrollment) {
             verifiedEnrollment = true;
-          } else {
-            if (!ticketToken) {
+          } else if (!ticketToken) {
+            // Check if there is an unconsumed, unrevoked, unexpired enrollment ticket for this user in this organization
+            const ticketRes = await tx.query<{ id: string; created_by: string | null }>(
+              `SELECT id, created_by FROM app.mfa_enrollment_tickets
+                WHERE organization_id = $1 AND user_id = $2
+                  AND used_at IS NULL AND revoked_at IS NULL AND expires_at > now()
+                ORDER BY created_at DESC LIMIT 1`,
+              [ctx.tenantId, ctx.userId],
+            );
+            if (ticketRes.rowCount === 0) {
               throw new AppError(
                 403,
                 'MFA_TICKET_REQUIRED',
                 'An administrator-issued enrollment ticket is required to enroll MFA for this account.',
               );
             }
+            const ticket = ticketRes.rows[0]!;
+            if (ticket.created_by === null) {
+              // Serialize bootstrap operations per tenant
+              await tx.query('SELECT pg_catalog.pg_advisory_xact_lock(hashtextextended($1, 0))', [
+                `app.mfa_bootstrap_exclusive:${ctx.tenantId}`,
+              ]);
+              if (await hasActiveVerifiedAdminMfa(tx, ctx.tenantId)) {
+                throw new AppError(
+                  409,
+                  'BOOTSTRAP_DISABLED',
+                  'First-administrator bootstrap is disabled: an active verified administrator already exists.',
+                );
+              }
+            }
+            enrollmentTicketId = ticket.id;
+            verifiedEnrollment = true;
+          }
+        } else if (!ticketToken && !verifiedEnrollment) {
+          // If not strictly required, still associate any issued onboarding ticket if present
+          const autoTicket = await tx.query<{ id: string }>(
+            `SELECT id FROM app.mfa_enrollment_tickets
+              WHERE organization_id = $1 AND user_id = $2
+                AND used_at IS NULL AND revoked_at IS NULL AND expires_at > now()
+              ORDER BY created_at DESC LIMIT 1`,
+            [ctx.tenantId, ctx.userId],
+          );
+          if (autoTicket.rows[0]) {
+            enrollmentTicketId = autoTicket.rows[0].id;
+            verifiedEnrollment = true;
           }
         }
 
@@ -803,6 +840,25 @@ export async function adminResetUserMfa(
   const sessionsRevoked = row.identity_id
     ? await repo.revokeMembershipSessions(tx, row.identity_id, ctx.tenantId)
     : 0;
+
+  // Revoke any prior unused tickets and issue a fresh 24h enrollment ticket for the reset user
+  await tx.query(
+    `UPDATE app.mfa_enrollment_tickets
+        SET revoked_at = now()
+      WHERE organization_id = $1 AND user_id = $2 AND used_at IS NULL AND revoked_at IS NULL`,
+    [ctx.tenantId, target],
+  );
+
+  const resetTicketId = uuidv7();
+  const resetRawTicket = randomBytes(32).toString('hex');
+  const resetCodeHash = createHash('sha256').update(resetRawTicket).digest('hex');
+  await tx.query(
+    `INSERT INTO app.mfa_enrollment_tickets
+       (id, organization_id, user_id, code_hash, created_by, created_at, expires_at)
+     VALUES ($1, $2, $3, $4, $5, now(), now() + interval '24 hours')`,
+    [resetTicketId, ctx.tenantId, target, resetCodeHash, ctx.userId],
+  );
+
   const factorsRevoked = reset.rows[0]?.factors_revoked ?? 0;
   const codesRevoked = reset.rows[0]?.codes_revoked ?? 0;
   await recordAudit(

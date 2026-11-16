@@ -136,6 +136,16 @@ export const FacultyAssignmentSchema = z.object({
 });
 export type FacultyAssignment = z.infer<typeof FacultyAssignmentSchema>;
 
+export const FacultyAssigneeSchema = z.object({
+  id: z.string(),
+  employeeCode: z.string(),
+  displayName: z.string(),
+  email: z.string().optional(),
+  campusId: z.string().nullable().optional(),
+  campusName: z.string().nullable(),
+});
+export type FacultyAssignee = z.infer<typeof FacultyAssigneeSchema>;
+
 export const fetchAcademicYears = (c: ApiClient) =>
   c.get('/v1/academics/academic-years', { schema: List(AcademicYearSchema) }).then((r) => r.data);
 export const fetchTerms = (c: ApiClient) =>
@@ -299,6 +309,22 @@ export const endFacultyAssignment = (
     body,
     headers: ifMatch(a.version),
   });
+
+export const searchFacultyForAssignment = (
+  c: ApiClient,
+  params: { q?: string; campusId?: string; limit?: number } = {},
+) => {
+  const qp = new URLSearchParams();
+  if (params.q !== undefined && params.q.trim()) qp.set('q', params.q.trim());
+  if (params.campusId) qp.set('campusId', params.campusId);
+  if (params.limit) qp.set('limit', String(params.limit));
+  const qs = qp.toString();
+  return c
+    .get(`/v1/faculty/employees/search${qs ? `?${qs}` : ''}`, {
+      schema: List(FacultyAssigneeSchema),
+    })
+    .then((r) => r.data);
+};
 
 export const createSlot = (
   c: ApiClient,
@@ -580,6 +606,85 @@ export const updateHoliday = (
     body,
     headers: ifMatch(h.version),
   });
+
+export const HolidaySuggestionSchema = z.object({
+  id: z.string(),
+  holidayDate: z.string(),
+  name: z.string(),
+  kind: z.enum(['HOLIDAY', 'NON_TEACHING_DAY', 'EVENT']),
+  category: z.enum(['NATIONAL', 'STATE', 'FESTIVAL', 'RESTRICTED', 'INSTITUTIONAL']),
+  jurisdiction: z.string(),
+  year: z.number(),
+  source: z.string(),
+  verificationStatus: z.enum(['VERIFIED', 'PROVISIONAL', 'UNVERIFIED']),
+  verifiedDate: z.string().nullable(),
+  isGovernmentMandated: z.boolean(),
+  notes: z.string().optional(),
+  alreadyDeclared: z.boolean().optional(),
+});
+export type HolidaySuggestion = z.infer<typeof HolidaySuggestionSchema>;
+
+export const fetchHolidaySuggestions = (
+  c: ApiClient,
+  q: {
+    country?: string;
+    state?: string;
+    academicYearId?: string;
+    from?: string;
+    to?: string;
+    campusId?: string;
+  } = {},
+) => {
+  const p = new URLSearchParams();
+  if (q.country) p.set('country', q.country);
+  if (q.state) p.set('state', q.state);
+  if (q.academicYearId) p.set('academicYearId', q.academicYearId);
+  if (q.from) p.set('from', q.from);
+  if (q.to) p.set('to', q.to);
+  if (q.campusId) p.set('campusId', q.campusId);
+  return c
+    .get(`/v1/academics/holidays/suggestions?${p.toString()}`, {
+      schema: List(HolidaySuggestionSchema),
+    })
+    .then((r) => r.data);
+};
+
+export const BulkCreateHolidaysResponseSchema = z.object({
+  createdCount: z.number(),
+  skippedCount: z.number(),
+  createdIds: z.array(z.string()),
+  skipped: z.array(
+    z.object({
+      holidayDate: z.string(),
+      name: z.string(),
+      reason: z.string(),
+    }),
+  ),
+});
+export type BulkCreateHolidaysResponse = z.infer<typeof BulkCreateHolidaysResponseSchema>;
+
+export const bulkCreateHolidays = (
+  c: ApiClient,
+  body: {
+    campusId?: string | null;
+    reason: string;
+    holidays: Array<{
+      holidayDate: string;
+      name: string;
+      kind: Holiday['kind'];
+    }>;
+  },
+) =>
+  c
+    .post('/v1/academics/holidays/bulk', {
+      schema: One(BulkCreateHolidaysResponseSchema),
+      body: {
+        ...(body.campusId ? { campusId: body.campusId } : {}),
+        reason: body.reason,
+        holidays: body.holidays,
+      },
+    })
+    .then((r) => r.data);
 
 export const TERMINOLOGY_SLOTS = [
   'program',

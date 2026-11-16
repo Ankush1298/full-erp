@@ -1,17 +1,28 @@
 import type { ReactNode } from 'react';
 
-export type StatTone = 'purple' | 'coral' | 'amber' | 'emerald';
+export type StatTone =
+  | 'purple'
+  | 'coral'
+  | 'amber'
+  | 'emerald'
+  | 'brand'
+  | 'positive'
+  | 'warning'
+  | 'danger'
+  | 'neutral';
 
 export interface StatCardProps {
   label: string;
   value: string | number;
   helper?: string;
+  detail?: string;
   trend?: {
     text: string;
     tone?: 'positive' | 'negative' | 'neutral';
   };
   tone?: StatTone;
   icon?: ReactNode;
+  compact?: boolean;
   className?: string;
 }
 
@@ -19,13 +30,25 @@ export function StatCard({
   label,
   value,
   helper,
+  detail,
   trend,
   tone = 'purple',
   icon,
+  compact = false,
   className = '',
 }: StatCardProps) {
+  const toneMap: Record<string, 'purple' | 'coral' | 'amber' | 'emerald'> = {
+    brand: 'purple',
+    positive: 'emerald',
+    warning: 'amber',
+    danger: 'coral',
+    neutral: 'purple',
+  };
+  const resolvedTone = (toneMap[tone] || tone) as 'purple' | 'coral' | 'amber' | 'emerald';
+  const compactClass = compact ? 'stat-card--compact' : '';
+  const helperText = detail ?? helper;
   return (
-    <div className={`stat-card stat-card--${tone} ${className}`.trim()}>
+    <div className={`stat-card stat-card--${resolvedTone} ${compactClass} ${className}`.trim()}>
       <div className="stat-card-header">
         <span className="stat-card-label">{label}</span>
         {icon && (
@@ -45,7 +68,7 @@ export function StatCard({
           </span>
         )}
       </div>
-      {helper && <p className="stat-card-helper">{helper}</p>}
+      {helperText && <p className="stat-card-helper">{helperText}</p>}
     </div>
   );
 }

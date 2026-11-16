@@ -22,6 +22,7 @@ export function MfaChallenge({
 }: MfaChallengeProps) {
   const { client } = useAuth();
   const [useRecovery, setUseRecovery] = useState(false);
+  const [showRecoveryHelp, setShowRecoveryHelp] = useState(false);
   const [code, setCode] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -155,6 +156,37 @@ export function MfaChallenge({
           ) : null}
         </div>
       </form>
+
+      {showRecoveryHelp ? (
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <Alert tone="info">
+            <strong>Lost your authenticator and recovery codes?</strong>
+            <br />
+            Contact your school administrator or Principal to request an account MFA reset. An
+            administrator will verify your identity and securely reset your MFA factors, allowing
+            you to set up a new authenticator on your next sign in.
+          </Alert>
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
+          <button
+            type="button"
+            className="btn-link"
+            style={{
+              fontSize: '0.85rem',
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-primary)',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
+            onClick={() => setShowRecoveryHelp(true)}
+          >
+            Lost access to authenticator and recovery codes?
+          </button>
+        </div>
+      )}
+
       <p className="fineprint">
         Two-factor authentication adds an extra layer of security. If you lost your device, use an
         emergency recovery code.

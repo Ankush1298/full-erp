@@ -102,6 +102,33 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
   { code: 'fee.receipt.record', sensitivity: 'SENSITIVE' },
   { code: 'fee.receipt.read', sensitivity: 'SENSITIVE' },
   { code: 'fee.receipt.reverse', sensitivity: 'CRITICAL' },
+  { code: 'fee.gateway.read', sensitivity: 'SENSITIVE' },
+  { code: 'fee.gateway.manage', sensitivity: 'CRITICAL' },
+  { code: 'fee.payment.initiate', sensitivity: 'NORMAL' },
+  { code: 'fee.refund.initiate', sensitivity: 'CRITICAL' },
+
+  { code: 'parent.portal.access', sensitivity: 'NORMAL' },
+  { code: 'parent.student.read', sensitivity: 'SENSITIVE' },
+  { code: 'parent.attendance.read', sensitivity: 'SENSITIVE' },
+  { code: 'parent.academics.read', sensitivity: 'SENSITIVE' },
+  { code: 'parent.exam.read', sensitivity: 'SENSITIVE' },
+  { code: 'parent.fee.read', sensitivity: 'SENSITIVE' },
+  { code: 'parent.fee.pay', sensitivity: 'SENSITIVE' },
+
+  { code: 'homework.manage', sensitivity: 'SENSITIVE' },
+  { code: 'homework.review', sensitivity: 'SENSITIVE' },
+  { code: 'homework.read', sensitivity: 'NORMAL' },
+  { code: 'homework.submit', sensitivity: 'NORMAL' },
+
+  { code: 'vault.authority.manage', sensitivity: 'CRITICAL' },
+  { code: 'vault.authority.read', sensitivity: 'SENSITIVE' },
+  { code: 'vault.device.enroll', sensitivity: 'NORMAL' },
+  { code: 'vault.device.manage', sensitivity: 'CRITICAL' },
+  { code: 'vault.recovery.initiate', sensitivity: 'CRITICAL' },
+  { code: 'vault.grant.issue', sensitivity: 'CRITICAL' },
+  { code: 'vault.record.read', sensitivity: 'SENSITIVE' },
+  { code: 'vault.record.write', sensitivity: 'SENSITIVE' },
+  { code: 'adult.consent.manage', sensitivity: 'SENSITIVE' },
 ];
 
 export const PERMISSION_CODES: ReadonlySet<string> = new Set(PERMISSION_CATALOG.map((p) => p.code));

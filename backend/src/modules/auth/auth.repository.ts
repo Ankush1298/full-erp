@@ -36,7 +36,7 @@ export class AuthRepository {
   async findIdentityByEmail(tx: TenantTx, email: string): Promise<IdentityRow | null> {
     const res = await tx.query<IdentityRow>(
       `SELECT id, email, password_hash, status, failed_login_count, locked_until
-       FROM platform.identities WHERE email = lower($1)`,
+       FROM platform.lookup_identity_by_email($1)`,
       [email],
     );
     return res.rows[0] ?? null;
@@ -45,7 +45,7 @@ export class AuthRepository {
   async findIdentityById(tx: TenantTx, identityId: string): Promise<IdentityRow | null> {
     const res = await tx.query<IdentityRow>(
       `SELECT id, email, password_hash, status, failed_login_count, locked_until
-       FROM platform.identities WHERE id = $1`,
+       FROM platform.lookup_identity_by_id($1)`,
       [identityId],
     );
     return res.rows[0] ?? null;
@@ -108,8 +108,7 @@ export class AuthRepository {
     const res = await tx.query<SessionRow>(
       `SELECT id, identity_id, tenant_id, token_hash, expires_at, revoked_at, step_up_at, auth_strength,
               mfa_verified_at
-       FROM platform.auth_sessions
-       WHERE token_hash = $1`,
+       FROM platform.lookup_session_by_token($1)`,
       [tokenHash],
     );
     return res.rows[0] ?? null;
@@ -119,8 +118,7 @@ export class AuthRepository {
     const res = await tx.query<SessionRow>(
       `SELECT id, identity_id, tenant_id, token_hash, expires_at, revoked_at, step_up_at, auth_strength,
               mfa_verified_at
-       FROM platform.auth_sessions
-       WHERE id = $1`,
+       FROM platform.lookup_session_by_id($1)`,
       [sessionId],
     );
     return res.rows[0] ?? null;
@@ -223,7 +221,7 @@ export class AuthRepository {
   async lockIdentityByEmail(tx: TenantTx, email: string): Promise<IdentityRow | null> {
     const res = await tx.query<IdentityRow>(
       `SELECT id, email, password_hash, status, failed_login_count, locked_until
-         FROM platform.identities WHERE email = lower($1) FOR UPDATE`,
+         FROM platform.lock_identity_by_email($1)`,
       [email],
     );
     return res.rows[0] ?? null;

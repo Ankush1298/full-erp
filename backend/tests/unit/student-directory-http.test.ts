@@ -59,7 +59,7 @@ function scripted(people: Person[], studentRows: unknown[]): Stand {
   const tx = {
     query: (sql: string, params: unknown[] = []) => {
       const rows = (r: unknown[]) => Promise.resolve({ rows: r, rowCount: r.length });
-      if (sql.includes('platform.auth_sessions')) {
+      if (sql.includes('platform.auth_sessions') || sql.includes('lookup_session_by_token')) {
         const p = byHash.get(params[0] as string);
         return rows(
           p
@@ -78,7 +78,8 @@ function scripted(people: Person[], studentRows: unknown[]): Stand {
             : [],
         );
       }
-      if (sql.includes('platform.identities')) return rows([{ status: 'ACTIVE' }]);
+      if (sql.includes('platform.identities') || sql.includes('lookup_identity_by_id'))
+        return rows([{ status: 'ACTIVE' }]);
       if (sql.includes('get_identity_memberships')) {
         const p = people.find((x) => x.identityId === params[0]);
         return rows(

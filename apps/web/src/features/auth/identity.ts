@@ -8,11 +8,15 @@ export interface Identity {
   readonly roles: readonly string[];
   readonly capabilities: ReadonlySet<string>;
   /** Display names for this user's roles as the institution chose (doc 44). Never consulted for access. */
-  readonly roleLabels?: Readonly<Record<string, string>>;
-  readonly institutionType?: 'SCHOOL' | 'COLLEGE' | 'UNIVERSITY' | null;
+  readonly roleLabels?: Readonly<Record<string, string>> | undefined;
+  readonly institutionType?: 'SCHOOL' | 'COLLEGE' | 'UNIVERSITY' | null | undefined;
+  /** Active ERP modules enabled centrally for this institution by Platform Owner. */
+  readonly entitledModules?: ReadonlySet<string> | undefined;
 }
 
-export function toIdentity(me: MeResponse): Identity {
+export function toIdentity(
+  me: Omit<MeResponse, 'entitled_modules'> & { entitled_modules?: string[] },
+): Identity {
   return {
     userId: me.user_id,
     displayName: me.display_name,
@@ -21,7 +25,14 @@ export function toIdentity(me: MeResponse): Identity {
     capabilities: new Set(me.capabilities),
     roleLabels: me.role_labels,
     institutionType: me.institution_type,
+    entitledModules: new Set(me.entitled_modules ?? []),
   };
+}
+
+export function isModuleEntitled(identity: Identity, moduleKey?: string): boolean {
+  if (!moduleKey) return true;
+  if (!identity.entitledModules) return false;
+  return identity.entitledModules.has(moduleKey);
 }
 
 export function can(identity: Identity, ...anyOf: readonly string[]): boolean {
@@ -54,6 +65,7 @@ const ROLE_LABELS: Record<string, string> = {
   CAMPUS_ADMIN: 'Campus administrator',
   COLLEGE_ADMIN: 'College administrator',
   REGISTRAR: 'Registrar',
+  PARENT: 'Parent / Guardian',
 };
 
 /** The role's display name: the institution's (from the server) over the built-in default. Display only. */

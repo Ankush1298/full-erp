@@ -25,7 +25,14 @@ export const ScheduleStatusSchema = z.enum([
   'CANCELLED',
 ]);
 
-export const MarkStatusSchema = z.enum(['ENTERED', 'ABSENT', 'EXEMPT', 'WITHHELD']);
+export const MarkStatusSchema = z.enum([
+  'ENTERED',
+  'SUBMITTED',
+  'DRAFT',
+  'ABSENT',
+  'EXEMPT',
+  'WITHHELD',
+]);
 
 export const CreateExaminationSchema = z
   .object({
@@ -99,13 +106,13 @@ export const StudentMarkEntrySchema = z
   })
   .refine(
     (entry) => {
-      if (entry.status === 'ENTERED') {
+      if (entry.status === 'ENTERED' || entry.status === 'SUBMITTED') {
         return entry.marks_obtained !== null && entry.marks_obtained !== undefined;
       }
       return true;
     },
     {
-      message: 'marks_obtained is required when status is ENTERED',
+      message: 'marks_obtained is required when status is ENTERED or SUBMITTED',
       path: ['marks_obtained'],
     },
   );
@@ -113,6 +120,25 @@ export const StudentMarkEntrySchema = z
 export const SaveMarksSchema = z.object({
   action: z.enum(['DRAFT', 'SUBMIT']).default('DRAFT'),
   entries: z.array(StudentMarkEntrySchema).min(1),
+  allow_early_entry: z.boolean().optional(),
+  early_entry_reason: z.string().optional(),
+});
+
+export const CorrectMarksSchema = z.object({
+  student_id: z.string().uuid(),
+  status: MarkStatusSchema.default('ENTERED'),
+  marks_obtained: z.coerce.number().min(0).max(10000).optional().nullable(),
+  reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(500),
+  evidence_url: z
+    .string()
+    .url()
+    .or(z.literal(''))
+    .nullable()
+    .transform((val) => (val === '' ? null : val))
+    .optional(),
+  evidence_exception: z.boolean().default(false),
+  is_amendment: z.boolean().default(false),
+  remarks: z.string().max(500).optional().nullable(),
 });
 
 export const ListExaminationsQuerySchema = z.object({
@@ -132,5 +158,6 @@ export type UpdateExaminationInput = z.infer<typeof UpdateExaminationSchema>;
 export type CreateScheduleInput = z.infer<typeof CreateScheduleSchema>;
 export type StudentMarkEntry = z.infer<typeof StudentMarkEntrySchema>;
 export type SaveMarksInput = z.infer<typeof SaveMarksSchema>;
+export type CorrectMarksInput = z.infer<typeof CorrectMarksSchema>;
 export type ListExaminationsQuery = z.infer<typeof ListExaminationsQuerySchema>;
 export type ListSchedulesQuery = z.infer<typeof ListSchedulesQuerySchema>;

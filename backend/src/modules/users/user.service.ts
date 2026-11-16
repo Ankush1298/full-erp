@@ -46,6 +46,7 @@ interface UserRow {
   version: number;
   created_at: Date;
   identity_id?: string | null;
+  mfa_enrolled?: boolean;
 }
 const COLS = 'id, email, display_name, status, version, created_at';
 const toDto = (r: UserRow): UserDto => ({
@@ -55,6 +56,7 @@ const toDto = (r: UserRow): UserDto => ({
   status: r.status,
   version: r.version,
   createdAt: r.created_at.toISOString(),
+  ...(r.mfa_enrolled ? { mfaEnrolled: true } : {}),
 });
 
 function ensureTrusted(ctx: TrustedContext): void {
@@ -137,6 +139,21 @@ export interface InviteOutcome {
  */
 export class UserService {
   /** Minimal user fields of the caller's own tenant. Not held: 403. Scoped (campus/department) holders: 403 (inert). */
+  static async createRecordOnlyPupil(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    input: { userId: string; name: string; admissionNumber: string },
+  ): Promise<void> {
+    ensureTrusted(ctx);
+    const cleanAdm = input.admissionNumber.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const placeholderEmail = `student.${cleanAdm}.${input.userId.toLowerCase()}@${ctx.tenantId.toLowerCase()}.anesa.internal`;
+    await tx.query(
+      `INSERT INTO app.users (id, organization_id, email, display_name, status, identity_id)
+       VALUES ($1, $2, $3, $4, 'ACTIVE', NULL)`,
+      [input.userId, ctx.tenantId, placeholderEmail, input.name],
+    );
+  }
+
   static async list(
     tx: TenantTx,
     ctx: TrustedContext,
@@ -160,7 +177,12 @@ export class UserService {
 
     const n = limit as number;
     const res = await tx.query<UserRow>(
-      `SELECT ${COLS} FROM app.users
+      `SELECT ${COLS},
+              EXISTS (
+                SELECT 1 FROM app.user_mfa_factors f
+                 WHERE f.organization_id = app.users.organization_id AND f.user_id = app.users.id AND f.status = 'ACTIVE'
+              ) AS mfa_enrolled
+         FROM app.users
         WHERE organization_id = $1
           AND ($2::text IS NULL OR status = $2)
           AND ($3::uuid IS NULL OR id > $3::uuid)
@@ -462,7 +484,13 @@ export class UserService {
     if (!isUuidV7(userId)) throw invalid('Invalid user ID.');
     await assertOrganizationScope(tx, ctx, USER_READ_PERMISSION);
     const res = await tx.query<UserRow>(
-      `SELECT ${COLS} FROM app.users WHERE organization_id = $1 AND id = $2`,
+      `SELECT ${COLS},
+              EXISTS (
+                SELECT 1 FROM app.user_mfa_factors f
+                 WHERE f.organization_id = app.users.organization_id AND f.user_id = app.users.id AND f.status = 'ACTIVE'
+              ) AS mfa_enrolled
+         FROM app.users
+        WHERE organization_id = $1 AND id = $2`,
       [ctx.tenantId, userId.toLowerCase()],
     );
     const row = res.rows[0];

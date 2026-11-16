@@ -38,6 +38,7 @@ import { createStorageDriver, type StorageDriver } from './shared/storage/index.
 import { registerUserRoutes } from './modules/users/user.routes.js';
 import {
   DisabledInvitationMailer,
+  SmtpInvitationMailer,
   type InvitationMailer,
 } from './shared/email/invitation-mailer.js';
 import {
@@ -53,6 +54,10 @@ import { MfaService } from './modules/auth/mfa/mfa.service.js';
 import { registerMfaRoutes } from './modules/auth/mfa/mfa.routes.js';
 import { registerFinanceRoutes } from './modules/finance/finance.routes.js';
 import { registerReportingRoutes } from './modules/reporting/reporting.routes.js';
+import { registerParentRoutes } from './modules/parent/parent.routes.js';
+import { registerHomeworkRoutes } from './modules/homework/homework.routes.js';
+import { registerVaultRoutes } from './modules/vault/vault.routes.js';
+import { registerMonitoringRoutes } from './modules/monitoring/monitoring.routes.js';
 
 declare module 'fastify' {
   interface FastifyContextConfig {
@@ -201,7 +206,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.register(registerUserRoutes, {
     prefix: '/api/v1',
     db: deps.db,
-    mailer: deps.invitationMailer ?? new DisabledInvitationMailer(),
+    mailer:
+      deps.invitationMailer ??
+      (config.smtp ? new SmtpInvitationMailer(config.smtp) : new DisabledInvitationMailer()),
     inviteLimiter:
       deps.inviteLimiter ??
       new FixedWindowLimiter({ limit: 30, windowMs: 60 * 60_000, maxKeys: 10_000 }),
@@ -216,6 +223,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.register(registerExamRoutes, { db: deps.db });
   app.register(registerFinanceRoutes, { db: deps.db });
   app.register(registerReportingRoutes, { db: deps.db });
+  app.register(registerParentRoutes, { prefix: '/api/v1/parent', db: deps.db });
+  app.register(registerHomeworkRoutes, { prefix: '/api/v1/homework', db: deps.db });
+  app.register(registerVaultRoutes, { prefix: '/api/v1/vault', db: deps.db });
   app.register(registerPeopleRoutes, { prefix: '/api/v1/faculty', db: deps.db });
   app.register(registerFacultyAssignmentRoutes, { prefix: '/api/v1/faculty', db: deps.db });
   app.register(registerStudentRoutes, { prefix: '/api/v1/students', db: deps.db });
@@ -231,6 +241,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
   app.register(registerEmployeeImportRoutes, { prefix: '/api/v1/faculty/imports', db: deps.db });
   app.register(registerConsentRoutes, { prefix: '/api/v1', db: deps.db });
+  app.register(registerMonitoringRoutes, { prefix: '/api/v1/monitoring', db: deps.db });
   app.register(registerNotificationRoutes, {
     prefix: '/api/v1/notifications',
     db: deps.db,

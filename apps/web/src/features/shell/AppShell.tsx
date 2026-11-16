@@ -369,6 +369,17 @@ function NavIcon({ id }: { id: string }) {
   }
 }
 
+function getModuleLabel(pathname: string, currentNav?: { label: string }): string {
+  if (currentNav) return currentNav.label;
+  const segments = pathname.split('/').filter(Boolean);
+  const first = segments[0];
+  if (!first) return 'Dashboard';
+  return first
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 export function AppShell() {
   const { identity } = useAuth();
   const location = useLocation();
@@ -431,41 +442,30 @@ export function AppShell() {
           <span className="sr-only">{navOpen ? 'Close menu' : 'Open menu'}</span>
           <span className="menu-icon" aria-hidden="true" />
         </button>
-        <div className="topbar-welcome">
-          <span className="topbar-greeting">Welcome to Anesa</span>
-          {currentNav ? (
-            <span className="topbar-breadcrumb" aria-hidden="true">
-              <span className="topbar-breadcrumb-sep">/</span>
-              <span className="topbar-breadcrumb-label">{currentNav.label}</span>
-            </span>
-          ) : null}
-        </div>
-        <div className="topbar-search">
-          <div className="search-pill">
-            <input
-              type="search"
-              placeholder="Search..."
-              aria-label="Search"
-              className="search-input"
-            />
-            <button type="button" className="search-btn" aria-label="Submit search">
-              <svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </button>
+        {location.pathname === '/' ? (
+          <div className="topbar-welcome">
+            <span className="topbar-greeting">Welcome to Anesa</span>
           </div>
-        </div>
+        ) : (
+          <div className="topbar-header-context">
+            <nav className="topbar-breadcrumb-nav" aria-label="Breadcrumb">
+              <ol className="topbar-breadcrumbs">
+                <li className="topbar-breadcrumb-item">
+                  <NavLink to="/" className="topbar-breadcrumb-link">
+                    Dashboard
+                  </NavLink>
+                </li>
+                <li className="topbar-breadcrumb-sep" aria-hidden="true">
+                  /
+                </li>
+                <li className="topbar-breadcrumb-item current" aria-current="page">
+                  <span className="topbar-breadcrumb-current">{getModuleLabel(location.pathname, currentNav)}</span>
+                </li>
+              </ol>
+            </nav>
+            <span className="topbar-module-title" aria-hidden="true">{getModuleLabel(location.pathname, currentNav)}</span>
+          </div>
+        )}
         <div className="topbar-actions">
           <NavLink
             to="/notifications"

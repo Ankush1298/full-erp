@@ -391,8 +391,21 @@ describe('university: course offerings', () => {
   it('a section of another cohort period, or a cohort period of another term, is refused', async () => {
     expect((await offering(s.admin, core({ cohortPeriodId: SC.cp }))).statusCode).toBe(400);
     expect(
-      (await offering(s.admin, core({ sectionId: undefined, cohortPeriodId: SC.cp }))).statusCode,
+      (
+        await offering(
+          s.admin,
+          core({ sectionId: undefined, cohortPeriodId: SC.cp, registrationPolicy: 'MANUAL' }),
+        )
+      ).statusCode,
     ).toBe(400);
+  });
+
+  it('an offering with registration policy AUTO_FROM_SECTION requires a section', async () => {
+    const res = await offering(s.admin, core({ sectionId: undefined }));
+    expect(res.statusCode).toBe(400);
+    expect(res.json<{ error: { message: string } }>().error.message).toContain(
+      'An offering with registration policy AUTO_FROM_SECTION requires a section',
+    );
   });
 
   it('publication freezes the catalogue snapshot; later catalogue edits do not touch it', async () => {

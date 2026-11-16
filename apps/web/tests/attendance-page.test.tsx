@@ -13,6 +13,15 @@ const STUDENT_1 = '01900000-0000-7000-8000-000000000001';
 const STUDENT_2 = '01900000-0000-7000-8000-000000000002';
 
 function setupAttendanceState(backend: ReturnType<typeof createFakeBackend>) {
+  backend.state.attendance.campuses = [
+    {
+      id: 'camp-1',
+      name: 'Main Campus',
+      timezone: 'Asia/Kolkata',
+      today: TODAY,
+    },
+  ];
+
   backend.state.attendance.myOfferings = [
     {
       id: OFFERING_1,
@@ -400,7 +409,7 @@ describe('Attendance UI & Teacher Workflow', () => {
     expect(
       await screen.findByRole('heading', { name: 'Daily School Attendance Register' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Introduction to Functions')).toBeInTheDocument();
+    expect(await screen.findByText('Introduction to Functions')).toBeInTheDocument();
     expect(screen.getByText('Data Types')).toBeInTheDocument();
 
     // Verify student counts are shown

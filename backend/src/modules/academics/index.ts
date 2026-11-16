@@ -11,6 +11,7 @@ export * from './class-teacher.schemas.js';
 export * from './registration.service.js';
 export * from './registration.schemas.js';
 export * from './holiday.service.js';
+export * from './holiday-catalogue.js';
 export * from './setup.service.js';
 export * from './assigned-resolver.js';
 export * from './faculty.routes.js';

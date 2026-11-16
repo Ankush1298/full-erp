@@ -6,6 +6,10 @@ import { contractVersions, migrate } from '../../tools/db/migrate.js';
 import { startThrowawayPostgres, type RunningPostgres } from './embedded-postgres.js';
 import { seedFixtures } from './fixtures.js';
 import { rolePasswords, urlFor } from './role-passwords.js';
+import {
+  extractDatabaseName,
+  FORBIDDEN_PERSISTENT_DB_NAMES,
+} from '../../src/shared/database/test-guard.js';
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -32,6 +36,14 @@ declare module 'vitest' {
  */
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const configured = process.env['TEST_DATABASE_URL'];
+  if (configured) {
+    const dbName = extractDatabaseName(configured);
+    if (FORBIDDEN_PERSISTENT_DB_NAMES.includes(dbName)) {
+      throw new Error(
+        `TEST_DATABASE_URL points to protected persistent database "${dbName}". Refusing to run tests against persistent databases.`,
+      );
+    }
+  }
   let embedded: RunningPostgres | undefined;
   const serverAdminUrl = configured ?? (embedded = await startThrowawayPostgres()).adminUrl;
 

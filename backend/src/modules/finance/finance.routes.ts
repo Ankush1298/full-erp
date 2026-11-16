@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { Database } from '../../shared/database/index.js';
 import { requireContext } from '../academics/common.js';
 import { FinanceService } from './finance.service.js';
+import { PaymentGatewayService } from './gateway.service.js';
 import {
   CreateFeeCategorySchema,
   CreateFeeStructureSchema,
@@ -13,6 +14,16 @@ import {
   ListStudentDuesQuerySchema,
   ListFeeReceiptsQuerySchema,
 } from './finance.schemas.js';
+import {
+  SaveGatewayConfigSchema,
+  TestGatewayConnectionSchema,
+  InitiateOnlinePaymentSchema,
+  VerifyOnlinePaymentSchema,
+  InitiateRefundSchema,
+  ListPaymentAttemptsQuerySchema,
+  ReconciliationQuerySchema,
+} from './gateway.schemas.js';
+import type { PaymentGatewayProvider } from './gateways/types.js';
 
 export const registerFinanceRoutes: FastifyPluginAsync<{
   db: Database;
@@ -20,6 +31,7 @@ export const registerFinanceRoutes: FastifyPluginAsync<{
   await Promise.resolve();
   const db = opts.db;
   const financeService = new FinanceService();
+  const gatewayService = new PaymentGatewayService();
 
   // 1. Fee Categories
   app.get(
@@ -185,6 +197,128 @@ export const registerFinanceRoutes: FastifyPluginAsync<{
         financeService.getCollectionSummary(tx, ctx, query),
       );
       reply.send({ data: summary });
+    },
+  );
+
+  // 7. Payment Gateway Settings
+  app.get(
+    '/api/v1/finance/gateway/config',
+    { config: { permission: 'fee.gateway.read' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const configs = await db.withTenant(ctx, (tx) => gatewayService.listConfigs(tx, ctx));
+      reply.send({ data: configs });
+    },
+  );
+
+  app.post(
+    '/api/v1/finance/gateway/config',
+    { config: { permission: 'fee.gateway.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = SaveGatewayConfigSchema.parse(req.body);
+      const saved = await db.withTenant(ctx, (tx) => gatewayService.saveConfig(tx, ctx, body));
+      reply.status(201).send({ data: saved });
+    },
+  );
+
+  app.post(
+    '/api/v1/finance/gateway/test',
+    { config: { permission: 'fee.gateway.manage' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = TestGatewayConnectionSchema.parse(req.body);
+      const result = await db.withTenant(ctx, (tx) => gatewayService.testConnection(tx, ctx, body));
+      reply.send({ data: result });
+    },
+  );
+
+  // 8. Online Payments
+  app.post(
+    '/api/v1/finance/payments/initiate',
+    { config: { permission: 'fee.payment.initiate' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = InitiateOnlinePaymentSchema.parse(req.body);
+      const result = await db.withTenant(ctx, (tx) =>
+        gatewayService.initiatePayment(tx, ctx, body),
+      );
+      reply.status(201).send({ data: result });
+    },
+  );
+
+  app.post(
+    '/api/v1/finance/payments/verify',
+    { config: { permission: 'fee.payment.initiate' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const body = VerifyOnlinePaymentSchema.parse(req.body);
+      const result = await db.withTenant(ctx, (tx) => gatewayService.verifyPayment(tx, ctx, body));
+      reply.send({ data: result });
+    },
+  );
+
+  app.get(
+    '/api/v1/finance/payments/attempts',
+    { config: { permission: 'fee.receipt.read' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const query = ListPaymentAttemptsQuerySchema.parse(req.query);
+      const items = await db.withTenant(ctx, (tx) =>
+        gatewayService.listPaymentAttempts(tx, ctx, query),
+      );
+      reply.send({ data: items });
+    },
+  );
+
+  // 9. Payment Gateway Refunds
+  app.post(
+    '/api/v1/finance/receipts/:id/refund',
+    { config: { permission: 'fee.refund.initiate' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const { id } = req.params as { id: string };
+      const body = InitiateRefundSchema.parse({
+        ...(typeof req.body === 'object' && req.body !== null ? req.body : {}),
+        receipt_id: id,
+      });
+      const result = await db.withTenant(ctx, (tx) => gatewayService.initiateRefund(tx, ctx, body));
+      reply.send({ data: result });
+    },
+  );
+
+  // 10. Financial Reconciliation
+  app.get(
+    '/api/v1/finance/reports/reconciliation',
+    { config: { permission: 'fee.receipt.read' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const query = ReconciliationQuerySchema.parse(req.query);
+      const report = await db.withTenant(ctx, (tx) =>
+        gatewayService.getReconciliationReport(tx, ctx, query),
+      );
+      reply.send({ data: report });
+    },
+  );
+
+  // 11. Authenticated Webhook Handler
+  app.post(
+    '/api/v1/finance/payments/webhook/:provider',
+    { config: { permission: 'fee.payment.initiate' } },
+    async (req, reply) => {
+      const ctx = requireContext(req);
+      const { provider } = req.params as { provider: PaymentGatewayProvider };
+      const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      const result = await db.withTenant(ctx, (tx) =>
+        gatewayService.handleWebhook(
+          tx,
+          ctx,
+          provider,
+          req.headers as Record<string, string | string[] | undefined>,
+          rawBody,
+        ),
+      );
+      reply.send({ data: result });
     },
   );
 };

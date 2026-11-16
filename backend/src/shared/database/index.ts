@@ -5,3 +5,13 @@ export type { DatabaseStatus } from './pool.js';
 export { RuntimeRoleError } from './runtime-role.js';
 export { UnsafeSqlError } from './sql-guard.js';
 export type { TenantTx } from './tenant-tx.js';
+export {
+  FORBIDDEN_PERSISTENT_DB_NAMES,
+  DISPOSABLE_TEST_DB_PATTERN,
+  PersistentDatabaseMutationBlockedError,
+  extractDatabaseName,
+  isPersistentDatabase,
+  isDisposableDatabase,
+  assertDisposableTestDatabase,
+  validatePersistentWriteAuthorized,
+} from './test-guard.js';

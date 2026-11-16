@@ -102,7 +102,7 @@ describe('Phase 1 Pages (Web Integration)', () => {
       });
       renderApp(b, '/documents');
 
-      expect(await screen.findByText('My Documents')).toBeInTheDocument();
+      expect(await screen.findByText('Document Center')).toBeInTheDocument();
       expect(screen.getByText('No documents uploaded')).toBeInTheDocument();
     });
   });

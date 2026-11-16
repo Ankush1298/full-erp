@@ -18,6 +18,9 @@ import {
   UpdateEmployeeBodySchema,
   type UpdateEmployeeBody,
   UpdateEmployeeResponseSchema,
+  EmployeeSearchQuerySchema,
+  type EmployeeSearchQuery,
+  EmployeeSearchResponseSchema,
 } from './employee.schemas.js';
 import {
   ClosePostingBodySchema,
@@ -76,6 +79,46 @@ export const registerPeopleRoutes: FastifyPluginAsync<{ db: Database }> = async 
         EmployeeService.create(tx, ctx, req.body, meta),
       );
       return reply.status(201).send({ success: true, data: { id } });
+    },
+  );
+
+  // Search employees / faculty for assignment selector (Defect #7).
+  // Defined BEFORE /employees/:id so Fastify matches it explicitly.
+  app.get<{ Querystring: EmployeeSearchQuery }>(
+    '/employees/search',
+    {
+      config: { permission: ['academic.faculty.assign', 'employee.profile.read'] },
+      schema: {
+        querystring: EmployeeSearchQuerySchema,
+        response: { 200: EmployeeSearchResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        EmployeeService.search(tx, ctx, req.query),
+      );
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  app.get<{ Querystring: EmployeeSearchQuery }>(
+    '/search',
+    {
+      config: { permission: ['academic.faculty.assign', 'employee.profile.read'] },
+      schema: {
+        querystring: EmployeeSearchQuerySchema,
+        response: { 200: EmployeeSearchResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        EmployeeService.search(tx, ctx, req.query),
+      );
+      return reply.status(200).send({ success: true, data });
     },
   );
 

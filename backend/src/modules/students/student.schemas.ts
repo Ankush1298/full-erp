@@ -42,7 +42,12 @@ export type StudentIdParam = Static<typeof StudentIdParamSchema>;
  */
 export const CreateStudentBodySchema = Type.Object(
   {
-    userId: UuidV7Schema,
+    /**
+     * Optional pre-existing user account UUID. When omitted (e.g. for school pupils or direct admissions),
+     * the system transactionally creates a non-authenticating record-only profile (identity_id = NULL)
+     * using the mandatory `name` field, preserving the pending PR-1 student login policy decision.
+     */
+    userId: Type.Optional(UuidV7Schema),
     admissionNumber: Type.String({
       minLength: 1,
       maxLength: 50,

@@ -312,6 +312,132 @@ describe('Scoped Admissions: School, College, and University Workflow Completion
     expect(userRoleAssignments).toHaveLength(0);
   });
 
+  it('1b. SCHOOL: admits pupil directly WITHOUT pre-existing User Account UUID', async () => {
+    const { cookie, csrf } = await login(schoolTenant.emails.registrarCampus);
+    const admissionNumber = num('DIR');
+    const idempotencyKey = uuidv7();
+
+    // 1. Validation failure: missing both userId and name yields 400
+    const failRes = await app.inject({
+      method: 'POST',
+      url: STUDENTS_BASE,
+      headers: {
+        cookie: `session_token=${cookie}`,
+        'x-csrf-token': csrf,
+        'idempotency-key': uuidv7(),
+      },
+      payload: {
+        admissionNumber,
+        admissionDate: '2026-07-01',
+        campusId: schoolTenant.campusId,
+        reason: 'Direct admission validation check',
+      },
+    });
+    expect(failRes.statusCode).toBe(400);
+
+    // 2. Successful admission with pupil name and date of birth, without userId
+    const res = await app.inject({
+      method: 'POST',
+      url: STUDENTS_BASE,
+      headers: {
+        cookie: `session_token=${cookie}`,
+        'x-csrf-token': csrf,
+        'idempotency-key': idempotencyKey,
+      },
+      payload: {
+        name: 'Aanya Sharma',
+        dateOfBirth: '2018-04-12',
+        admissionNumber,
+        admissionDate: '2026-07-01',
+        campusId: schoolTenant.campusId,
+        reason: 'School direct admission for Class 1',
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const studentId = res.json<{ data: { id: string } }>().data.id;
+
+    // Verify student record created with auto-provisioned user_id
+    const studentRows = await adminQuery<{ user_id: string; campus_id: string }>(
+      `SELECT user_id, campus_id FROM app.students WHERE organization_id = $1 AND id = $2`,
+      [schoolTenant.orgId, studentId],
+    );
+    expect(studentRows).toHaveLength(1);
+    const pupilUserId = studentRows[0]!.user_id;
+    expect(studentRows[0]!.campus_id).toBe(schoolTenant.campusId);
+
+    // Verify non-authenticating record-only user row created transactionally
+    const userRows = await adminQuery<{
+      display_name: string;
+      email: string;
+      status: string;
+      identity_id: string | null;
+      date_of_birth: string | null;
+    }>(
+      `SELECT display_name, email, status, identity_id, to_char(date_of_birth, 'YYYY-MM-DD') AS date_of_birth
+       FROM app.users WHERE organization_id = $1 AND id = $2`,
+      [schoolTenant.orgId, pupilUserId],
+    );
+    expect(userRows).toHaveLength(1);
+    expect(userRows[0]!.display_name).toBe('Aanya Sharma');
+    expect(userRows[0]!.date_of_birth).toBeNull(); // ephemeral in memory for duplicate check; not written to app.users per OD-2
+    expect(userRows[0]!.status).toBe('ACTIVE');
+    expect(userRows[0]!.identity_id).toBeNull();
+    expect(userRows[0]!.email).toContain('student.');
+    expect(userRows[0]!.email).toContain('@');
+    expect(userRows[0]!.email).toContain('.anesa.internal');
+
+    // Verify pupil cannot authenticate (no platform identity / password)
+    const loginAttempt = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: userRows[0]!.email, password: PASSWORD },
+    });
+    expect(loginAttempt.statusCode).toBe(401);
+
+    // 3. Idempotent retry replays original answer
+    const replayRes = await app.inject({
+      method: 'POST',
+      url: STUDENTS_BASE,
+      headers: {
+        cookie: `session_token=${cookie}`,
+        'x-csrf-token': csrf,
+        'idempotency-key': idempotencyKey,
+      },
+      payload: {
+        name: 'Aanya Sharma',
+        dateOfBirth: '2018-04-12',
+        admissionNumber,
+        admissionDate: '2026-07-01',
+        campusId: schoolTenant.campusId,
+        reason: 'School direct admission for Class 1',
+      },
+    });
+    expect(replayRes.statusCode).toBe(201);
+    expect(replayRes.headers['idempotent-replayed']).toBe('true');
+    expect(replayRes.json<{ data: { id: string } }>().data.id).toBe(studentId);
+
+    // 4. Duplicate admission number rejected with 409
+    const dupRes = await app.inject({
+      method: 'POST',
+      url: STUDENTS_BASE,
+      headers: {
+        cookie: `session_token=${cookie}`,
+        'x-csrf-token': csrf,
+        'idempotency-key': uuidv7(),
+      },
+      payload: {
+        name: 'Another Pupil',
+        admissionNumber, // Duplicate!
+        admissionDate: '2026-07-01',
+        campusId: schoolTenant.campusId,
+        reason: 'Duplicate admission number test',
+      },
+    });
+    expect(dupRes.statusCode).toBe(409);
+    expect(dupRes.json<{ error: { message: string } }>().error.message).toContain('already exists');
+  });
+
   it('2. COLLEGE: registers student with durable campusId and returns it in profile', async () => {
     const { cookie, csrf } = await login(collegeTenant.emails.registrarCampus);
     const userId = await createTargetUser(collegeTenant.orgId);

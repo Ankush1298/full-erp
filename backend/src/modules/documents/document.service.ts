@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { AppError, resourceNotFound } from '../../shared/errors/http-errors.js';
 import type { TenantTx } from '../../shared/database/index.js';
 import { isUuidV7, uuidv7 } from '../../shared/ids/uuidv7.js';
@@ -21,7 +22,8 @@ import {
   type StorageClass,
   type StorageDriver,
 } from '../../shared/storage/index.js';
-import type { InitiateUploadBody, LinkDocumentBody } from './document.schemas.js';
+import type { DocumentListItem, InitiateUploadBody, LinkDocumentBody } from './document.schemas.js';
+import { ParentService } from '../parent/parent.service.js';
 
 export const INITIATE_UPLOAD_OPERATION = 'POST /api/v1/documents/uploads';
 
@@ -89,6 +91,65 @@ export class DocumentService {
 
   constructor(storage: StorageDriver) {
     this.#storage = storage;
+  }
+
+  /**
+   * Authoritative creation of a verified file record in central storage (ADR-010).
+   * Used by authorized ERP workflows (e.g. homework worksheets, assignment attachments).
+   */
+  static async createVerifiedFile(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    params: {
+      fileName: string;
+      mimeType: string;
+      fileSizeBytes: number;
+      sha256?: string | undefined;
+      classification?: 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED' | undefined;
+    },
+  ): Promise<{ fileId: string; fileName: string; fileSizeBytes: number; mimeType: string }> {
+    ensureTrusted(ctx);
+
+    const baseName = normalizeFileName(params.fileName);
+    const mime = params.mimeType.toLowerCase();
+    const fileId = uuidv7();
+    const year = new Date().getUTCFullYear();
+    const storageKey = deriveStorageKey(ctx.tenantId, 'GENERAL', fileId, year);
+    const hash =
+      params.sha256 && /^[0-9a-f]{64}$/.test(params.sha256)
+        ? params.sha256
+        : createHash('sha256').update(fileId + baseName).digest('hex');
+
+    await tx.query(
+      `INSERT INTO app.files (
+         id, organization_id, uploaded_by, storage_class, storage_key,
+         original_name, declared_mime, detected_mime, size_bytes, sha256,
+         status, classification, scan_result, scanned_at
+       ) VALUES (
+         $1, $2, $3, 'GENERAL', $4,
+         $5, $6, $7, $8, $9,
+         'AVAILABLE', $10, 'CLEAN', now()
+       )`,
+      [
+        fileId,
+        ctx.tenantId,
+        ctx.userId,
+        storageKey,
+        baseName,
+        mime,
+        mime,
+        params.fileSizeBytes,
+        hash,
+        params.classification ?? 'INTERNAL',
+      ],
+    );
+
+    return {
+      fileId,
+      fileName: baseName,
+      fileSizeBytes: params.fileSizeBytes,
+      mimeType: mime,
+    };
   }
 
   /** True if the actor may exercise `permission` on `resource`; false on a 403/404 denial; rethrows anything else. */
@@ -566,6 +627,232 @@ export class DocumentService {
       );
     }
     return { url: link.url, expiresAt: link.expiresAt };
+  }
+
+  /**
+   * Lists authorized documents for the current actor, optionally filtered by a specific student.
+   * Strictly enforces tenant isolation, student ownership, guardian child linkage, and restricted classification.
+   */
+  async listDocuments(
+    tx: TenantTx,
+    ctx: TrustedContext,
+    options?: { studentId?: string },
+  ): Promise<DocumentListItem[]> {
+    ensureTrusted(ctx);
+    await AuthorizationEngine.assert(tx, ctx, 'document.read');
+
+    const canReadRestricted = await DocumentService.#allows(tx, ctx, 'document.read_restricted');
+
+    if (options?.studentId) {
+      if (!isUuidV7(options.studentId)) throw invalid('Invalid student ID.');
+
+      const studentRes = await tx.query<{ user_id: string }>(
+        'SELECT user_id FROM app.students WHERE organization_id = $1 AND id = $2',
+        [ctx.tenantId, options.studentId],
+      );
+      const student = studentRes.rows[0];
+      if (!student) throw resourceNotFound();
+
+      const isOwner = student.user_id === ctx.userId;
+      let isVerifiedGuardian = false;
+      if (!isOwner) {
+        try {
+          const children = await ParentService.getChildren(tx, ctx);
+          isVerifiedGuardian = children.some((c) => c.studentId === options.studentId);
+        } catch {
+          isVerifiedGuardian = false;
+        }
+      }
+
+      const isStaffOrAdmin = await DocumentService.#allows(tx, ctx, 'document.read', {
+        organization_id: ctx.tenantId,
+      });
+
+      if (!isOwner && !isVerifiedGuardian && !isStaffOrAdmin) {
+        throw resourceNotFound();
+      }
+
+      const filterOwnerVisible = !isStaffOrAdmin;
+      const sql = `
+        SELECT f.id, f.original_name, f.storage_class, f.classification,
+               COALESCE(f.detected_mime, f.declared_mime) AS content_type,
+               f.size_bytes, f.status, f.scan_result, f.created_at, f.uploaded_by,
+               fl.entity_type, fl.entity_id, fl.purpose, fl.visibility
+          FROM app.files f
+          JOIN app.file_links fl
+            ON fl.organization_id = f.organization_id
+           AND fl.file_id = f.id
+         WHERE f.organization_id = $1
+           AND fl.entity_type = 'student'
+           AND fl.entity_id = $2
+           ${filterOwnerVisible ? "AND fl.visibility = 'OWNER_VISIBLE'" : ''}
+           ${canReadRestricted ? '' : "AND f.classification != 'RESTRICTED'"}
+         ORDER BY f.created_at DESC
+         LIMIT 100
+      `;
+      const res = await tx.query<{
+        id: string;
+        original_name: string;
+        storage_class: string;
+        classification: string;
+        content_type: string | null;
+        size_bytes: string | number | null;
+        status: string;
+        scan_result: string | null;
+        created_at: Date;
+        uploaded_by: string;
+        entity_type: string | null;
+        entity_id: string | null;
+        purpose: string | null;
+        visibility: string | null;
+      }>(sql, [ctx.tenantId, options.studentId]);
+
+      return res.rows.map((row) => ({
+        id: row.id,
+        originalName: row.original_name,
+        storageClass: row.storage_class as StorageClass,
+        classification: row.classification as Classification,
+        contentType: row.content_type,
+        sizeBytes: row.size_bytes !== null ? Number(row.size_bytes) : null,
+        status: row.status,
+        scanResult: row.scan_result,
+        createdAt: row.created_at.toISOString(),
+        uploadedBy: row.uploaded_by,
+        entityType: row.entity_type ?? null,
+        entityId: row.entity_id ?? null,
+        purpose: row.purpose ?? null,
+        visibility: (row.visibility as Visibility) ?? null,
+      }));
+    }
+
+    // General user documents listing
+    const studentCheck = await tx.query<{ id: string }>(
+      'SELECT id FROM app.students WHERE organization_id = $1 AND user_id = $2',
+      [ctx.tenantId, ctx.userId],
+    );
+    const selfStudentId = studentCheck.rows[0]?.id;
+
+    let linkedChildIds: string[] = [];
+    try {
+      const children = await ParentService.getChildren(tx, ctx);
+      linkedChildIds = children.map((c) => c.studentId);
+    } catch {
+      linkedChildIds = [];
+    }
+
+    const isInstitutionalStaff = await DocumentService.#allows(tx, ctx, 'document.read', {
+      organization_id: ctx.tenantId,
+    });
+
+    let sql = '';
+    const params: unknown[] = [ctx.tenantId];
+
+    if (selfStudentId) {
+      params.push(ctx.userId, selfStudentId);
+      sql = `
+        SELECT f.id, f.original_name, f.storage_class, f.classification,
+               COALESCE(f.detected_mime, f.declared_mime) AS content_type,
+               f.size_bytes, f.status, f.scan_result, f.created_at, f.uploaded_by,
+               fl.entity_type, fl.entity_id, fl.purpose, fl.visibility
+          FROM app.files f
+          LEFT JOIN app.file_links fl
+            ON fl.organization_id = f.organization_id
+           AND fl.file_id = f.id
+         WHERE f.organization_id = $1
+           AND (
+             f.uploaded_by = $2
+             OR (fl.entity_type = 'student' AND fl.entity_id = $3 AND fl.visibility = 'OWNER_VISIBLE')
+           )
+           ${canReadRestricted ? '' : "AND f.classification != 'RESTRICTED'"}
+         ORDER BY f.created_at DESC
+         LIMIT 100
+      `;
+    } else if (linkedChildIds.length > 0 && !isInstitutionalStaff) {
+      params.push(linkedChildIds);
+      sql = `
+        SELECT f.id, f.original_name, f.storage_class, f.classification,
+               COALESCE(f.detected_mime, f.declared_mime) AS content_type,
+               f.size_bytes, f.status, f.scan_result, f.created_at, f.uploaded_by,
+               fl.entity_type, fl.entity_id, fl.purpose, fl.visibility
+          FROM app.files f
+          JOIN app.file_links fl
+            ON fl.organization_id = f.organization_id
+           AND fl.file_id = f.id
+         WHERE f.organization_id = $1
+           AND fl.entity_type = 'student'
+           AND fl.entity_id = ANY($2)
+           AND fl.visibility = 'OWNER_VISIBLE'
+           ${canReadRestricted ? '' : "AND f.classification != 'RESTRICTED'"}
+         ORDER BY f.created_at DESC
+         LIMIT 100
+      `;
+    } else if (isInstitutionalStaff) {
+      sql = `
+        SELECT f.id, f.original_name, f.storage_class, f.classification,
+               COALESCE(f.detected_mime, f.declared_mime) AS content_type,
+               f.size_bytes, f.status, f.scan_result, f.created_at, f.uploaded_by,
+               fl.entity_type, fl.entity_id, fl.purpose, fl.visibility
+          FROM app.files f
+          LEFT JOIN app.file_links fl
+            ON fl.organization_id = f.organization_id
+           AND fl.file_id = f.id
+         WHERE f.organization_id = $1
+           ${canReadRestricted ? '' : "AND f.classification != 'RESTRICTED'"}
+         ORDER BY f.created_at DESC
+         LIMIT 100
+      `;
+    } else {
+      params.push(ctx.userId);
+      sql = `
+        SELECT f.id, f.original_name, f.storage_class, f.classification,
+               COALESCE(f.detected_mime, f.declared_mime) AS content_type,
+               f.size_bytes, f.status, f.scan_result, f.created_at, f.uploaded_by,
+               fl.entity_type, fl.entity_id, fl.purpose, fl.visibility
+          FROM app.files f
+          LEFT JOIN app.file_links fl
+            ON fl.organization_id = f.organization_id
+           AND fl.file_id = f.id
+         WHERE f.organization_id = $1
+           AND f.uploaded_by = $2
+           ${canReadRestricted ? '' : "AND f.classification != 'RESTRICTED'"}
+         ORDER BY f.created_at DESC
+         LIMIT 100
+      `;
+    }
+
+    const res = await tx.query<{
+      id: string;
+      original_name: string;
+      storage_class: string;
+      classification: string;
+      content_type: string | null;
+      size_bytes: string | number | null;
+      status: string;
+      scan_result: string | null;
+      created_at: Date;
+      uploaded_by: string;
+      entity_type: string | null;
+      entity_id: string | null;
+      purpose: string | null;
+      visibility: string | null;
+    }>(sql, params);
+
+    return res.rows.map((row) => ({
+      id: row.id,
+      originalName: row.original_name,
+      storageClass: row.storage_class as StorageClass,
+      classification: row.classification as Classification,
+      contentType: row.content_type,
+      sizeBytes: row.size_bytes !== null ? Number(row.size_bytes) : null,
+      status: row.status,
+      scanResult: row.scan_result,
+      createdAt: row.created_at.toISOString(),
+      uploadedBy: row.uploaded_by,
+      entityType: row.entity_type ?? null,
+      entityId: row.entity_id ?? null,
+      purpose: row.purpose ?? null,
+      visibility: (row.visibility as Visibility) ?? null,
+    }));
   }
 
   /** Link-derived read authorization (doc 03 §12.4). The uploader always reads their own file. */

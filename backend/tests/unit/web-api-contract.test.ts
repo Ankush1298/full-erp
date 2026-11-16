@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config/env.js';
+import { buildPlatformServer } from '../../tools/platform/platform-server.js';
 
 // Every path the web client calls must be a route of the real backend once the documented proxy contract
 // (docs/deployment/frontend.md) is applied: client `/v1/...` -> browser `/api/v1/...` -> backend `/api/v1/...`
@@ -31,8 +32,16 @@ const app = buildApp({
   storage: {} as never, // registers the document routes; never called (every request stops at 401)
   logger: false,
 });
-beforeAll(() => app.ready());
-afterAll(() => app.close());
+const platformApp = buildPlatformServer({ db });
+
+beforeAll(async () => {
+  await app.ready();
+  await platformApp.ready();
+});
+afterAll(async () => {
+  await app.close();
+  await platformApp.close();
+});
 
 /** Every path literal in the web API modules, interpolations replaced by a sample value (query strings dropped). */
 function clientPaths(): string[] {
@@ -55,8 +64,9 @@ function clientPaths(): string[] {
 const toBackend = (clientPath: string): string =>
   clientPath.startsWith('/v1/') ? `/api${clientPath}` : clientPath;
 async function exists(url: string): Promise<boolean> {
+  const targetApp = url.startsWith('/api/v1/platform') ? platformApp : app;
   for (const method of METHODS) {
-    const r = await app.inject({ method, url });
+    const r = await targetApp.inject({ method, url });
     if (r.statusCode !== 404) return true;
   }
   return false;

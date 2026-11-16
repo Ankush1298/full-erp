@@ -1,0 +1,169 @@
+/* ==========================================================================
+   Anesa Campus OS — Fees & Finance Module Stylesheet
+   Modern, school-friendly styling for fee management, structures,
+   student dues, online/offline collections, receipts, and reconciliation.
+   All tokens adhere to Anesa Deep Royal Purple (#504175) & Lavender palette.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Segmented Control Navigation Tab Bar
+   -------------------------------------------------------------------------- */
+.finance-nav-bar,
+nav[aria-label='Fees and finance sections'],
+[aria-label='Fees and finance sections'] {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin !important;
+  gap: 0.375rem !important;
+  background: var(--color-surface, #ffffff) !important;
+  border: 1px solid var(--color-border, #ded7eb) !important;
+  border-radius: var(--radius-lg, 10px) !important;
+  padding: 0.375rem !important;
+  margin-bottom: var(--space-4, 1rem) !important;
+  box-shadow: 0 1px 3px rgba(80, 65, 117, 0.06) !important;
+}
+
+.finance-nav-btn,
+nav[aria-label='Fees and finance sections'] button,
+[aria-label='Fees and finance sections'] button {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.45rem 0.75rem !important;
+  font-family: var(--font-sans) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+  color: var(--color-muted, #5e5475) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius, 6px) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease-in-out !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.finance-nav-btn:hover,
+nav[aria-label='Fees and finance sections'] button:hover,
+[aria-label='Fees and finance sections'] button:hover {
+  color: var(--color-primary, #504175) !important;
+  background: var(--color-primary-soft, #f2eef9) !important;
+}
+
+.finance-nav-btn:focus-visible,
+nav[aria-label='Fees and finance sections'] button:focus-visible,
+[aria-label='Fees and finance sections'] button:focus-visible {
+  outline: 2px solid var(--color-primary, #504175) !important;
+  outline-offset: 2px !important;
+}
+
+.finance-nav-btn--active,
+.finance-nav-btn[aria-current='page'],
+nav[aria-label='Fees and finance sections'] button[aria-current='page'],
+[aria-label='Fees and finance sections'] button[aria-current='page'] {
+  background: var(--color-primary, #504175) !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 4px rgba(80, 65, 117, 0.25) !important;
+}
+
+.finance-nav-btn:disabled,
+nav[aria-label='Fees and finance sections'] button:disabled,
+[aria-label='Fees and finance sections'] button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+/* Badge indicator within tab */
+.finance-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.375rem;
+  padding: 0.125rem 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  background: rgba(80, 65, 117, 0.1);
+  color: inherit;
+  line-height: 1;
+}
+
+.finance-nav-btn--active .finance-nav-badge,
+nav[aria-label='Fees and finance sections'] button[aria-current='page'] .finance-nav-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   2. Balanced Responsive KPI Stat Grid
+   -------------------------------------------------------------------------- */
+.finance-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-4, 1rem);
+}
+
+@media (min-width: 1024px) {
+  .finance-stat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .finance-stat-grid--5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   3. Summary and Context Cards
+   -------------------------------------------------------------------------- */
+.finance-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4, 1rem);
+}
+
+@media (min-width: 768px) {
+  .finance-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.finance-card {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #ded7eb);
+  border-radius: var(--radius-lg, 10px);
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(80, 65, 117, 0.04);
+}
+
+.finance-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border, #ded7eb);
+}
+
+.finance-card-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text, #221a36);
+  margin: 0;
+}
+
+.finance-card-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-muted, #5e5475);
+  margin: 0.125rem 0 0 0;
+}

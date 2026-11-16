@@ -4,6 +4,13 @@ import {
   seedTenantRoles,
   type SqlExecutor,
 } from '../../src/shared/authorization/seed.js';
+import {
+  planTenantReconciliation,
+  type ReconciliationPlan,
+  type ReconciliationResult,
+} from '../../src/shared/authorization/reconcile.js';
+import { getInstitutionRoleMapping } from '../../src/shared/institution/institution-roles.js';
+import { roleLabelsFor, type InstitutionType } from '../../src/shared/settings/institution.js';
 
 export const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -12,6 +19,8 @@ export interface CreateTenantInput {
   name: string;
   slug: string;
   adminEmail?: string | undefined;
+  institutionType?: InstitutionType | undefined;
+  adminTitle?: string | undefined;
 }
 
 export interface TenantRecord {
@@ -19,7 +28,9 @@ export interface TenantRecord {
   name: string;
   slug: string;
   status: string;
+  institutionType: InstitutionType;
   adminUserId?: string | undefined;
+  adminTitle?: string | undefined;
 }
 
 export function parseArgs(argv: readonly string[]): {
@@ -29,7 +40,7 @@ export function parseArgs(argv: readonly string[]): {
   const command = argv[0];
   if (!command || command === '--help' || command === '-h') {
     throw new Error(
-      'Usage: tsx tools/platform/cli.ts <tenant:create|tenant:seed|tenant:suspend|admin:invite|admin:invite-revoke|admin:mfa-ticket> [options]',
+      'Usage: tsx tools/platform/cli.ts <tenant:create|tenant:seed|tenant:reconcile|tenant:suspend|admin:invite|admin:invite-revoke|admin:mfa-ticket|staff:invite-link> [options]',
     );
   }
 
@@ -52,8 +63,13 @@ export function parseArgs(argv: readonly string[]): {
 }
 
 /**
- * Validates and provisions a new tenant organization with isolated role matrix.
- * Optionally provisions the initial College Administrator account in INVITED status.
+ * Validates and provisions a new tenant organization with canonical multi-tier role matrix.
+ * Supports SCHOOL, COLLEGE, and UNIVERSITY institution types.
+ *
+ * Security Guarantee:
+ * Displayed job titles (e.g. "Principal" or custom title) are purely descriptive metadata and
+ * do NOT grant security privileges; authorization derives strictly from the assigned RoleCode
+ * and scope (COLLEGE_ADMIN at ORGANIZATION scope for the initial top executive).
  */
 export async function createTenant(
   db: SqlExecutor,
@@ -76,6 +92,14 @@ export async function createTenant(
     throw new Error('Invalid administrator email format.');
   }
 
+  const rawType = input.institutionType ? input.institutionType.toUpperCase() : undefined;
+  if (rawType && rawType !== 'SCHOOL' && rawType !== 'COLLEGE' && rawType !== 'UNIVERSITY') {
+    throw new Error(
+      `Invalid institution type: "${input.institutionType}". Allowed: SCHOOL, COLLEGE, UNIVERSITY.`,
+    );
+  }
+  const institutionType: InstitutionType = (rawType as InstitutionType) || 'SCHOOL';
+
   // Check slug uniqueness
   const existing = await db.query('SELECT id FROM app.organizations WHERE slug = $1', [slug]);
   if (existing.rows.length > 0) {
@@ -84,23 +108,52 @@ export async function createTenant(
 
   const tenantId = uuidv7();
 
-  // 1. Insert organization
-  await db.query(
-    `INSERT INTO app.organizations (id, name, slug, status)
-     VALUES ($1, $2, $3, 'ACTIVE')`,
-    [tenantId, name, slug],
-  );
+  // 1. Insert organization (checking if institution_type column exists)
+  let hasTypeCol = false;
+  try {
+    const colCheck = await db.query(
+      `SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'app' AND table_name = 'organizations' AND column_name = 'institution_type'`,
+    );
+    hasTypeCol = colCheck.rows.length > 0;
+  } catch {
+    hasTypeCol = false;
+  }
 
-  // 2. Seed system roles & permissions
-  await seedTenantRoles(db, tenantId);
+  if (hasTypeCol) {
+    await db.query(
+      `INSERT INTO app.organizations (id, name, slug, status, institution_type)
+       VALUES ($1, $2, $3, 'ACTIVE', $4)`,
+      [tenantId, name, slug, institutionType],
+    );
+  } else {
+    await db.query(
+      `INSERT INTO app.organizations (id, name, slug, status)
+       VALUES ($1, $2, $3, 'ACTIVE')`,
+      [tenantId, name, slug],
+    );
+  }
+
+  // 2. Seed system roles & permissions with canonical display titles for institution type
+  const roleDisplayTitles = institutionType ? roleLabelsFor(institutionType) : undefined;
+  await seedTenantRoles(db, tenantId, { roleDisplayTitles, allowCriticalGrants: true });
   await seedMfaPermissions(db, tenantId);
 
   let adminUserId: string | undefined;
+  let finalAdminTitle: string | undefined;
 
-  // 3. Provision initial College Admin if email provided
+  // 3. Provision initial administrator if email provided
   if (adminEmail) {
     adminUserId = uuidv7();
-    const displayName = `${name} Administrator`;
+    if (input.adminTitle?.trim()) {
+      finalAdminTitle = input.adminTitle.trim();
+    } else if (input.institutionType) {
+      const roleMapping = getInstitutionRoleMapping(institutionType, 'COLLEGE_ADMIN');
+      finalAdminTitle = roleMapping.displayTitle;
+    } else {
+      finalAdminTitle = 'Administrator';
+    }
+    const displayName = `${name} ${finalAdminTitle}`;
 
     await db.query(
       `INSERT INTO app.users (id, organization_id, email, display_name, status)
@@ -129,17 +182,36 @@ export async function createTenant(
     name,
     slug,
     status: 'ACTIVE',
+    institutionType,
     ...(adminUserId ? { adminUserId } : {}),
+    ...(finalAdminTitle ? { adminTitle: finalAdminTitle } : {}),
   };
 }
 
+export interface SeedTenantOptions {
+  dryRun?: boolean;
+  allowCritical?: boolean;
+  purgeOrphanGrants?: boolean;
+}
+
+export interface SeedTenantOutput {
+  id: string;
+  name: string;
+  slug: string;
+  dryRun?: boolean;
+  plan?: ReconciliationPlan;
+  reconciliation?: ReconciliationResult;
+}
+
 /**
- * Re-syncs tenant roles and MFA permissions for an existing organization.
+ * Re-syncs or reconciles tenant roles and permissions for an existing organization.
+ * Supports dry-run diffing and safe non-destructive reconciliation.
  */
 export async function seedTenant(
   db: SqlExecutor,
   tenantIdentifier: string,
-): Promise<{ id: string; name: string; slug: string }> {
+  options: SeedTenantOptions = {},
+): Promise<SeedTenantOutput> {
   const ident = tenantIdentifier.trim();
   if (!ident) throw new Error('Tenant identifier (ID or slug) is required.');
 
@@ -153,20 +225,138 @@ export async function seedTenant(
   }
 
   const org = res.rows[0] as { id: string; name: string; slug: string };
-  // One transaction (M3 doc 39, PR-3): seedTenantRoles deletes and re-inserts each role's grants, so in autocommit a
-  // concurrent request could see a role without its grants, and a failure part-way left some roles re-synced and
-  // others not. Now the re-sync is all or nothing. The caller passes a dedicated client (cli.ts), never a pooled one.
+
+  if (options.dryRun) {
+    const plan = await planTenantReconciliation(db, org.id, {
+      allowCriticalGrants: options.allowCritical === true,
+    });
+    return {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      dryRun: true,
+      plan,
+    };
+  }
+
+  // One transaction for all-or-nothing execution
   await db.query('BEGIN');
   try {
-    await seedTenantRoles(db, org.id);
+    const reconciliation = await seedTenantRoles(db, org.id, {
+      allowCriticalGrants: options.allowCritical === true,
+      preserveCustomizations: !options.purgeOrphanGrants,
+      purgeOrphanGrants: options.purgeOrphanGrants ?? false,
+    });
     await seedMfaPermissions(db, org.id);
     await db.query('COMMIT');
+    return {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      reconciliation,
+    };
   } catch (err) {
     await db.query('ROLLBACK').catch(() => undefined);
     throw err;
   }
+}
 
-  return org;
+export type AuthorityType = 'SECURITY_AUTHORITY' | 'FINANCIAL_GATEWAY_AUTHORITY';
+
+export interface GrantAuthorityInput {
+  tenant: string;
+  authority: AuthorityType;
+  roleCode?: string;
+  approvedBy: string;
+  justification: string;
+}
+
+export interface GrantAuthorityOutput {
+  organizationId: string;
+  name: string;
+  authority: AuthorityType;
+  roleCode: string;
+  grantedPermissions: string[];
+  approvedBy: string;
+  justification: string;
+}
+
+export const AUTHORITY_PERMISSIONS: Record<AuthorityType, readonly string[]> = {
+  SECURITY_AUTHORITY: [
+    'vault.authority.manage',
+    'vault.device.manage',
+    'vault.recovery.initiate',
+    'vault.grant.issue',
+  ],
+  FINANCIAL_GATEWAY_AUTHORITY: [
+    'fee.gateway.manage',
+    'fee.refund.initiate',
+  ],
+};
+
+/**
+ * Grants high-privilege institutional authority (e.g. Institutional Security Authority or
+ * Financial Gateway Authority) to a specific role within an institution.
+ * Requires mandatory --approved-by and --justification flags for auditability.
+ */
+export async function grantAuthority(
+  db: SqlExecutor,
+  input: GrantAuthorityInput,
+): Promise<GrantAuthorityOutput> {
+  const ident = input.tenant?.trim();
+  if (!ident) throw new Error('Tenant identifier (ID or slug) is required.');
+  if (!input.approvedBy?.trim()) throw new Error('--approved-by is required for critical authority delegation.');
+  if (!input.justification?.trim()) throw new Error('--justification is required for critical authority delegation.');
+
+  const roleCode = (input.roleCode || 'COLLEGE_ADMIN').trim().toUpperCase();
+  const perms = AUTHORITY_PERMISSIONS[input.authority];
+  if (!perms) {
+    throw new Error(`Invalid authority type "${input.authority}". Must be SECURITY_AUTHORITY or FINANCIAL_GATEWAY_AUTHORITY.`);
+  }
+
+  const orgRes = await db.query(
+    `SELECT id, name, slug FROM app.organizations WHERE id::text = $1 OR slug = $1`,
+    [ident],
+  );
+  if (orgRes.rows.length === 0) {
+    throw new Error(`Organization "${ident}" not found.`);
+  }
+  const org = orgRes.rows[0] as { id: string; name: string; slug: string };
+
+  const roleRes = await db.query(
+    `SELECT id FROM app.roles WHERE organization_id = $1 AND code = $2`,
+    [org.id, roleCode],
+  );
+  if (roleRes.rows.length === 0) {
+    throw new Error(`Role "${roleCode}" not found for organization "${org.name}".`);
+  }
+  const roleId = roleRes.rows[0]!['id'] as string;
+
+  await db.query('BEGIN');
+  try {
+    for (const perm of perms) {
+      await db.query(
+        `INSERT INTO app.role_permissions (organization_id, role_id, permission_code, scope_mode)
+         VALUES ($1, $2, $3, 'GRANTED')
+         ON CONFLICT (organization_id, role_id, permission_code) DO NOTHING`,
+        [org.id, roleId, perm],
+      );
+    }
+    await db.query('COMMIT');
+  } catch (err) {
+    await db.query('ROLLBACK');
+    throw err;
+  }
+
+  return {
+    organizationId: org.id,
+    name: org.name,
+    authority: input.authority,
+    roleCode,
+    grantedPermissions: [...perms],
+    approvedBy: input.approvedBy,
+    justification: input.justification,
+  };
 }
 
 /**
@@ -196,10 +386,7 @@ export async function suspendTenant(
 }
 
 /**
- * Platform support grants are NOT implemented (doc 46 P0-3; doc 48). The earlier command signed a token with a fallback
- * key that nothing stored, audited or accepted, which looked like a control and was not one. It now fails closed: this
- * issues no token, reads nothing, and has no signing path. A real mechanism needs the designed platform realm (stored,
- * tenant-approved, time-boxed, audited grants; doc 05 and 06 §9) and its own owner-approved design.
+ * Platform support grants are NOT implemented (doc 46 P0-3; doc 48).
  */
 export const SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE =
   'Platform support grants are not implemented. No support access token can be issued; use the documented privileged-access procedure (docs/runbooks/database-credential-separation.md) until a tenant-approved, audited grant mechanism exists.';

@@ -43,21 +43,21 @@ export const GLOBAL_TABLES: Readonly<Record<string, GlobalTable>> = {
   },
   'platform.identities': {
     reason:
-      'Global login identity (one identity can belong to several tenants; sign-in looks it up by e-mail before any tenant is known), so tenant RLS cannot apply. Writes are narrowed to the columns the application changes (0043). SELECT remains table-wide: ACCEPTED RESIDUAL RISK (doc 48 §4).',
+      'Global login identity (one identity can belong to several tenants; sign-in looks it up by e-mail before any tenant is known), so tenant RLS cannot apply. Writes narrowed to columns application changes (0043); table-wide SELECT revoked and replaced by SECURITY DEFINER functions (0048). Minimal column SELECT on (id, email, failed_login_count, locked_until) allows safe lockout updates and ON CONFLICT insert arbitration.',
     owner: PLATFORM_SECURITY_OWNER,
-    review: 'Replace direct SELECT by SECURITY DEFINER lookup functions (doc 48 §4.3).',
+    review: 'Never; lookups are bounded by SECURITY DEFINER functions (0048).',
     rls: 'none',
-    runtimePrivileges: ['SELECT', 'INSERT', 'UPDATE'],
+    runtimePrivileges: ['INSERT', 'UPDATE'],
     insertColumns: ['id', 'email', 'password_hash', 'status'],
     updateColumns: ['failed_login_count', 'locked_until'],
   },
   'platform.auth_sessions': {
     reason:
-      'Global session registry (tenant_id is a column, the lookup key is the token hash, resolved before a tenant context exists). Writes narrowed to what the application changes (0043). SELECT remains table-wide: ACCEPTED RESIDUAL RISK (doc 48 §4).',
+      'Global session registry (tenant_id is a column, lookup key is token hash). Writes narrowed to columns application changes (0043); table-wide SELECT revoked and replaced by SECURITY DEFINER functions (0048). Minimal column SELECT on non-token columns allows safe session assurance updates.',
     owner: PLATFORM_SECURITY_OWNER,
-    review: 'Replace direct SELECT by SECURITY DEFINER session functions (doc 48 §4.3).',
+    review: 'Never; session lookups are bounded by SECURITY DEFINER functions (0048).',
     rls: 'none',
-    runtimePrivileges: ['SELECT', 'INSERT', 'UPDATE'],
+    runtimePrivileges: ['INSERT', 'UPDATE'],
     insertColumns: ['id', 'identity_id', 'tenant_id', 'token_hash', 'expires_at'],
     updateColumns: ['revoked_at', 'step_up_at', 'auth_strength', 'mfa_verified_at'],
   },
@@ -120,6 +120,48 @@ export const SECURITY_DEFINER_FUNCTIONS: Readonly<
       "Administrative MFA reset: removes a user's factors across the identity boundary under audit.",
     owner: PLATFORM_SECURITY_OWNER,
     review: 'Never.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.mint_invitation_mfa_ticket': {
+    reason:
+      'Invitation acceptance: issues a self-service MFA onboarding ticket under RLS without exposing ticket issuance to app_runtime.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.lookup_identity_by_email': {
+    reason:
+      'Login and password verification: looks up one identity by lowercase email before tenant context exists.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never; bounded lookup replacing raw table SELECT.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.lookup_identity_by_id': {
+    reason:
+      'Session validation and identity status: looks up one identity by id before tenant context exists.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never; bounded lookup replacing raw table SELECT.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.lock_identity_by_email': {
+    reason:
+      'Invitation acceptance concurrency lock: acquires row lock on one identity by lowercase email.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never; bounded lock replacing raw table SELECT FOR UPDATE.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.lookup_session_by_token': {
+    reason:
+      'Session resolution: looks up one authenticated session by token hash before tenant context is loaded.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never; bounded session lookup replacing raw table SELECT.',
+    maxSearchPath: 'pg_catalog',
+  },
+  'platform.lookup_session_by_id': {
+    reason:
+      'Session lookup: looks up one authenticated session by session id before tenant context is loaded.',
+    owner: PLATFORM_SECURITY_OWNER,
+    review: 'Never; bounded session lookup replacing raw table SELECT.',
     maxSearchPath: 'pg_catalog',
   },
 };

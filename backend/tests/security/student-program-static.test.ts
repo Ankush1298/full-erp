@@ -56,6 +56,7 @@ describe('only StudentProgramService writes app.student_programs and app.student
         DEPT,
         DIRECTORY,
         DIRECTORY_LIST,
+        'src/modules/parent/parent.service.ts',
         REGISTRATION,
         SERVICE,
         TERM_ENROLLMENT,

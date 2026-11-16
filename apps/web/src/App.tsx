@@ -23,6 +23,19 @@ import { OrganisationPage } from './pages/OrganisationPage';
 import { NotFoundPage } from './pages/StatePages';
 import { StudentProfilePage } from './pages/StudentProfilePage';
 import { StudentsPage } from './pages/StudentsPage';
+import { ParentPortalPage } from './pages/ParentPortalPage';
+import { HomeworkPage } from './pages/HomeworkPage';
+import { SecurityCenterPage } from './pages/SecurityCenterPage';
+import { PlatformShell } from './pages/platform/PlatformShell';
+import { PlatformErrorBoundary } from './pages/platform/PlatformErrorBoundary';
+import { PlatformDashboardPage } from './pages/platform/PlatformDashboardPage';
+import { PlatformInstitutionsPage } from './pages/platform/PlatformInstitutionsPage';
+import { PlatformInstitutionDetailPage } from './pages/platform/PlatformInstitutionDetailPage';
+import { PlatformEntitlementsPage } from './pages/platform/PlatformEntitlementsPage';
+import { PlatformPlansPage } from './pages/platform/PlatformPlansPage';
+import { PlatformRolesPage } from './pages/platform/PlatformRolesPage';
+import { PlatformAuditPage } from './pages/platform/PlatformAuditPage';
+import './styles/platform.css';
 import {
   AboutPage,
   AccessibilityPage,
@@ -54,6 +67,24 @@ function Guarded({
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Platform Owner Control Center */}
+      <Route
+        path="/platform"
+        element={
+          <PlatformErrorBoundary>
+            <PlatformShell />
+          </PlatformErrorBoundary>
+        }
+      >
+        <Route index element={<PlatformDashboardPage />} />
+        <Route path="institutions" element={<PlatformInstitutionsPage />} />
+        <Route path="institutions/:id" element={<PlatformInstitutionDetailPage />} />
+        <Route path="entitlements" element={<PlatformEntitlementsPage />} />
+        <Route path="plans" element={<PlatformPlansPage />} />
+        <Route path="roles" element={<PlatformRolesPage />} />
+        <Route path="audit" element={<PlatformAuditPage />} />
+      </Route>
+
       <Route path="/login" element={<LoginPage />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route element={<InformationalShell />}>
@@ -105,6 +136,14 @@ export function AppRoutes() {
             }
           />
           <Route
+            path="parent"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/parent'] ?? []}>
+                <ParentPortalPage />
+              </RequireCapability>
+            }
+          />
+          <Route
             path="students"
             element={
               <RequireCapability anyOf={ROUTE_REQUIREMENTS['/students'] ?? []}>
@@ -141,6 +180,14 @@ export function AppRoutes() {
             element={
               <RequireCapability anyOf={ROUTE_REQUIREMENTS['/attendance'] ?? []}>
                 <AttendancePage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="homework"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/homework'] ?? []}>
+                <HomeworkPage />
               </RequireCapability>
             }
           />
@@ -189,6 +236,14 @@ export function AppRoutes() {
             element={
               <RequireCapability anyOf={ROUTE_REQUIREMENTS['/access'] ?? []}>
                 <AccessPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="security-center"
+            element={
+              <RequireCapability anyOf={ROUTE_REQUIREMENTS['/security-center'] ?? []}>
+                <SecurityCenterPage />
               </RequireCapability>
             }
           />

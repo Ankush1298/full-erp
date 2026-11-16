@@ -146,7 +146,7 @@ const ORG_COUNTS: Record<string, string> = {
       AND NOT EXISTS (SELECT 1 FROM app.holidays h WHERE h.organization_id = t.organization_id AND h.status = 'ACTIVE'
                          AND (h.campus_id IS NULL OR h.campus_id = t.campus_id)
                          AND h.holiday_date BETWEEN t.start_date AND t.end_date)`,
-  students: `SELECT count(*) FROM app.students WHERE organization_id = $1 AND status = 'ACTIVE'`,
+  students: `SELECT count(*) FROM app.students WHERE organization_id = $1 AND status IN ('ADMITTED', 'ACTIVE')`,
   enrolments: `SELECT count(*) FROM app.term_enrollments e JOIN app.terms t ON t.organization_id = e.organization_id AND t.id = e.term_id
       WHERE e.organization_id = $1 AND e.status IN ('REGISTERED', 'ACTIVE') AND t.status IN ${OPEN}`,
   enrolmentsWithoutSection: `SELECT count(*) FROM app.term_enrollments e JOIN app.terms t ON t.organization_id = e.organization_id AND t.id = e.term_id

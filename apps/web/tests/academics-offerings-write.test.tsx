@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
 import { ACADEMIC_READER, OFFERING_ADMIN, createFakeBackend } from './helpers/fakeBackend';
 import { renderApp } from './helpers/render';
+import { todayIso } from '../src/pages/AcademicsPage';
 
 const TERM_ID = 't1';
 const COURSE_ID = 'c1';
@@ -12,7 +13,7 @@ const SECTION_ID = 'sec1';
 const EMPLOYEE_ID = '0194a000-0000-7000-8000-0000000000e1';
 const STUDENT_1 = '0194a000-0000-7000-8000-000000000001';
 const STUDENT_2 = '0194a000-0000-7000-8000-000000000002';
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayIso();
 
 function setupOfferingState(backend: ReturnType<typeof createFakeBackend>) {
   backend.state.academics.courses = [
@@ -589,6 +590,65 @@ describe('Academics: student registration write workflows', () => {
     expect(
       screen.queryByRole('form', { name: 'Register students from section' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('validates section requirement when registration policy is AUTO_FROM_SECTION', async () => {
+    const b = createFakeBackend({ session: true, me: OFFERING_ADMIN });
+    setupOfferingState(b);
+
+    renderApp(b, '/academics');
+    await userEvent.click(await screen.findByRole('button', { name: 'Offerings' }));
+    await userEvent.selectOptions(await screen.findByLabelText('Term'), TERM_ID);
+
+    const form = await screen.findByRole('form', { name: 'Create course offering' });
+    await userEvent.selectOptions(within(form).getByLabelText('Course'), COURSE_ID);
+    // Policy defaults to AUTO_FROM_SECTION. Without selecting a section:
+    await userEvent.click(within(form).getByRole('button', { name: 'Create course offering' }));
+
+    expect(
+      await screen.findByText(
+        'A section is required when registration policy is AUTO_FROM_SECTION.',
+      ),
+    ).toBeInTheDocument();
+    expect(b.callsTo('POST', '/academics/course-offerings')).toHaveLength(0);
+  });
+
+  it('displays informational warning when an AUTO_FROM_SECTION offering lacks an assigned section', async () => {
+    const b = createFakeBackend({ session: true, me: OFFERING_ADMIN });
+    setupOfferingState(b);
+    b.state.academics.offerings = [
+      {
+        id: 'off-no-sec',
+        campusId: 'camp-1',
+        termId: TERM_ID,
+        courseId: COURSE_ID,
+        cohortPeriodId: COHORT_PERIOD_ID,
+        sectionId: null,
+        offeringKind: 'CORE',
+        groupLabel: 'Class 5 - A',
+        codeSnapshot: 'MATH5',
+        titleSnapshot: 'Mathematics 5',
+        creditsSnapshot: '4.0',
+        tracksAttendance: true,
+        registrationPolicy: 'AUTO_FROM_SECTION',
+        capacity: 40,
+        electiveGroupId: null,
+        status: 'PUBLISHED',
+        publishedAt: '2026-11-09T00:00:00.000Z',
+        version: 1,
+      },
+    ];
+
+    renderApp(b, '/academics');
+    await userEvent.click(await screen.findByRole('button', { name: 'Offerings' }));
+    await userEvent.selectOptions(await screen.findByLabelText('Term'), TERM_ID);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Manage MATH5 Class 5 - A/ }));
+    expect(
+      await screen.findByText(
+        /This course offering has registration policy AUTO_FROM_SECTION, but was created without an associated section/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('passes axe accessibility audit with no detectable violations', async () => {

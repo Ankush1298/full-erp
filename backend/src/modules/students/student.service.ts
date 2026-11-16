@@ -11,6 +11,7 @@ import {
   type IdempotentResult,
 } from '../../shared/idempotency/index.js';
 import { invalid, parseDate, parseReason } from '../people/validation.js';
+import { UserService } from '../users/user.service.js';
 import { StudentDuplicateService, duplicateWarningError } from './student-duplicate.service.js';
 import { readActiveEnrolment } from './student-program.service.js';
 import {
@@ -100,8 +101,17 @@ export class StudentService {
     if (!input || typeof input !== 'object') throw invalid('Student payload is required.');
 
     // Shape first: no database access, nothing about the tenant is revealed.
-    if (!isUuidV7(input.userId)) throw invalid('Invalid user ID.');
-    const userId = input.userId.toLowerCase();
+    const rawUserId = (input as { userId?: unknown }).userId;
+    let userId: string;
+    const isRecordOnlyPupil = rawUserId === undefined || rawUserId === null || rawUserId === '';
+    if (!isRecordOnlyPupil) {
+      if (typeof rawUserId !== 'string' || !isUuidV7(rawUserId)) {
+        throw invalid('Invalid user ID.');
+      }
+      userId = rawUserId.toLowerCase();
+    } else {
+      userId = uuidv7();
+    }
     const admissionNumber = typeof input.admissionNumber === 'string' ? input.admissionNumber : '';
     if (!ADMISSION_NUMBER_RE.test(admissionNumber)) {
       throw invalid('Admission number must be 1 to 50 letters, digits, "-" or "_".');
@@ -123,6 +133,9 @@ export class StudentService {
       throw invalid('dateOfBirth must not be in the future.');
     }
     const name = input.name === undefined ? null : optionalText(input.name, 'name', 200);
+    if (isRecordOnlyPupil && name === null) {
+      throw invalid('Student name is required when user ID is not provided.');
+    }
     const guardianPhone =
       input.guardianPhone === undefined
         ? null
@@ -184,7 +197,7 @@ export class StudentService {
         // DIFFERENT value of a field that was present replays the original answer; the acknowledgement token (a fingerprint of
         // the current candidate set, the actor and the account) is what binds a creation to the reviewed warning.
         request: {
-          userId,
+          userId: isRecordOnlyPupil ? null : userId,
           admissionNumber,
           admissionDate,
           campusId: campusId ?? null,
@@ -198,6 +211,14 @@ export class StudentService {
         },
       },
       async () => {
+        if (isRecordOnlyPupil) {
+          await UserService.createRecordOnlyPupil(tx, ctx, {
+            userId,
+            name: name!,
+            admissionNumber,
+          });
+        }
+
         const id = await StudentService.insertRecord(
           tx,
           ctx,

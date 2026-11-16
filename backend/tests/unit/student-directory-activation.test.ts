@@ -25,7 +25,7 @@ function scriptedDb(held: readonly string[]): { db: Database; unexpected: string
   const tx = {
     query: (sql: string, params: unknown[] = []) => {
       const rows = (r: unknown[]) => Promise.resolve({ rows: r, rowCount: r.length });
-      if (sql.includes('platform.auth_sessions')) {
+      if (sql.includes('platform.auth_sessions') || sql.includes('lookup_session_by_token')) {
         return rows([
           {
             id: uuidv7(),
@@ -39,7 +39,8 @@ function scriptedDb(held: readonly string[]): { db: Database; unexpected: string
           },
         ]);
       }
-      if (sql.includes('platform.identities')) return rows([{ status: 'ACTIVE' }]);
+      if (sql.includes('platform.identities') || sql.includes('lookup_identity_by_id'))
+        return rows([{ status: 'ACTIVE' }]);
       if (sql.includes('get_identity_memberships')) {
         return rows([
           {

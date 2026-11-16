@@ -11,6 +11,7 @@ export const UserSchema = z.object({
   status: z.enum(USER_STATUSES),
   version: z.number(),
   createdAt: z.string(),
+  mfaEnrolled: z.boolean().optional(),
 });
 export type User = z.infer<typeof UserSchema>;
 
@@ -127,6 +128,60 @@ export async function reactivateUser(
     body: input,
     headers: { 'If-Match': `"${user.version}"` },
     schema: GetUserResponseSchema,
+  });
+  return res.data;
+}
+
+export interface ResetMfaResult {
+  factorsRevoked: number;
+  codesRevoked: number;
+  sessionsRevoked: number;
+}
+
+export const ResetMfaResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    factorsRevoked: z.number(),
+    codesRevoked: z.number(),
+    sessionsRevoked: z.number(),
+  }),
+});
+
+export async function adminResetUserMfa(
+  client: ApiClient,
+  userId: string,
+  reason: string,
+): Promise<ResetMfaResult> {
+  const res = await client.post(`/v1/users/${encodeURIComponent(userId)}/mfa/reset`, {
+    body: { reason },
+    schema: ResetMfaResponseSchema,
+  });
+  return res.data;
+}
+
+export interface IssueMfaTicketResult {
+  ticketId: string;
+  ticket: string;
+  expiresAt: string;
+}
+
+export const IssueMfaTicketResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    ticketId: z.string(),
+    ticket: z.string(),
+    expiresAt: z.string(),
+  }),
+});
+
+export async function issueMfaEnrollmentTicket(
+  client: ApiClient,
+  userId: string,
+  reason: string,
+): Promise<IssueMfaTicketResult> {
+  const res = await client.post(`/v1/users/${encodeURIComponent(userId)}/mfa/enrollment-ticket`, {
+    body: { reason },
+    schema: IssueMfaTicketResponseSchema,
   });
   return res.data;
 }

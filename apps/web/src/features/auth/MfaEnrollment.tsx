@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { QrCode } from './QrCode';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
@@ -35,11 +35,23 @@ export function MfaEnrollment({
   const { runWithStepUp } = useStepUp();
   const [step, setStep] = useState<Step>('init');
   const [ticket, setTicket] = useState('');
+  const [showManualTicket, setShowManualTicket] = useState(false);
   const [enrollData, setEnrollData] = useState<MfaEnrollStartData | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const [savedCodesConfirmed, setSavedCodesConfirmed] = useState(false);
+  const [secretCopied, setSecretCopied] = useState(false);
+  const [codesCopied, setCodesCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const verifyInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (step === 'scan') {
+      verifyInputRef.current?.focus();
+    }
+  }, [step]);
 
   const handleStart = async (e?: FormEvent) => {
     if (e) e.preventDefault();
@@ -137,9 +149,79 @@ export function MfaEnrollment({
           ))}
         </div>
 
+        <div
+          style={{
+            display: 'flex',
+            gap: 'var(--space-2)',
+            margin: 'var(--space-3) 0',
+            flexWrap: 'wrap',
+          }}
+        >
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              void navigator.clipboard?.writeText(recoveryCodes.join('\n'));
+              setCodesCopied(true);
+              setTimeout(() => setCodesCopied(false), 2500);
+            }}
+          >
+            {codesCopied ? 'Codes copied!' : 'Copy all recovery codes'}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              const content = [
+                'Anesa Campus OS - Emergency Recovery Codes',
+                `Generated: ${new Date().toISOString()}`,
+                '',
+                'Keep these codes safe. Each code can only be used once.',
+                '',
+                ...recoveryCodes.map((c, i) => `${i + 1}. ${c}`),
+                '',
+              ].join('\n');
+              const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'anesa-recovery-codes.txt';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Download codes (.txt)
+          </Button>
+        </div>
+
         <p className="muted">
           Each recovery code can be used once if you lose access to your authenticator application.
         </p>
+
+        <div
+          style={{
+            margin: 'var(--space-4) 0',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 'var(--space-2)',
+            padding: 'var(--space-3)',
+            backgroundColor: 'var(--color-surface, #f8f9fa)',
+            borderRadius: 'var(--radius-md, 6px)',
+            border: '1px solid var(--color-border, #dadce0)',
+          }}
+        >
+          <input
+            type="checkbox"
+            id="confirm-saved-codes"
+            checked={savedCodesConfirmed}
+            onChange={(e) => setSavedCodesConfirmed(e.target.checked)}
+            style={{ marginTop: '3px' }}
+          />
+          <label htmlFor="confirm-saved-codes" style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
+            <strong>I have safely saved these recovery codes.</strong> I understand they will never
+            be displayed again.
+          </label>
+        </div>
 
         <Button
           type="button"
@@ -198,9 +280,47 @@ export function MfaEnrollment({
         {error ? <Alert tone="error">{error}</Alert> : null}
 
         <div className="setup-key-block">
-          <span className="setup-key-label">Can’t scan? Enter this setup key:</span>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 'var(--space-1)',
+            }}
+          >
+            <span className="setup-key-label">Can’t scan? Enter this setup key:</span>
+            <Button
+              type="button"
+              variant="secondary"
+              style={{ fontSize: '0.8rem', padding: 'var(--space-1) var(--space-2)' }}
+              onClick={() => {
+                void navigator.clipboard?.writeText(enrollData.secret);
+                setSecretCopied(true);
+                setTimeout(() => setSecretCopied(false), 2500);
+              }}
+            >
+              {secretCopied ? 'Copied key!' : 'Copy key'}
+            </Button>
+          </div>
           <code className="setup-key-code">{formatSecret(enrollData.secret)}</code>
         </div>
+
+        <ol
+          className="mfa-instructions-list"
+          style={{
+            paddingLeft: 'var(--space-4)',
+            margin: 'var(--space-3) 0',
+            fontSize: '0.85rem',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          <li>
+            Open <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong>,{' '}
+            <strong>1Password</strong>, or your preferred TOTP app.
+          </li>
+          <li>Scan the QR code above or enter the setup key manually.</li>
+          <li>Enter the 6-digit confirmation code generated by your app below.</li>
+        </ol>
 
         <form
           onSubmit={(e) => {
@@ -223,6 +343,7 @@ export function MfaEnrollment({
             hint="Enter the code shown in your authenticator app to confirm setup."
             required
             disabled={busy}
+            inputRef={verifyInputRef}
           />
 
           <div className="auth-actions-stack">
@@ -289,16 +410,36 @@ export function MfaEnrollment({
         className="auth-form"
       >
         {isMfaRequired ? (
-          <TextField
-            label="Enrollment Ticket"
-            name="ticket"
-            value={ticket}
-            onChange={(e) => setTicket(e.target.value)}
-            placeholder="64-character administrator ticket"
-            hint="An administrator-issued enrollment ticket is required to enroll MFA for your role."
-            required
-            disabled={busy}
-          />
+          showManualTicket ? (
+            <TextField
+              label="Enrollment Ticket"
+              name="ticket"
+              value={ticket}
+              onChange={(e) => setTicket(e.target.value)}
+              placeholder="64-character administrator ticket"
+              hint="An administrator-issued enrollment ticket. Leave blank if onboarding via invitation."
+              disabled={busy}
+            />
+          ) : (
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <button
+                type="button"
+                className="btn-link"
+                style={{
+                  fontSize: '0.85rem',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: 'var(--color-primary)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+                onClick={() => setShowManualTicket(true)}
+              >
+                Have a manual administrator enrollment ticket?
+              </button>
+            </div>
+          )
         ) : null}
 
         <div className="auth-actions-stack">

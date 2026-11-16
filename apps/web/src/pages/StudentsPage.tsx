@@ -318,8 +318,8 @@ function AdmissionsCard({
     setError(null);
     setSuccessId(null);
 
-    if (!userId.trim()) {
-      setError('User account ID is required.');
+    if (!userId.trim() && !name.trim()) {
+      setError(isSchool ? 'Pupil name is required.' : 'Student name is required.');
       return;
     }
     if (!ADMISSION_NUMBER_RE.test(admissionNumber.trim())) {
@@ -334,10 +334,10 @@ function AdmissionsCard({
     setPending(true);
     try {
       const payload: CreateStudentPayload = {
-        userId: userId.trim(),
         admissionNumber: admissionNumber.trim(),
         admissionDate: admissionDate.trim(),
         reason: reason.trim() || 'Admission registration',
+        ...(userId.trim() ? { userId: userId.trim() } : {}),
         ...(campusId ? { campusId } : {}),
         ...(name.trim() ? { name: name.trim() } : {}),
         ...(dateOfBirth.trim() ? { dateOfBirth: dateOfBirth.trim() } : {}),
@@ -345,18 +345,40 @@ function AdmissionsCard({
         ...(acknowledged && duplicateWarning ? { duplicateAcknowledgement: duplicateWarning } : {}),
       };
 
-      const res = await createStudent(client, payload);
+      const idempotencyKey = crypto.randomUUID();
+      const res = await createStudent(client, payload, idempotencyKey);
       setSuccessId(res.id);
       setDuplicateWarning(null);
       setAcknowledged(false);
+      setName('');
       setUserId('');
       setAdmissionNumber('');
+      setDateOfBirth('');
+      setGuardianPhone('');
       onStudentCreated?.();
     } catch (err: unknown) {
       if (isApiError(err)) {
         if (err.status === 409) {
           setError(
             `A conflict or duplicate ${personLabel} record was detected (${err.code ?? 'CONFLICT'}). Please verify applicant identity.`,
+          );
+        } else if (err.status === 428) {
+          if (err.code === 'IDEMPOTENCY_KEY_REQUIRED') {
+            setError(
+              'A required transaction identifier (Idempotency-Key) was missing. Please submit again.',
+            );
+          } else {
+            setError(
+              'A required precondition was not satisfied before admission could be confirmed. Please reload and try again.',
+            );
+          }
+        } else if (err.status === 400) {
+          setError(
+            `Admission request could not be validated (${err.code ?? 'VALIDATION_ERROR'}). Please check all entered details.`,
+          );
+        } else if (err.status === 403) {
+          setError(
+            `You do not have permission to admit a ${personLabel} for the selected campus or institution.`,
           );
         } else {
           setError(err.message);
@@ -385,12 +407,12 @@ function AdmissionsCard({
         noValidate
       >
         <TextField
-          label="User account ID (UUID)"
-          name="userId"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          hint="The active user account for this person."
-          required
+          label={isSchool ? 'Pupil name' : 'Student name'}
+          name="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          hint={isSchool ? 'Full legal name of the pupil.' : 'Full legal name of the student.'}
+          required={!userId.trim()}
         />
         <TextField
           label="Admission number"
@@ -407,6 +429,14 @@ function AdmissionsCard({
           value={admissionDate}
           onChange={(e) => setAdmissionDate(e.target.value)}
           required
+        />
+        <TextField
+          label="Date of birth"
+          name="dateOfBirth"
+          type="date"
+          value={dateOfBirth}
+          onChange={(e) => setDateOfBirth(e.target.value)}
+          hint="Calendar date of birth (optional)."
         />
         {campuses.length > 0 ? (
           <div className="field" style={{ maxWidth: '24rem' }}>
@@ -442,29 +472,25 @@ function AdmissionsCard({
 
         <details style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <summary style={{ cursor: 'pointer', fontWeight: 500 }}>
-            Duplicate detection probes (optional)
+            Additional details & account linkage (optional)
           </summary>
           <p className="field-hint" style={{ marginTop: '0.5rem' }}>
-            Used strictly for duplicate detection and never persisted on the student record.
+            Optional demographic probes and account linking. Leave User account ID blank for
+            record-only pupil registration.
           </p>
-          <TextField
-            label="Full name"
-            name="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <TextField
-            label="Date of birth"
-            name="dateOfBirth"
-            type="date"
-            value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
-          />
           <TextField
             label="Guardian phone"
             name="guardianPhone"
             value={guardianPhone}
             onChange={(e) => setGuardianPhone(e.target.value)}
+            hint="Contact phone for duplicate safeguards."
+          />
+          <TextField
+            label="User account ID (UUID)"
+            name="userId"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            hint="Optional: link an existing active login account (leave blank for record-only pupil)."
           />
         </details>
 

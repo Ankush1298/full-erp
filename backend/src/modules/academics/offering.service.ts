@@ -204,6 +204,8 @@ export class OfferingService {
         throw invalid('The section does not belong to that cohort period.');
       }
       cohortPeriodId = s.rows[0].cohort_period_id;
+    } else if (input.registrationPolicy === 'AUTO_FROM_SECTION') {
+      throw invalid('An offering with registration policy AUTO_FROM_SECTION requires a section.');
     }
     const scope = await newOfferingScope(tx, ctx, termId, courseId, cohortPeriodId);
     await assertScoped(tx, ctx, MANAGE, engineScope(scope));

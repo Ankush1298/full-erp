@@ -51,6 +51,28 @@ const ASSURANCE_RANK: Record<AuthStrength, number> = {
 /** Allowed clock skew between the database-written `step_up_at` and this process's clock. */
 const STEP_UP_CLOCK_SKEW_MS = 5_000;
 
+interface RouteModuleMapping {
+  prefix: string;
+  moduleKey: string;
+  name: string;
+}
+
+const ROUTE_TO_MODULE_MAP: readonly RouteModuleMapping[] = [
+  { prefix: '/api/v1/academics', moduleKey: 'academics', name: 'Academics & Cohort Management' },
+  { prefix: '/api/v1/attendance', moduleKey: 'attendance', name: 'Attendance & Class Tracking' },
+  { prefix: '/api/v1/examinations', moduleKey: 'examinations', name: 'Examinations, Marks & Report Cards' },
+  { prefix: '/api/v1/homework', moduleKey: 'homework', name: 'Homework & Assignment Workflow' },
+  { prefix: '/api/v1/finance', moduleKey: 'finance', name: 'Fees & Finance Ledger' },
+  { prefix: '/api/v1/parent', moduleKey: 'parent_portal', name: 'Parent / Guardian Portal' },
+  { prefix: '/api/v1/vault', moduleKey: 'school_vault', name: 'School Vault Zero-Access Enclave' },
+  { prefix: '/api/v1/documents', moduleKey: 'documents', name: 'Document Center & Storage' },
+  { prefix: '/api/v1/reporting', moduleKey: 'reports', name: 'Institutional Analytics & Reports' },
+  { prefix: '/api/v1/students/imports', moduleKey: 'imports', name: 'Bulk Data Imports' },
+  { prefix: '/api/v1/faculty/imports', moduleKey: 'imports', name: 'Bulk Data Imports' },
+  { prefix: '/api/v1/consent', moduleKey: 'consents', name: 'Institutional Consent & Policy Management' },
+  { prefix: '/api/v1/notifications', moduleKey: 'notifications', name: 'Omnichannel Notifications & Dispatch' },
+];
+
 /**
  * Is the session's step-up assurance sufficient for a CRITICAL action? FAIL CLOSED: every input is re-validated here
  * (defence in depth behind issueTrustedContext), and anything missing, malformed, unrecognized or out of range is a
@@ -118,10 +140,11 @@ const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, opts) => {
         const ctx = await opts.authService.validateSession(token);
         request.tenantContext = ctx;
       } catch (err: unknown) {
-        if (err instanceof AppError && err.statusCode === 401) {
+        if (err instanceof AppError && (err.statusCode === 401 || err.statusCode === 403)) {
           throw err;
         }
-        throw new AppError(500, 'INTERNAL_ERROR', 'Authentication failed unexpectedly');
+        request.log.warn({ err }, 'Session validation failed; rejecting invalid session with 401');
+        throw new AppError(401, 'UNAUTHORIZED', 'Invalid or expired session');
       }
 
       // 1b. CSRF token: required for every authenticated state-changing request.
@@ -177,6 +200,37 @@ const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, opts) => {
     // We execute the check using the configured permission(s) and scope extractor
     let authorizedPermission: string | undefined;
     await opts.db.withTenant(ctx, async (tx) => {
+      // Paid module entitlements check
+      const matchedModule = ROUTE_TO_MODULE_MAP.find((m) => request.url.startsWith(m.prefix));
+      if (matchedModule) {
+        const entRes = await tx.query<{ value: unknown }>(
+          "SELECT value FROM app.organization_settings WHERE organization_id = $1 AND key = 'feature.entitlements'",
+          [ctx.tenantId],
+        );
+        if (entRes.rows[0]?.value) {
+          const val = entRes.rows[0].value as any;
+          let enabled = true;
+          if (Array.isArray(val.modules)) {
+            const found = val.modules.find((m: any) => m.key === matchedModule.moduleKey);
+            if (found && found.enabled === false) {
+              enabled = false;
+            }
+          } else if (val.modules && typeof val.modules === 'object') {
+            const found = val.modules[matchedModule.moduleKey];
+            if (found && (found.enabled === false || found === false)) {
+              enabled = false;
+            }
+          }
+          if (!enabled) {
+            throw new AppError(
+              403,
+              'MODULE_NOT_ENTITLED',
+              `Module "${matchedModule.name}" is not included in the institution's current subscription plan. Contact platform administrator to upgrade.`,
+            );
+          }
+        }
+      }
+
       if (
         mfaGated &&
         !hasSessionMfa(ctx, nowMs) &&
