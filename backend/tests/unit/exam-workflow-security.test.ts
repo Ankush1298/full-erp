@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ExamService } from '../../src/modules/examinations/exam.service.js';
+import { CorrectMarksSchema } from '../../src/modules/examinations/exam.schemas.js';
 import type { TenantTx } from '../../src/shared/database/index.js';
 import { issueTrustedContext } from '../../src/shared/tenancy/issue-trusted-context.js';
 
@@ -467,6 +468,67 @@ describe('Examination Workflow Security & Lifecycle Controls', () => {
           marks_obtained: 25,
           reason: 'err',
           evidence_exception: false,
+          is_amendment: false,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('allows Principal to correct submitted mark from 21 to 30 with status SUBMITTED and valid reason', async () => {
+      const { tx, auditLogs } = createMockTx({
+        schedule: { ...baseSchedule, status: 'SUBMITTED', max_marks: 100 },
+        existingMark: {
+          id: '01939a00-0000-7000-8000-000000000m01',
+          marks_obtained: '21',
+          status: 'SUBMITTED',
+          marked_by_user_id: TEACHER_USER_ID,
+        },
+      });
+
+      const parsedPayload = CorrectMarksSchema.parse({
+        student_id: STUDENT_USER_ID,
+        status: 'SUBMITTED',
+        marks_obtained: 30,
+        reason: 'Recounting of Section B answers confirmed clerical error in original tally',
+        evidence_url: '',
+        evidence_exception: true,
+      });
+
+      const res = await ExamService.correctMark(
+        tx,
+        principalCtx,
+        baseSchedule.id,
+        parsedPayload,
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.student_id).toBe(STUDENT_USER_ID);
+      expect(res.marks_obtained).toBe(30);
+      expect(res.status).toBe('SUBMITTED');
+
+      const correctLog = auditLogs.find(
+        (p: any) => Array.isArray(p) && p.includes('exam.marks.correct'),
+      );
+      expect(correctLog).toBeDefined();
+    });
+
+    it('rejects mark correction when marks exceed maximum marks', async () => {
+      const { tx } = createMockTx({
+        schedule: { ...baseSchedule, status: 'SUBMITTED', max_marks: 50 },
+        existingMark: {
+          id: '01939a00-0000-7000-8000-000000000m01',
+          marks_obtained: '21',
+          status: 'SUBMITTED',
+          marked_by_user_id: TEACHER_USER_ID,
+        },
+      });
+
+      await expect(
+        ExamService.correctMark(tx, principalCtx, baseSchedule.id, {
+          student_id: STUDENT_USER_ID,
+          status: 'SUBMITTED',
+          marks_obtained: 55,
+          reason: 'Attempting to assign marks greater than maximum allowable marks',
+          evidence_exception: true,
           is_amendment: false,
         }),
       ).rejects.toThrow();

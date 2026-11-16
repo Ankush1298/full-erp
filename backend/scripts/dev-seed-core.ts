@@ -32,6 +32,7 @@ export interface DevSeedTargetOptions {
 }
 
 export const FORBIDDEN_TEST_DB_NAMES = [
+  'campusos_demo',
   'campusos_dev',
   'campusos_prod',
   'production',
@@ -43,7 +44,7 @@ export const FORBIDDEN_TEST_DB_NAMES = [
 ];
 
 // Exactly the names the test harness generates (tests/support/global-db.ts: 6 random bytes; fresh-db.ts: 5 bytes).
-export const DISPOSABLE_TEST_DB_PATTERN = /^campusos_(?:test_[0-9a-f]{12}|mig_[0-9a-f]{10})$/;
+export const DISPOSABLE_TEST_DB_PATTERN = /^campusos_(?:test_[0-9a-f]{12}|mig_[0-9a-f]{10}|dr_[0-9a-f]{10})$/;
 
 /**
  * True only for 172.16.0.0/12, the range Docker bridge networks (and the GitHub Actions service container) use.

@@ -28,6 +28,8 @@ export function loginErrorMessage(err: unknown): string {
     case 'server':
     case 'protocol':
     case 'not_found':
+    case 'module_not_entitled':
+    case 'institution_suspended':
       return 'Sign-in is temporarily unavailable. Please try again shortly.';
   }
 }
@@ -91,6 +93,8 @@ export function academicsErrorMessage(err: unknown): string {
     case 'rate_limited':
     case 'server':
     case 'protocol':
+    case 'module_not_entitled':
+    case 'institution_suspended':
       return 'Something went wrong on our side. Please try again.';
   }
 }
@@ -136,6 +140,8 @@ export function importErrorMessage(err: unknown): string {
     case 'rate_limited':
     case 'server':
     case 'protocol':
+    case 'module_not_entitled':
+    case 'institution_suspended':
       return 'Something went wrong on our side. Please try again.';
   }
 }
@@ -202,6 +208,8 @@ export function accessErrorMessage(err: unknown): string {
     case 'mfa_required':
     case 'server':
     case 'protocol':
+    case 'module_not_entitled':
+    case 'institution_suspended':
       return 'Something went wrong on our side. Nothing was changed. Please try again.';
   }
 }
@@ -246,6 +254,8 @@ export function userErrorMessage(err: unknown): string {
     case 'mfa_required':
     case 'server':
     case 'protocol':
+    case 'module_not_entitled':
+    case 'institution_suspended':
       return 'Something went wrong on our side. Nothing was changed. Please try again.';
   }
 }

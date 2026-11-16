@@ -159,13 +159,7 @@ export class EligibilityService {
           require_principal_approval: true,
           allow_individual_override: true,
           results_workflow: 'DIRECT_PUBLISH',
-          delegated_roles: [
-            'COLLEGE_ADMIN',
-            'CAMPUS_ADMIN',
-            'REGISTRAR',
-            'DEPARTMENT_ADMIN',
-            'HOD',
-          ],
+          delegated_roles: [],
           effective_date: '2026-11-12',
         },
       };
@@ -284,13 +278,7 @@ export class EligibilityService {
             require_principal_approval: (ext.approval_rules as any).require_principal_approval ?? true,
             allow_individual_override: (ext.approval_rules as any).allow_individual_override ?? true,
             results_workflow: (ext.approval_rules as any).results_workflow ?? 'DRAFT_REVIEW_PUBLISH',
-            delegated_roles: (ext.approval_rules as any).delegated_roles ?? [
-              'COLLEGE_ADMIN',
-              'CAMPUS_ADMIN',
-              'REGISTRAR',
-              'DEPARTMENT_ADMIN',
-              'HOD',
-            ],
+            delegated_roles: (ext.approval_rules as any).delegated_roles ?? [],
             effective_date: (ext.approval_rules as any).effective_date,
             notes: (ext.approval_rules as any).notes,
           }
@@ -300,13 +288,7 @@ export class EligibilityService {
             require_principal_approval: true,
             allow_individual_override: true,
             results_workflow: 'DIRECT_PUBLISH',
-            delegated_roles: [
-              'COLLEGE_ADMIN',
-              'CAMPUS_ADMIN',
-              'REGISTRAR',
-              'DEPARTMENT_ADMIN',
-              'HOD',
-            ],
+            delegated_roles: [],
             effective_date: '2026-11-12',
           },
     };

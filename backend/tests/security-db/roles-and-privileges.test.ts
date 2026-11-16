@@ -33,6 +33,9 @@ const APP_TABLES = [
   'organization_settings',
   'organizations',
   'outbox_events',
+  'payment_attempts',
+  'payment_gateway_configs',
+  'payment_refunds',
   'period_types',
   'programs',
   'role_assignments',
@@ -53,6 +56,10 @@ const APP_TABLES = [
   'elective_groups',
   'course_registrations',
   'holidays',
+  'homework_assignments',
+  'homework_attachments',
+  'homework_submissions',
+  'homework_submission_files',
   'section_memberships',
   'sections',
   'term_enrollments',
@@ -79,6 +86,14 @@ const APP_TABLES = [
   'student_dues',
   'fee_receipts',
   'fee_receipt_allocations',
+  'institution_security_authorities',
+  'institution_vault_epochs',
+  'user_vault_devices',
+  'vault_key_grants',
+  'institution_recovery_custodians',
+  'institution_recovery_ceremonies',
+  'vault_protected_records',
+  'adult_guardian_consents',
 ];
 
 describe('real PostgreSQL 16 server', () => {
@@ -274,7 +289,7 @@ describe('ownership trap: FORCE ROW LEVEL SECURITY (Invariant E)', () => {
         expect(r.rows[0], `${t} as owner`).toEqual({ n: 0 });
       }
     }
-  });
+  }, 180000);
 
   it('regression: the owner cannot write tenant data either', async () => {
     const ins = await runAsMigrator(

@@ -86,6 +86,12 @@ export function AuthProvider({ client, children }: { client: ApiClient; children
 
   // Restore the session from the HttpOnly cookie (the browser sends it; we never read it).
   useEffect(() => {
+    // If browsing within the Platform Owner realm (/platform), skip tenant ERP auth restoration
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/platform')) {
+      setState({ status: 'unauthenticated', identity: null, notice: null, mfaRequired: false });
+      return;
+    }
+
     const controller = new AbortController();
     setState((s) => (s.status === 'loading' ? s : { ...s, status: 'loading' }));
     fetchMe(client, controller.signal).then(

@@ -711,7 +711,7 @@ export class ExamService {
       validated.status === 'ABSENT' || validated.status === 'EXEMPT' || validated.status === 'WITHHELD';
     const marksVal = isAbsentOrExempt ? null : validated.marks_obtained;
 
-    if (validated.status === 'ENTERED') {
+    if (validated.status === 'ENTERED' || validated.status === 'SUBMITTED') {
       const val = Number(marksVal);
       if (Number.isNaN(val) || val < 0 || val > maxMarks) {
         throw invalid(
@@ -743,7 +743,9 @@ export class ExamService {
           WHERE organization_id = $6 AND exam_schedule_id = $7 AND student_id = $8`,
         [
           marksVal,
-          validated.status === 'ENTERED' ? 'SUBMITTED' : validated.status,
+          validated.status === 'ENTERED' || validated.status === 'SUBMITTED'
+            ? 'SUBMITTED'
+            : validated.status,
           isPassing,
           validated.remarks ?? `Amended: ${validated.reason}`,
           ctx.userId,
@@ -805,7 +807,9 @@ export class ExamService {
         WHERE organization_id = $6 AND exam_schedule_id = $7 AND student_id = $8`,
       [
         marksVal,
-        validated.status === 'ENTERED' ? 'SUBMITTED' : validated.status,
+        validated.status === 'ENTERED' || validated.status === 'SUBMITTED'
+          ? 'SUBMITTED'
+          : validated.status,
         isPassing,
         validated.remarks ?? `Corrected: ${validated.reason}`,
         ctx.userId,

@@ -251,6 +251,41 @@ export class AuthService {
       const stored = chosen.rows[0]?.value;
       const institutionType = isInstitutionType(stored) ? stored : null;
       const all = roleLabelsFor(institutionType);
+
+      // Feature entitlements for the institution (configured centrally by Platform Owner)
+      const entRow = await tx.query<{ value: unknown }>(
+        `SELECT value FROM app.organization_settings WHERE organization_id = $1 AND key = 'feature.entitlements'`,
+        [ctx.tenantId],
+      );
+      let entitledModules: string[] = [];
+      const entVal = entRow.rows[0]?.value as any;
+      if (entVal) {
+        if (Array.isArray(entVal.modules)) {
+          entitledModules = entVal.modules
+            .filter((m: any) => m && m.enabled !== false)
+            .map((m: any) => (typeof m === 'string' ? m : m.key));
+        } else if (entVal.modules && typeof entVal.modules === 'object') {
+          entitledModules = Object.entries(entVal.modules)
+            .filter(([, v]: any) => v && (v === true || v.enabled !== false))
+            .map(([k]) => k);
+        }
+      }
+      const ALL_DEFAULT_MODULES = [
+        'students',
+        'academics',
+        'attendance',
+        'homework',
+        'examinations',
+        'finance',
+        'parent_portal',
+        'documents',
+        'imports',
+        'reports',
+        'school_vault',
+        'consents',
+        'notifications',
+      ];
+
       return {
         display_name: user.rows[0]?.display_name ?? '',
         roles: who.roleCodes,
@@ -259,6 +294,7 @@ export class AuthService {
         role_labels: Object.fromEntries(
           who.roleCodes.flatMap((c) => (all[c] !== undefined ? [[c, all[c]]] : [])),
         ),
+        entitled_modules: entVal ? entitledModules : ALL_DEFAULT_MODULES,
       };
     });
   }
@@ -297,6 +333,17 @@ export class AuthService {
       const activeMembership = memberships.find((m) => m.organization_id === session.tenant_id);
 
       if (!activeMembership || activeMembership.status !== 'ACTIVE') {
+        const orgRes = await tx.query<{ status: string }>(
+          'SELECT status FROM app.organizations WHERE id = $1',
+          [session.tenant_id],
+        );
+        if (orgRes.rows[0]?.status === 'SUSPENDED') {
+          throw new AppError(
+            403,
+            'INSTITUTION_SUSPENDED',
+            'Institution access has been suspended by the platform administrator. Records are preserved but operations are restricted.',
+          );
+        }
         throw new AppError(401, 'UNAUTHORIZED', 'Membership suspended');
       }
       const userId = activeMembership.user_id;

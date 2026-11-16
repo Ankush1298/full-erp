@@ -9,6 +9,7 @@ import pg from 'pg';
 import {
   SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE,
   createTenant,
+  grantAuthority,
   parseArgs,
   seedTenant,
   suspendTenant,
@@ -55,35 +56,79 @@ async function main(argv: readonly string[]): Promise<void> {
       const name = flags['name'];
       const slug = flags['slug'];
       const adminEmail = flags['admin-email'];
+      const rawType = flags['type'] || flags['institution-type'];
+      const adminTitle = flags['admin-title'];
 
       if (!name || !slug) {
         console.error('Error: --name and --slug flags are required for tenant:create.');
         process.exit(1);
       }
 
-      const res = await createTenant(client, { name, slug, adminEmail });
+      const res = await createTenant(client, {
+        name,
+        slug,
+        adminEmail,
+        ...(rawType ? { institutionType: rawType.toUpperCase() as any } : {}),
+        ...(adminTitle ? { adminTitle } : {}),
+      });
       console.log('Tenant provisioned successfully:');
       console.log(`  ID:     ${res.id}`);
       console.log(`  Name:   ${res.name}`);
       console.log(`  Slug:   ${res.slug}`);
+      console.log(`  Type:   ${res.institutionType}`);
       console.log(`  Status: ${res.status}`);
       if (res.adminUserId) {
         console.log(`  Admin User ID: ${res.adminUserId} (${adminEmail})`);
+        console.log(`  Admin Title:   ${res.adminTitle || 'Administrator'}`);
         console.log(
           '  Next: admin:invite --tenant <slug> (the administrator has no invitation yet).',
         );
       }
-    } else if (command === 'tenant:seed') {
+    } else if (command === 'tenant:seed' || command === 'tenant:reconcile') {
       const tenant = flags['tenant'];
       if (!tenant) {
-        console.error('Error: --tenant <id|slug> is required for tenant:seed.');
+        console.error(`Error: --tenant <id|slug> is required for ${command}.`);
         process.exit(1);
       }
+      const dryRun = flags['dry-run'] === 'true';
+      const allowCritical = flags['allow-critical'] === 'true';
 
-      const res = await seedTenant(client, tenant);
-      console.log(
-        `Tenant roles and permissions successfully re-synced for "${res.name}" (${res.id}).`,
-      );
+      const res = await seedTenant(client, tenant, { dryRun, allowCritical });
+      if (res.dryRun && res.plan) {
+        console.log(`[DRY-RUN] Reconciliation Plan for "${res.name}" (${res.id}):`);
+        console.log(`  Already Present Grants:    ${res.plan.alreadyPresentCount}`);
+        console.log(`  Proposed Additions:        ${res.plan.proposedAdditions.length}`);
+        console.log(`  Skipped Critical Grants:   ${res.plan.skippedCritical.length}`);
+        console.log(`  Preserved Custom Grants:   ${res.plan.preservedCustomizations.length}`);
+        console.log(`  Explicit Denials Honored:  ${res.plan.explicitDenials.length}`);
+        if (res.plan.proposedAdditions.length > 0) {
+          console.log('\n  Proposed Additions:');
+          for (const a of res.plan.proposedAdditions) {
+            console.log(`    + [${a.roleCode}] ${a.permissionCode} (${a.scopeMode})${a.isCritical ? ' [CRITICAL]' : ''}`);
+          }
+        }
+        if (res.plan.skippedCritical.length > 0) {
+          console.log('\n  Skipped Critical Capabilities (require --allow-critical to grant):');
+          for (const s of res.plan.skippedCritical) {
+            console.log(`    * [${s.roleCode}] ${s.permissionCode}: ${s.reason}`);
+          }
+        }
+        if (res.plan.preservedCustomizations.length > 0) {
+          console.log('\n  Preserved Custom Grants (will not be deleted):');
+          for (const p of res.plan.preservedCustomizations) {
+            console.log(`    = [${p.roleCode}] ${p.permissionCode} (${p.scopeMode})`);
+          }
+        }
+      } else {
+        console.log(
+          `Tenant roles and permissions successfully reconciled for "${res.name}" (${res.id}).`,
+        );
+        if (res.reconciliation) {
+          console.log(`  Added Grants:            ${res.reconciliation.addedGrants.length}`);
+          console.log(`  Preserved Custom Grants: ${res.reconciliation.preservedCustomGrants.length}`);
+          console.log(`  Skipped Critical Grants: ${res.reconciliation.skippedCriticalCount}`);
+        }
+      }
     } else if (command === 'tenant:suspend') {
       const tenant = flags['tenant'];
       const reason = flags['reason'];
@@ -94,6 +139,33 @@ async function main(argv: readonly string[]): Promise<void> {
 
       const res = await suspendTenant(client, tenant, reason);
       console.log(`Tenant "${res.name}" (${res.id}) has been SUSPENDED.`);
+    } else if (command === 'authority:grant') {
+      const tenant = flags['tenant'];
+      const authority = flags['authority'] as any;
+      const role = flags['role'] || 'COLLEGE_ADMIN';
+      const approvedBy = flags['approved-by'];
+      const justification = flags['justification'];
+
+      if (!tenant || !authority || !approvedBy || !justification) {
+        console.error(
+          'Error: --tenant <id|slug>, --authority <SECURITY_AUTHORITY|FINANCIAL_GATEWAY_AUTHORITY>, --approved-by <user_id>, and --justification <reason> are required.',
+        );
+        process.exit(1);
+      }
+
+      const res = await grantAuthority(client, {
+        tenant,
+        authority,
+        roleCode: role,
+        approvedBy,
+        justification,
+      });
+
+      console.log(`Authority "${res.authority}" successfully granted for "${res.name}":`);
+      console.log(`  Role:           ${res.roleCode}`);
+      console.log(`  Approved By:    ${res.approvedBy}`);
+      console.log(`  Justification:  ${res.justification}`);
+      console.log(`  Granted Perms:  ${res.grantedPermissions.join(', ')}`);
     } else if (command === 'admin:invite') {
       const tenant = flags['tenant'];
       if (!tenant) throw new Error('--tenant is required for admin:invite.');

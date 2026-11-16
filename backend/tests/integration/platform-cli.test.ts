@@ -163,8 +163,24 @@ describe('Platform CLI (Integration, ADR-002 & Doc 05/11)', () => {
     expect(await grants()).toEqual(drifted);
     expect(await assignments()).toEqual(assigned);
 
-    // A complete re-seed restores exactly the matrix and leaves every assignment as it was.
+    // Safe reconciliation preserves custom grants, resets scope mode drift, and leaves every assignment as it was.
     await seedTenant(client, slug);
+    const postReconcile = await grants();
+    expect(
+      postReconcile.find(
+        (g: { role: string; perm: string }) =>
+          g.role === 'FACULTY' && g.perm === 'student.profile.read',
+      )?.mode,
+    ).toBe('ASSIGNED');
+    expect(
+      postReconcile.some(
+        (g: { role: string; perm: string }) =>
+          g.role === 'HOD' && g.perm === 'academic.term.manage',
+      ),
+    ).toBe(true);
+
+    // When explicitly instructed to purge orphans, it restores exactly the canonical matrix
+    await seedTenant(client, slug, { purgeOrphanGrants: true });
     expect(await grants()).toEqual(matrix);
     expect(await assignments()).toEqual(assigned);
   });

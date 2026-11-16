@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../features/auth/AuthProvider';
 import { can } from '../features/auth/identity';
+import { isApiError, isModuleNotEntitled, isInstitutionSuspended } from '../lib/api/errors';
+import { FeatureUnavailableState, InstitutionSuspendedState } from '../components/ui/FeatureUnavailableState';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -44,6 +46,7 @@ import {
   type GatewayMode,
   type PaymentMethod,
 } from '../lib/api/finance-api';
+import '../features/finance/finance.css';
 
 function formatMoney(minorUnits: number, currency = 'INR'): string {
   const major = minorUnits / 100;
@@ -85,6 +88,8 @@ export function FeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [isNotEntitled, setIsNotEntitled] = useState(false);
+  const [isSuspended, setIsSuspended] = useState(false);
 
   const [summary, setSummary] = useState<CollectionSummaryDto | null>(null);
   const [categories, setCategories] = useState<FeeCategoryDto[]>([]);
@@ -173,18 +178,22 @@ export function FeesPage() {
         const ledger = await fetchStudentLedger(client, identity.userId);
         setStudentLedger(ledger);
       } else {
+        const catchModuleError = <T,>(fallback: T) => (err: unknown): T => {
+          if (isModuleNotEntitled(err) || isInstitutionSuspended(err)) throw err;
+          return fallback;
+        };
         const [sumRes, catsRes, structsRes, duesRes, recsRes, gwRes, attsRes, reconRes] =
           await Promise.all([
-            fetchCollectionSummary(client).catch(() => null),
-            fetchFeeCategories(client).catch(() => []),
-            fetchFeeStructures(client).catch(() => []),
-            fetchStudentDues(client).catch(() => []),
-            fetchFeeReceipts(client).catch(() => []),
+            fetchCollectionSummary(client).catch(catchModuleError(null)),
+            fetchFeeCategories(client).catch(catchModuleError([])),
+            fetchFeeStructures(client).catch(catchModuleError([])),
+            fetchStudentDues(client).catch(catchModuleError([])),
+            fetchFeeReceipts(client).catch(catchModuleError([])),
             canReadGateway || canManageGateway
-              ? fetchGatewayConfigs(client).catch(() => [])
+              ? fetchGatewayConfigs(client).catch(catchModuleError([]))
               : Promise.resolve([]),
-            fetchPaymentAttempts(client).catch(() => []),
-            fetchReconciliationReport(client).catch(() => null),
+            fetchPaymentAttempts(client).catch(catchModuleError([])),
+            fetchReconciliationReport(client).catch(catchModuleError(null)),
           ]);
         setSummary(sumRes);
         setCategories(catsRes);
@@ -196,7 +205,15 @@ export function FeesPage() {
         setReconciliation(reconRes);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load finance data');
+      if (isModuleNotEntitled(err)) {
+        setIsNotEntitled(true);
+        setError(null);
+      } else if (isInstitutionSuspended(err)) {
+        setIsSuspended(true);
+        setError(null);
+      } else {
+        setError(isApiError(err) ? err.message : err instanceof Error ? err.message : 'Failed to load finance data');
+      }
     } finally {
       setLoading(false);
     }
@@ -520,118 +537,113 @@ export function FeesPage() {
             : 'Manage fee structures, dues assessments, offline collections, multi-gateway online payments, and reconciliation.'
         }
         actions={
-          <div className="flex flex-wrap gap-2">
-            {!isStudent && canRecordReceipt && (
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setActiveTab('offline-payments');
-                }}
-              >
-                Record Offline Payment
-              </Button>
-            )}
-            {!isStudent && canManageStructure && (
-              <Button variant="secondary" onClick={() => setShowCreateStructureModal(true)}>
-                + New Fee Structure
-              </Button>
-            )}
-            {!isStudent && canManageStructure && (
-              <Button variant="ghost" onClick={() => setShowCreateCategoryModal(true)}>
-                + Fee Category
-              </Button>
-            )}
-          </div>
+          !isNotEntitled && !isSuspended ? (
+            <div className="flex flex-wrap gap-2">
+              {!isStudent && canRecordReceipt && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setActiveTab('offline-payments');
+                  }}
+                >
+                  Record Offline Payment
+                </Button>
+              )}
+              {!isStudent && canManageStructure && (
+                <Button variant="secondary" onClick={() => setShowCreateStructureModal(true)}>
+                  + New Fee Structure
+                </Button>
+              )}
+              {!isStudent && canManageStructure && (
+                <Button variant="ghost" onClick={() => setShowCreateCategoryModal(true)}>
+                  + Fee Category
+                </Button>
+              )}
+            </div>
+          ) : undefined
         }
       />
 
-      {error && <Alert tone="error">{error}</Alert>}
+      {isNotEntitled ? (
+        <FeatureUnavailableState
+          moduleKey="finance"
+          moduleName="Fees & Finance Ledger"
+        />
+      ) : isSuspended ? (
+        <InstitutionSuspendedState />
+      ) : (
+        <>
+          {error && <Alert tone="error">{error}</Alert>}
 
-      {actionSuccess && <Alert tone="success">{actionSuccess}</Alert>}
+          {actionSuccess && <Alert tone="success">{actionSuccess}</Alert>}
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs - Modern Segmented Control Bar */}
       {!isStudent && (
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-6 overflow-x-auto">
+        <div className="finance-nav-bar">
+          <nav className="flex flex-nowrap overflow-x-auto gap-1.5 w-full items-center" aria-label="Fees and finance sections">
             <button
+              type="button"
               onClick={() => setActiveTab('overview')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'overview'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              aria-current={activeTab === 'overview' ? 'page' : undefined}
+              className={`finance-nav-btn ${activeTab === 'overview' ? 'finance-nav-btn--active' : ''}`}
             >
               Overview & Collections
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('structures')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'structures'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              aria-current={activeTab === 'structures' ? 'page' : undefined}
+              className={`finance-nav-btn ${activeTab === 'structures' ? 'finance-nav-btn--active' : ''}`}
             >
-              Fee Structures ({structures.length})
+              Fee Structures <span className="finance-nav-badge">{structures.length}</span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('dues')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'dues'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              aria-current={activeTab === 'dues' ? 'page' : undefined}
+              className={`finance-nav-btn ${activeTab === 'dues' ? 'finance-nav-btn--active' : ''}`}
             >
-              Student Dues ({dues.length})
+              Student Dues <span className="finance-nav-badge">{dues.length}</span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('online-payments')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'online-payments'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              aria-current={activeTab === 'online-payments' ? 'page' : undefined}
+              className={`finance-nav-btn ${activeTab === 'online-payments' ? 'finance-nav-btn--active' : ''}`}
             >
-              Online Payments ({paymentAttempts.length})
+              Online Payments <span className="finance-nav-badge">{paymentAttempts.length}</span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('offline-payments')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'offline-payments'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              aria-current={activeTab === 'offline-payments' ? 'page' : undefined}
+              className={`finance-nav-btn ${activeTab === 'offline-payments' ? 'finance-nav-btn--active' : ''}`}
             >
               Offline Payments
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('receipts')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'receipts'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              aria-current={activeTab === 'receipts' ? 'page' : undefined}
+              className={`finance-nav-btn ${activeTab === 'receipts' ? 'finance-nav-btn--active' : ''}`}
             >
-              Receipts & Reversals ({receipts.length})
+              Receipts & Reversals <span className="finance-nav-badge">{receipts.length}</span>
             </button>
             {(canReadGateway || canManageGateway) && (
               <button
+                type="button"
                 onClick={() => setActiveTab('gateway-settings')}
-                className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                  activeTab === 'gateway-settings'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                aria-current={activeTab === 'gateway-settings' ? 'page' : undefined}
+                className={`finance-nav-btn ${activeTab === 'gateway-settings' ? 'finance-nav-btn--active' : ''}`}
               >
                 Gateway Settings
               </button>
             )}
             <button
+              type="button"
               onClick={() => setActiveTab('reconciliation')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'reconciliation'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              aria-current={activeTab === 'reconciliation' ? 'page' : undefined}
+              className={`finance-nav-btn ${activeTab === 'reconciliation' ? 'finance-nav-btn--active' : ''}`}
             >
               Reconciliation
             </button>
@@ -648,12 +660,21 @@ export function FeesPage() {
           {/* 1. Overview & Collections */}
           {activeTab === 'overview' && !isStudent && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="finance-stat-grid finance-stat-grid--5">
                 <StatCard
                   label="Total Collections"
                   value={formatMoney(summary?.total_collected || 0, summary?.currency || 'INR')}
                   helper={`${summary?.receipt_count || 0} valid receipts posted`}
                   tone="emerald"
+                />
+                <StatCard
+                  label="Outstanding Dues"
+                  value={formatMoney(
+                    dues.reduce((acc, d) => acc + (d.status !== 'PAID' ? d.balance_amount : 0), 0),
+                    summary?.currency || 'INR',
+                  )}
+                  helper={`${dues.filter((d) => d.status !== 'PAID').length} pending student dues`}
+                  tone="amber"
                 />
                 <StatCard
                   label="Active Online Gateways"
@@ -683,21 +704,22 @@ export function FeesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="finance-summary-grid">
                 <Card title="Collections by Payment Method">
                   <div className="space-y-3 pt-2">
                     {summary?.by_payment_method &&
                     Object.keys(summary.by_payment_method).length > 0 ? (
                       Object.entries(summary.by_payment_method).map(([method, count]) => (
-                        <div key={method} className="flex justify-between items-center text-sm">
-                          <span className="font-medium text-gray-700">{method}</span>
-                          <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded text-xs font-semibold">
-                            {count} receipts
-                          </span>
+                        <div
+                          key={method}
+                          className="flex justify-between items-center text-sm p-2 rounded-lg bg-surface-muted/50 border border-border/50"
+                        >
+                          <span className="font-semibold text-text">{method}</span>
+                          <span className="finance-nav-badge">{count} receipts</span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-gray-500 text-sm">No payment records found.</p>
+                      <p className="text-muted text-sm">No payment records found.</p>
                     )}
                   </div>
                 </Card>
@@ -705,33 +727,33 @@ export function FeesPage() {
                 <Card title="Payment Gateway Multi-Tenant Status">
                   <div className="space-y-3 pt-2">
                     {gatewayConfigs.length === 0 ? (
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-muted">
                         No payment gateways configured. School is operating in offline-only mode.
                       </div>
                     ) : (
                       gatewayConfigs.map((g) => (
                         <div
                           key={g.id}
-                          className="flex justify-between items-center p-3 rounded-lg border border-gray-100 bg-gray-50/50"
+                          className="flex justify-between items-center p-3 rounded-lg border border-border bg-surface-muted/30"
                         >
                           <div>
-                            <div className="font-semibold text-sm text-gray-800 flex items-center space-x-2">
+                            <div className="font-semibold text-sm text-text flex items-center space-x-2">
                               <span>{g.provider}</span>
-                              <span className="text-xs px-2 py-0.5 bg-gray-200 rounded text-gray-700">
+                              <span className="text-xs px-2 py-0.5 bg-primary-soft text-primary font-semibold rounded">
                                 {g.mode}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-500 font-mono">
+                            <div className="text-xs text-muted font-mono mt-0.5">
                               Key: {g.merchant_key_masked}
                             </div>
                           </div>
                           <div>
                             {g.is_active ? (
-                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">
+                              <span className="bg-emerald-soft text-emerald-ink text-xs px-2.5 py-1 rounded-full font-bold">
                                 ACTIVE
                               </span>
                             ) : (
-                              <span className="text-gray-400 text-xs">Standby</span>
+                              <span className="text-muted text-xs">Standby</span>
                             )}
                           </div>
                         </div>
@@ -2072,6 +2094,8 @@ export function FeesPage() {
           </div>
         </form>
       </Dialog>
+        </>
+      )}
     </div>
   );
 }

@@ -179,3 +179,136 @@ describe('accessibility behaviour', () => {
     }
   });
 });
+
+describe('entitlement-aware and role-aware navigation (Platform Owner module gating)', () => {
+  const FULL_ACCESS_STAFF: MeData = {
+    tenant_id: 't1',
+    user_id: 'u-super',
+    actor_kind: 'STAFF',
+    display_name: 'Dr. Sarah Principal',
+    roles: ['COLLEGE_ADMIN'],
+    capabilities: [
+      'session.read',
+      'session.revoke',
+      'exam.manage',
+      'homework.manage',
+      'fee.structure.read',
+      'student.directory.list',
+      'org.structure.read',
+      'role.assignment.grant',
+      'user.account.read',
+      'academic.term.manage',
+      'attendance.session.mark',
+      'document.read',
+    ],
+  };
+
+  it('hides disabled modules from sidebar even when user has full permissions (entitlement AND permission)', async () => {
+    // Platform owner has enabled ONLY core students, academics, and attendance
+    const meWithRestrictedEntitlements: MeData = {
+      ...FULL_ACCESS_STAFF,
+      entitled_modules: ['students', 'academics', 'attendance'],
+    };
+
+    await open(meWithRestrictedEntitlements);
+    const links = navLinks();
+
+    // Entitled and permitted
+    expect(links).toContain('Students');
+    expect(links).toContain('Academics');
+    expect(links).toContain('Attendance');
+
+    // Not entitled for institution by Platform Owner — MUST be hidden despite user having exam.manage & fee.structure.read
+    expect(links).not.toContain('Examinations');
+    expect(links).not.toContain('Homework');
+    expect(links).not.toContain('Fees & Finance');
+    expect(links).not.toContain('Documents');
+    expect(links).not.toContain('Reports');
+  });
+
+  it('shows module in sidebar when both entitled by Platform Owner AND permitted for user', async () => {
+    const meWithExaminationsAndFinance: MeData = {
+      ...FULL_ACCESS_STAFF,
+      entitled_modules: ['students', 'academics', 'examinations', 'finance'],
+    };
+
+    await open(meWithExaminationsAndFinance);
+    const links = navLinks();
+
+    expect(links).toContain('Students');
+    expect(links).toContain('Academics');
+    expect(links).toContain('Examinations');
+    expect(links).toContain('Fees & Finance');
+
+    // Homework not in entitled_modules
+    expect(links).not.toContain('Homework');
+  });
+
+  it('hides module from sidebar if user lacks permission even if module is entitled', async () => {
+    // Teacher with ONLY homework and attendance capabilities, in an institution with finance and examinations enabled
+    const teacher: MeData = {
+      tenant_id: 't1',
+      user_id: 'u-teacher',
+      actor_kind: 'STAFF',
+      display_name: 'Tara Teacher',
+      roles: ['FACULTY'],
+      capabilities: ['session.read', 'homework.manage', 'attendance.session.mark'],
+      entitled_modules: ['students', 'academics', 'attendance', 'homework', 'examinations', 'finance'],
+    };
+
+    await open(teacher);
+    const links = navLinks();
+
+    expect(links).toContain('Attendance');
+    expect(links).toContain('Homework');
+
+    // Lacks exam.manage and fee permissions -> hidden
+    expect(links).not.toContain('Examinations');
+    expect(links).not.toContain('Fees & Finance');
+    expect(links).not.toContain('Organisation');
+    expect(links).not.toContain('Roles & access');
+  });
+
+  it('parent sees Parent Portal only when entitled by Platform Owner and permitted', async () => {
+    const parentWithPortal: MeData = {
+      tenant_id: 't1',
+      user_id: 'u-parent',
+      actor_kind: 'STAFF',
+      display_name: 'Priya Parent',
+      roles: ['PARENT'],
+      capabilities: ['session.read', 'parent.portal.access'],
+      entitled_modules: ['students', 'parent_portal'],
+    };
+
+    const view1 = await open(parentWithPortal);
+    expect(navLinks()).toContain('Parent Portal');
+    view1.unmount();
+
+    // If Platform Owner disables parent_portal for the institution
+    const parentPortalDisabled: MeData = {
+      ...parentWithPortal,
+      entitled_modules: ['students'],
+    };
+
+    const view2 = await open(parentPortalDisabled);
+    expect(navLinks()).not.toContain('Parent Portal');
+    view2.unmount();
+  });
+
+  it('dynamic navigation is responsive and passes axe a11y with filtered items', async () => {
+    const v = renderApp(
+      createFakeBackend({
+        session: true,
+        me: {
+          ...FULL_ACCESS_STAFF,
+          entitled_modules: ['students', 'academics', 'examinations'],
+        },
+      }),
+      '/',
+    );
+
+    await screen.findByRole('navigation', { name: 'Primary' });
+    expect((await axe(v.container)).violations).toEqual([]);
+    v.unmount();
+  });
+});

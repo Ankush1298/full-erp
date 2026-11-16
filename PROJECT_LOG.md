@@ -1,5 +1,134 @@
 # Anesa Project Activity Log
 
+## [2026-11-16] Final Module Readiness Audit, Cross-Module E2E Rehearsal & Demonstration Release Gate
+
+- **Actor**: Antigravity Quality & Release Engineering Agent
+- **Status**: Complete & Verified (`DEMONSTRATION RELEASE VERDICT — READY`)
+- **Governing Directive**: Perform comprehensive requirements traceability, module-by-module evaluation, defect remediation, and cross-module end-to-end rehearsal across all 14 canonical ERP modules plus the Platform Control Center. Prepare Anesa Campus OS for institutional demonstration.
+- **1. Module Audits & Gaps Remediated**:
+  - Audited all 14 canonical ERP modules: Students & Admissions, Academics & Setup Wizard, Attendance, Homework, Examinations, Fees & Finance, Parent/Student Portals, Users & Access, Notifications, Documents, Reports, Imports, Privacy & Consents, and School Vault.
+  - Resolved `fakeBackend.ts` entitlement payload parity ensuring mock test identities align with real backend defaults (`ALL_DEFAULT_MODULES`).
+  - Restored full suite stability across `tests/academics-page.test.tsx`, `tests/imports-page.test.tsx`, and `tests/navigation.test.tsx`.
+- **2. Automated Test & Build Quality Metrics**:
+  - Web Frontend Tests (`apps/web test`): **43 / 43 test files passed (524 / 524 tests, 100%)**.
+  - Backend Unit Tests (`test:unit`): **58 / 58 test files passed (1,148 / 1,148 tests, 100%)**.
+  - Cross-Module E2E Rehearsal (`master-erp-e2e-workflow.test.ts`): **7 / 7 stages passed (100%)**.
+  - Core Module Integrations (`homework`, `examinations`, `finance`, `vault`, `parent-portal`, `reports`, `documents`, `imports`): **160 / 160 tests passed (100%)**.
+  - Static Typechecks: **0 errors** across both `@campusos/backend` and `apps/web`.
+  - Production Bundle: Clean build (`pnpm build`) with zero compilation errors.
+  - Secret Scan: **0 findings** (`pnpm check:secrets`).
+- **3. Data Safety & Tenancy Invariant**:
+  - Verified `campusos_demo` maintains all **6 persistent institutions** (`anesa-demo-school`, `test-poly-mwfdykiv`, `test-poly-mwfe07kh`, `test-poly-mwfe15qy`, `nit-campus`, `test-poly-mwfehgeb`) active and untouched. Zero persistent data mutations.
+- **4. Comprehensive Report Deliverable**:
+  - Deliverable created: `anesa-module-readiness-and-demo-release-report.md`.
+
+
+## [2026-11-16] Master Security Verification, Vulnerability Remediation & Production Hardening
+
+- **Actor**: Antigravity Autonomous Security Verification Agent
+- **Status**: Complete & Verified (`MASTER SECURITY VERIFICATION — 100% SUITES GREEN; GO FOR PRODUCTION`)
+- **Governing Directive**: Autonomous, evidence-based master security verification across frontend, backend, Platform Owner control center, PostgreSQL database layers, authentication, authorization, tenant isolation, Security Vault, SaaS subscription entitlements, student/parent privacy, document storage, and audit logging.
+- **1. Vulnerability Remediation & Architecture Alignment**:
+  - **SEC-01 (RBAC / Static Architecture)**: Refactored examination eligibility checks in `eligibility.schemas.ts` and `eligibility.service.ts` to evaluate permissions (`exam.manage`, `result.publish`, `exam.eligibility.override`) through `AuthorizationEngine` rather than bare role string comparisons. Verified by `static-architecture.test.ts` (27/27 passed).
+  - **SEC-02 (Catalog & Protected Tables Drift)**: Reconciled permission catalog to 91 permissions in `catalog.ts` and updated protected application tables in `roles-and-privileges.test.ts` to include `payment_*`, `homework_*`, `vault_*`, and `adult_guardian_consents`.
+  - **SEC-03 (Tenant Suspension & Unit Test Isolation)**: Moved tenant suspension enforcement into `authService.validateSession(sessionToken)`, preventing unexpected queries during `withTenant` in unit test environments with scripted mock databases. Restored 100% pass rates across `denial-audit`, `mfa-enforcement-hook`, `step-up-hook`, `student-directory-http`, and `student-directory-activation`.
+  - **SEC-04 (Web API Contract Alignment)**: Corrected unescaped query string parameter extraction in `apps/web/src/lib/api/platform-api.ts` and routed platform API paths to `buildPlatformServer` in `tests/unit/web-api-contract.test.ts` (196/196 passed).
+  - **SEC-05 (Git Diff Whitespace Cleanliness)**: Removed superfluous EOF blank lines in `apps/web/src/styles/app.css` and `backend/src/shared/database/index.ts`. `git diff --check` returned 0 warnings.
+- **2. Security & Database Isolation Verification**:
+  - Full backend unit suite (`test:unit`): **58 test files, 1,148 tests passed (100%)**, 0 failed.
+  - Security & database suite (`test:security`): **46 test files, 743 tests passed (100%)**, 0 failed (`schema-linter` 11/11, `roles-and-privileges` 36/36, `authorization-rls` 17/17, `tenant-isolation` 15/15).
+  - Web frontend suite (`apps/web test`): **42 test files, 504 tests passed (100%)**, 0 failed (all axe-core WCAG accessibility audits passed).
+  - Secret scanning (`check:secrets`): **0 findings** across codebase and commit history.
+  - TypeScript typecheck (`pnpm typecheck`): **0 errors** across `@campusos/backend` and `@campusos/web`.
+  - Production build: `pnpm --filter web build` completed cleanly in 165ms.
+- **3. Persistent Database Protection & Institution Preservation**:
+  - Read-only cluster verification on port 54329 confirmed `campusos_demo` maintains all **6 persistent institutions** (`anesa-demo-school`, `test-poly-mwfdykiv`, `test-poly-mwfe07kh`, `test-poly-mwfe15qy`, `nit-campus`, `test-poly-mwfehgeb`) and all existing user/student records untouched.
+  - Test suites ran strictly on ephemeral databases (`campusos_test_*`), fully protected by `backend/src/shared/database/test-guard.ts`.
+- **4. Comprehensive Report Deliverable**:
+  - Artifact generated: `docs/architecture/v3/52-anesa-master-security-verification-and-hardening-report.md`.
+
+## [2026-11-13] Anesa Universal Institution Architecture Standard & School Vault Full Implementation
+
+- **Actor**: Antigravity Core Security & Architecture Engineering
+- **Status**: Complete & Verified (`UNIVERSAL INSTITUTION COMPATIBILITY & SCHOOL VAULT — 100% SUITES GREEN`)
+- **Governing Objective**: Establish and codify the Anesa Universal Institution Requirement across Schools, Colleges, and Universities, implement True Zero-Access School Vault (hardware-bound authenticators, max 2 devices per account, scoped capability grants, 2-of-3 Shamir recovery quorum, and adult student privacy guard), and verify zero regressions across the ERP platform.
+- **1. Universal Institution Architecture Standard (Doc 50)**:
+  - Canonical standard published: `docs/architecture/v3/50-anesa-universal-institution-architecture-standard.md`.
+  - Defined universal institutional hierarchies, terminology aliasing (Principal vs Dean vs Chancellor; Teachers vs Lecturers vs Professors; Subjects vs Courses vs Modules; Homework vs Coursework vs Dissertations).
+  - Codified multi-tier academic standing calculations: percentage & letter grades ($A+-F$) for Schools, credit percentages for Colleges, and 10-point weighted SGPA/CGPA for Universities.
+  - Implemented the Adult Student Privacy Guard restricting parental access in Higher Ed (College/University or student age $\ge 18$) unless explicit scoped consent (`ALL`, `ACADEMICS_ONLY`, `FINANCE_ONLY`) is granted by the student via `app.adult_guardian_consents`.
+- **2. School Vault Zero-Access Cryptographic Architecture**:
+  - Migration `0053_school_vault_zero_access.sql`: Established tables `app.institution_security_authorities`, `app.institution_vault_epochs`, `app.user_vault_devices`, `app.vault_key_grants`, `app.institution_recovery_custodians`, `app.institution_recovery_ceremonies`, `app.vault_protected_records`, `app.adult_guardian_consents`.
+  - Device cap trigger `app.user_vault_device_limit_guard()`: Enforces max 2 active hardware credentials per user at database level against direct SQL inserts or API bypass.
+  - Cryptographic engine (`backend/src/shared/crypto/vault-crypto.ts`): AES-256-GCM symmetric encryption with 96-bit IV and 128-bit authentication tag, Authenticated Additional Data (AAD) tenant binding, ECDH P-256 key agreement, and 2-of-3 Shamir's Secret Sharing over $GF(2^8)$ (generator $g=3$, polynomial `0x11b`).
+  - School-controlled recovery: 2-of-3 custodian quorum ceremony with duplicate share rejection and zero unilateral cloud decryption backdoors.
+- **3. Security Center UI & Accessibility**:
+  - Created `/security-center` (`apps/web/src/pages/SecurityCenterPage.tsx`) using Anesa Deep Purple tokens, `<SegmentedNav />` tabs (`authority`, `devices`, `grants`, `recovery`), `<StatCard />`, `<Badge />`.
+  - Zero WCAG 2.2 accessibility violations verified via axe-core.
+- **4. Verification & Quality Gates**:
+  - `tests/integration/vault-zero-access.test.ts`: 20/20 passed.
+  - `tests/unit/vault-crypto.test.ts`: 7/7 passed.
+  - `tests/unit/institution-compatibility.test.ts`: 7/7 passed.
+  - `tests/unit/migrate-plan.test.ts`: 62/62 passed.
+  - `tests/security-db/schema-linter.test.ts`: 11/11 passed.
+  - `apps/web/tests/security-center-page.test.tsx`: 6/6 passed.
+  - Full web test suite: 39 test files, 484/484 passed (100%).
+  - Monorepo TypeScript check (`pnpm typecheck`): 0 errors across backend and web.
+  - Database safety: Zero modifications to persistent databases on port 54329 (`campusos_demo`, `campusos_dev`). Checkpoint `93e08a4` strictly preserved.
+
+## [2026-11-13] Known Defect Closure and Core Workflow Verification
+
+- **Actor**: Antigravity Core Engineering
+- **Status**: Complete & Verified (`KNOWN DEFECT CLOSURE — PASSED; ALL SUITES GREEN`)
+- **Governing Objective**: Resolve known functional defects across examination marks correction, academic setup readiness queries, migration assertions, and verify role-based dashboards, MFA, and payment workflows.
+- **1. Examination Marks Correction (Issue 1)**:
+  - Root cause: `MarkStatusSchema` in `backend/src/modules/examinations/exam.schemas.ts` was restricted to `['ENTERED', 'ABSENT', 'EXEMPT', 'WITHHELD']` while `fetchScheduleRoster` and the database assign submitted marks the status `SUBMITTED`. When a Principal submitted a mark correction on a submitted schedule, the frontend forwarded the target's existing `SUBMITTED` status, triggering a Zod validation HTTP 400 rejection.
+  - Fixes:
+    - Updated `MarkStatusSchema` in `exam.schemas.ts` to allow `SUBMITTED` and `DRAFT`.
+    - Enhanced `StudentMarkEntrySchema` refinement to validate `marks_obtained` when status is `ENTERED` or `SUBMITTED`.
+    - Added empty-string tolerance to `evidence_url` in `CorrectMarksSchema`.
+    - Updated `ExamService.correctMark` in `backend/src/modules/examinations/exam.service.ts` to enforce maximum marks validation on both `ENTERED` and `SUBMITTED` statuses.
+    - Added explicit `evidence_exception` handling in `ExaminationsPage.tsx` when evidence URLs are omitted under Principal Final Authority.
+    - Verified via unit test suite `tests/unit/exam-workflow-security.test.ts` (17/17 passed) and integration tests `tests/integration/examinations-slice1.test.ts` (17/17 passed) & `tests/integration/examinations-slice2-eligibility.test.ts` (12/12 passed).
+- **2. Academic Setup Step 12 Active-Student Readiness Indicator (Issue 2)**:
+  - Root cause: `setup-wizard.service.ts` queried `SELECT count(*) FROM app.students WHERE organization_id = $1 AND status = 'ACTIVE'`. In Anesa Campus OS, student admission creates students with status `ADMITTED`. Both `ADMITTED` and `ACTIVE` students are legally enrollable (`ENROLLABLE_STUDENT_STATUSES`). Because the wizard query strictly filtered for `status = 'ACTIVE'`, admitted students with active term enrollments, section placements, course registrations, and attendance were not counted in the indicator, triggering false `NO_ACTIVE_STUDENT` warnings.
+  - Fix: Updated query in `setup-wizard.service.ts` to `SELECT count(*) FROM app.students WHERE organization_id = $1 AND status IN ('ADMITTED', 'ACTIVE')`.
+  - Preserved school records and academic policies without mutating student statuses. Verified via `tests/integration/academic-setup-wizard.test.ts` (15/15 passed) and `apps/web/tests/academics-setup-wizard.test.tsx` (18/18 passed).
+- **3. Static and Regression Test Repairs (Issue 4)**:
+  - Synchronized migration assertion tests (`migration-0017.test.ts`, `migration-0019.test.ts`, `migration-0020.test.ts`) to account for migrations `0051_parent_identity_and_portal.sql` and `0052_homework_and_assignments.sql`.
+  - Synchronized `tests/security-db/schema-linter.test.ts` immutability trigger table assertions with the 4 new homework tables (`homework_assignments`, `homework_attachments`, `homework_submission_files`, `homework_submissions`).
+  - Updated `tests/integration/me-profile.test.ts` capabilities for `STUDENT` and `HOD` to reflect canonical Homework and Fee Payment permissions.
+  - All 5 repaired test suites passed: 31/31 tests green.
+- **4. Role and MFA Verification (Issue 3)**:
+  - Verified Principal, Vice Principal, Teacher, Registrar, Staff, Student, and Parent accounts.
+  - Ran backend authorization and MFA suites (`authorization.test.ts`, `authorization-http.test.ts`, `mfa.test.ts`, `session-cookie.test.ts`): 97/97 passed.
+  - Ran web authentication and onboarding suites (`auth-flow.test.tsx`, `mfa.test.tsx`, `self-service-mfa-onboarding.test.tsx`): 30/30 passed.
+- **5. Payment Integrity Verification (Issue 5)**:
+  - Verified offline payments and online multi-gateway integrations across Razorpay, Cashfree, and PhonePe (`payment-gateways.test.ts`, `finance-slice1.test.ts`, `fees-page.test.tsx`): 35/35 passed.
+
+
+## [2026-11-13] Fees & Finance UI Consistency Repair
+
+- **Actor**: Agent D (Frontend & UI/UX Consistency Lead)
+- **Status**: Code Complete & Verified (`FINANCE UI CONSISTENCY — CODE COMPLETE / BROWSER ACCEPTANCE PENDING`)
+- **Governing Objective**: Modernize Fees & Finance navigation and summary layout to match Anesa's deep-purple visual design system and the Examinations module.
+- **1. Modern Segmented Tab Navigation (`apps/web/src/features/finance/finance.css`)**:
+  - Replaced plain browser-default rectangular buttons with rounded segmented tabs (`.finance-nav-bar`, `.finance-nav-btn`) matching `examinations.css`.
+  - Implemented Anesa Deep Royal Purple (`#504175`) active state (`var(--color-primary)`), soft lavender hover (`var(--color-primary-soft)`), focus rings (`outline: 2px solid var(--color-primary)`), and disabled states.
+  - Added integrated pill badge counters (`.finance-nav-badge`) for active counts.
+  - Enhanced accessibility: semantic `<button type="button">`, `aria-current="page"`, `aria-label="Fees and finance sections"`, and full keyboard navigation.
+  - Ensured responsive design: horizontal scrolling on mobile (`max-width: 768px`) with smooth touch momentum and wrapping on larger screens.
+- **2. Balanced Responsive KPI Grid & Summary Cards**:
+  - Re-architected statistics layout into `.finance-stat-grid` with compact cards for Total Collections, Outstanding Dues, Active Online Gateways, Online Transactions, and Reversals/Refunds.
+  - Upgraded Collections by Payment Method and Multi-Tenant Gateway Status cards with `.finance-summary-grid` and authentic design tokens.
+- **3. Verification & Quality Gates**:
+  - Finance web tests (`apps/web/tests/fees-page.test.tsx`): 6/6 passed, including axe-core WCAG 2.2 accessibility.
+  - Full web test suite: 36 test files, 465/465 passed (100%).
+  - TypeScript validation: 0 errors (`pnpm --filter web typecheck`).
+  - Production build: Clean build (`pnpm --filter web build`).
+  - Code formatting: Clean Prettier formatting using authentic design tokens.
+  - Database safety: Zero modifications to persistent databases; running services left intact.
+
 ## [2026-11-13] Unified Offline & Multi-Gateway Online Fee Payments
 
 - **Actor**: Agent D (Finance & Payment Gateway Integration Lead)
@@ -3691,3 +3820,71 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
   - `docs/architecture/v3/47-pilot-v1-master-roadmap.md` updated: Track A Component A10 marked **COMPLETE AND VERIFIED (SLICE 1)**.
   - Institutional bulk data export remains **DEFERRED BY OWNER**.
   - Immediate Next Priority: **Task 7: PR-1 School Input and Invitation Mailer Integration (G4)**, followed by school setup wizard remaining steps rehearsal.
+
+
+## [2026-11-16] UX Polish for Disabled/Closed ERP Modules (`MODULE_NOT_ENTITLED`)
+
+- **Actor**: Antigravity. Preserved all backend entitlement checks, RLS policies, and 403 enforcement unchanged.
+- **Problem**: When an ERP module is disabled or not included in an institution's subscription, the backend returns 403 `MODULE_NOT_ENTITLED`. The web UI displayed a raw, broken "API forbidden (403)" error state in the content area, confusing users and appearing as if the platform crashed.
+- **Implemented Changes**:
+  1. `apps/web/src/lib/api/errors.ts`:
+     - Added `'module_not_entitled'` and `'institution_suspended'` to `ApiErrorKind`.
+     - Updated `kindForStatus()` to map `403 MODULE_NOT_ENTITLED` -> `'module_not_entitled'` and `403 INSTITUTION_SUSPENDED` -> `'institution_suspended'`.
+     - Added type-safe helpers `isModuleNotEntitled(err)` and `isInstitutionSuspended(err)`.
+  2. `apps/web/src/lib/api/module-state.ts`:
+     - Created shared enterprise module preview configuration (`MODULE_PREVIEWS`) for all 5 gated ERP modules (`examinations`, `homework`, `finance`, `reports`, `documents`) with detailed capability previews.
+     - Added `resolveModuleError(err, moduleKey)` to convert caught errors into semantic UI states.
+  3. `apps/web/src/components/ui/FeatureUnavailableState.tsx`:
+     - Created high-polish `FeatureUnavailableState` component with category pill, reassuring messaging ("This feature is not currently active", "Your workspace is working normally — this feature is simply not active right now"), capability cards grid, "Back to Dashboard" button, and accessible "Contact Campus Administrator" modal dialog.
+     - Created companion `InstitutionSuspendedState` for administrative holds.
+  4. `apps/web/src/styles/app.css`:
+     - Styled `.feature-unavailable` matching Anesa Deep Royal Purple (`#504175`) and lavender design tokens, responsive cards, and mobile-friendly layouts.
+  5. Module Page Integrations:
+     - `ExaminationsPage.tsx`: Catches `isModuleNotEntitled` on exam/schedule/results load, suppressing raw error banners and rendering `FeatureUnavailableState`.
+     - `HomeworkPage.tsx`: Catches `isModuleNotEntitled` on teacher/student homework load, suppressing raw error banners and rendering `FeatureUnavailableState`.
+     - `FeesPage.tsx`: Updated load catch blocks to propagate module entitlement errors, suppressing raw error banners and rendering `FeatureUnavailableState`.
+     - `ReportsPage.tsx`: Catches `isModuleNotEntitled` on report data load, suppressing raw error banners and rendering `FeatureUnavailableState`.
+     - `DocumentsPage.tsx`: Removed internal error-swallowing in `documents-api.ts` and updated load catch block to render `FeatureUnavailableState`.
+  6. Verification & Test Suite:
+     - Created `apps/web/tests/feature-unavailable-state.test.tsx` (15/15 passed): verified error classification, messaging presence, absence of raw 403 strings, accessible dialog interactions, axe accessibility audits (0 violations), and end-to-end page integration across all 5 modules.
+     - Ran full web test suite: 43 test files, 519/519 tests passed.
+     - `pnpm --filter web typecheck`: passed (0 errors).
+     - `pnpm --filter web build`: passed.
+     - `pnpm check:secrets`: passed.
+     - `git diff --check`: passed (0 whitespace errors).
+
+
+## [2026-11-16] Platform Owner Exclusive Module Control & Dynamic Role-Based Navigation
+
+- **Actor**: Antigravity. Preserved all six existing institutions in `campusos_demo` untouched. No destructive commands, no credential changes, no unauthorized commits or pushes.
+- **Objective**: Implement and verify strict separation between Platform Owner subscription module control and institution-level module access. Institutional users see only modules that are both (1) enabled for their institution by the Platform Owner and (2) authorized for their individual role and permissions.
+- **Implemented Architecture & Changes**:
+  1. **Platform Owner Exclusive Authority**:
+     - Verified Platform Control Center operations run with platform server authorization (`verifyPlatformAuth`, requiring `campusos_platform_session` or `PLATFORM_ADMIN_TOKEN`), inaccessible to institutional users.
+     - Confirmed normal institutional accounts cannot write to `feature.entitlements` or `subscription.plan`: `findSettingDefinition` checks reject unregistered keys with 404 in `settings.service.ts`.
+     - Platform module modification in `PlatformService.setEntitlements` validates module dependencies (`ERP_MODULE_CATALOG`), updates `app.organization_settings (key = 'feature.entitlements')`, and logs `platform.entitlements.update` in `app.audit_events`.
+     - Historical records are strictly preserved when a module is disabled; re-enabling restores access immediately without data loss.
+  2. **Dynamic Entitlement-Aware & Role-Aware Navigation**:
+     - Updated `backend/src/modules/auth/auth.service.ts`: `describe(ctx)` retrieves active institution entitlements from `app.organization_settings (key = 'feature.entitlements')` and returns `entitled_modules`.
+     - Updated `apps/web/src/lib/api/schemas.ts`: added `entitled_modules: z.array(z.string()).optional().default([])` to `MeResponseSchema`.
+     - Updated `apps/web/src/features/auth/identity.ts`: added `entitledModules?: ReadonlySet<string>` and helper `isModuleEntitled(identity, moduleKey)`.
+     - Updated `apps/web/src/features/shell/navigation.ts`:
+       - Tagged `NAV_ITEMS` with canonical `moduleKey` matching `ERP_MODULE_CATALOG`.
+       - Implemented combined rule in `visibleNav(identity)`: `audience check AND user permission (anyOf) AND institution entitlement (isModuleEntitled)`.
+       - If a module is disabled for an institution, it is hidden from the sidebar even if a user has full admin permissions.
+       - If a module is enabled, but the user lacks permission, it is hidden.
+  3. **Direct URL Security & Professional Unavailable States**:
+     - Verified direct URL security: navigation is a UX convenience only; backend `auth.hook.ts` enforces fail-closed 403 `MODULE_NOT_ENTITLED` on every API route.
+     - Updated `apps/web/src/components/ui/FeatureUnavailableState.tsx`:
+       - Heading: *"This feature is not currently active"*
+       - Description: *"This feature is managed centrally for your institution. You can continue using your available Anesa Campus OS features as normal."*
+       - Support dialog: *"Module availability is managed by the Anesa Platform team. For questions about enabling this feature, please contact your institution's designated administrator, who can coordinate with the platform team."*
+       - Completely removed misleading references to "School Principal, Registrar can activate" and eliminated commercial/plan-shaming terminology ("lower plan", "subscription tier").
+  4. **Verification & Test Suite**:
+     - Updated `apps/web/tests/navigation.test.tsx` (21/21 passed): verified entitlement-aware filtering, role permission filtering, parent portal visibility, and axe-core accessibility.
+     - Ran `apps/web/tests/feature-unavailable-state.test.tsx` (15/15 passed).
+     - Ran `backend/tests/integration/platform-and-entitlement-isolation.test.ts` (11/11 passed): verified operator isolation, 403 `MODULE_NOT_ENTITLED` enforcement, re-enable restoration, suspension without record deletion, audit logging, and cryptographic zero-access boundary.
+     - Ran backend unit tests: 58 test files, 1,148/1,148 passed.
+     - `pnpm --filter web typecheck` and `pnpm --filter @campusos/backend typecheck`: both exit code 0.
+     - `pnpm check:secrets`: 0 findings.
+     - `git diff --check`: 0 whitespace errors.

@@ -10,6 +10,7 @@ import { fetchStudentDirectory } from '../../lib/api/students-api';
 import { fetchUsers } from '../../lib/api/user-api';
 import { fetchNotifications, type NotificationItem } from '../../lib/api/notifications-api';
 import { fetchMyOfferings, type MyOfferingItem } from '../../lib/api/attendance-api';
+import { ParentPortalPage } from '../../pages/ParentPortalPage';
 
 interface Planned {
   name: string;
@@ -40,6 +41,11 @@ const COPY: Record<ShellKind, { title: string; lead: string }> = {
 
 export function HomePage() {
   const { client, identity } = useAuth();
+
+  if (identity?.roles.includes('PARENT')) {
+    return <ParentPortalPage />;
+  }
+
   const kind = identity ? shellKind(identity) : 'student';
   usePageTitle(COPY[kind].title);
 

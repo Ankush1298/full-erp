@@ -20,34 +20,14 @@ const ADMISSIONS_STAFF: MeData = {
 
 function setupWithInstitution(type: 'SCHOOL' | 'COLLEGE' | 'UNIVERSITY') {
   const b = createFakeBackend({ session: true, me: ADMISSIONS_STAFF });
-  // Intercept GET /academics/terminology to return institutionType
-  const originalFetch = b.fetch;
-  b.fetch = async (input, init) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    if (url.includes('/academics/terminology')) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            labels: {
-              program: type === 'SCHOOL' ? 'Class' : 'Programme',
-              cohort: 'Batch',
-              period: type === 'SCHOOL' ? 'Term' : 'Semester',
-              section: 'Section',
-              term: 'Term',
-              course: type === 'SCHOOL' ? 'Subject' : 'Course',
-            },
-            customised: [],
-            periodTypes: [],
-            byCohort: {},
-            institutionType: type,
-          },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      );
-    }
-    return originalFetch(input, init);
-  };
+  b.state.academics.institutionType = type;
+  if (type === 'SCHOOL') {
+    b.state.academics.terminology = {
+      program: 'Class',
+      period: 'Term',
+      course: 'Subject',
+    };
+  }
   return { b, user: userEvent.setup(), view: () => renderApp(b, '/students') };
 }
 

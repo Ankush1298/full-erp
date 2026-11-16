@@ -1,6 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-base-to-string */
 import { vi } from 'vitest';
 
+const ALL_DEFAULT_MODULES = [
+  'students',
+  'academics',
+  'attendance',
+  'homework',
+  'examinations',
+  'finance',
+  'parent_portal',
+  'documents',
+  'imports',
+  'reports',
+  'school_vault',
+  'consents',
+  'notifications',
+];
+
 export interface Call {
   method: string;
   path: string;
@@ -16,6 +32,7 @@ export interface MeData {
   display_name: string;
   roles: string[];
   capabilities: string[];
+  entitled_modules?: string[];
 }
 
 export const STUDENT: MeData = {
@@ -29,6 +46,19 @@ export const STUDENT: MeData = {
     'session.revoke',
     'student.profile.read',
     'student.profile.read_sensitive',
+  ],
+};
+export const PARENT: MeData = {
+  tenant_id: 't1',
+  user_id: 'u_parent_1',
+  actor_kind: 'STAFF',
+  display_name: 'Priya Parent',
+  roles: ['PARENT'],
+  capabilities: [
+    'session.read',
+    'session.revoke',
+    'parent.portal.access',
+    'document.read',
   ],
 };
 export const STAFF: MeData = {
@@ -734,6 +764,384 @@ export function createFakeBackend(
         ],
       },
     },
+    parent: {
+      children: [
+        {
+          studentId: 'stu_aarav_01',
+          admissionNumber: 'ADM-2024-001',
+          displayName: 'Aarav Sharma',
+          status: 'ACTIVE',
+          campusName: 'Main Campus',
+          programName: 'Secondary School',
+          cohortName: 'Grade 9-A',
+          relation: 'Mother',
+          isPrimary: true,
+          canViewAcademics: true,
+          canReceiveNotifications: true,
+        },
+      ] as Array<Record<string, unknown>>,
+      summary: {
+        child: {
+          studentId: 'stu_aarav_01',
+          admissionNumber: 'ADM-2024-001',
+          displayName: 'Aarav Sharma',
+          status: 'ACTIVE',
+          campusName: 'Main Campus',
+          programName: 'Secondary School',
+          cohortName: 'Grade 9-A',
+          relation: 'Mother',
+          isPrimary: true,
+          canViewAcademics: true,
+          canReceiveNotifications: true,
+        },
+        attendance: {
+          rate: 94,
+          conducted: 50,
+          present: 47,
+          absent: 3,
+        },
+        academics: {
+          coursesCount: 6,
+          todaySchedule: [],
+        },
+        examinations: {
+          latestPublished: [
+            {
+              examName: 'Midterm Examination 2026',
+              courseName: 'Mathematics',
+              marksObtained: 92,
+              maxMarks: 100,
+              grade: 'A+',
+              publishedDate: '2026-10-15',
+            },
+          ],
+        },
+        fees: {
+          totalOutstanding: 2500000,
+          currency: 'INR',
+          nextDue: {
+            amount: 2500000,
+            dueDate: '2026-11-30',
+            title: 'Term 2 Tuition Fee',
+          },
+        },
+      },
+      attendance: {
+        attendanceRate: 94,
+        totalSessions: 50,
+        presentCount: 47,
+        absentCount: 3,
+        lateCount: 0,
+        records: [
+          {
+            date: '2026-11-10',
+            period: 'Period 1 (08:30)',
+            courseName: 'Mathematics',
+            status: 'PRESENT',
+            remarks: 'On time',
+          },
+          {
+            date: '2026-11-09',
+            period: 'Period 2 (09:30)',
+            courseName: 'Science',
+            status: 'ABSENT',
+            remarks: 'Medical leave informed',
+          },
+        ],
+      },
+      academics: {
+        courses: [
+          { courseCode: 'MATH101', courseName: 'Advanced Mathematics', facultyName: 'Dr. Rao' },
+          { courseCode: 'SCI102', courseName: 'Integrated Science', facultyName: 'Prof. Mehta' },
+        ],
+        timetable: [],
+        homeworkService: {
+          status: 'NOT_CONFIGURED',
+          message: 'The digital homework and assignment module is pending school term deployment.',
+        },
+      },
+      examinations: {
+        publishedResults: [
+          {
+            scheduleId: 'sch_01',
+            examName: 'Midterm 2026',
+            courseCode: 'MATH101',
+            courseName: 'Advanced Mathematics',
+            marksObtained: 92,
+            maxMarks: 100,
+            grade: 'PASS',
+            publishedDate: '2026-10-15',
+          },
+        ],
+        upcomingExams: [
+          {
+            examName: 'Final Board Exam',
+            courseName: 'Integrated Science',
+            date: '2026-12-05',
+            time: '09:00',
+          },
+        ],
+      },
+      fees: {
+        summary: {
+          totalBilled: 5000000,
+          totalPaid: 2500000,
+          totalOutstanding: 2500000,
+          currency: 'INR',
+        },
+        dues: [
+          {
+            id: 'due_01',
+            dueNumber: 'DUE-2026-001',
+            title: 'Term 2 Tuition Fee',
+            dueDate: '2026-11-30',
+            netAmount: 2500000,
+            paidAmount: 0,
+            balanceAmount: 2500000,
+            status: 'UNPAID',
+          },
+        ],
+        receipts: [
+          {
+            receiptNumber: 'RCP-2026-001',
+            receiptDate: '2026-07-15',
+            amount: 2500000,
+            paymentMode: 'BANK_TRANSFER',
+            status: 'POSTED',
+          },
+        ],
+      },
+    },
+    homework: {
+      classes: [
+        {
+          courseOfferingId: 'off_math_101',
+          courseId: 'crs_math',
+          courseCode: 'MATH-01',
+          courseTitle: 'Mathematics Grade 9',
+          termId: 't1',
+          termName: 'Academic Year 2026-27',
+          campusId: 'cmp1',
+          campusName: 'Main Campus',
+          cohortPeriodId: 'cp1',
+          cohortName: 'Grade 9',
+          sectionId: 'sec_9a',
+          sectionName: 'Section A',
+          teachingRole: 'PRIMARY',
+          studentCount: 28,
+        },
+      ],
+      recipients: {
+        totalCount: 28,
+        courseTitle: 'Mathematics Grade 9',
+        sectionName: 'Section A',
+        students: [
+          {
+            studentId: 'stu_aarav_01',
+            admissionNumber: 'ADM-2024-001',
+            displayName: 'Aarav Sharma',
+            rollNumber: '01',
+            sectionName: 'Section A',
+          },
+          {
+            studentId: 'stu_02',
+            admissionNumber: 'ADM-2024-002',
+            displayName: 'Diya Patel',
+            rollNumber: '02',
+            sectionName: 'Section A',
+          },
+        ],
+      },
+      teacherAssignments: [
+        {
+          id: 'hw_01',
+          courseOfferingId: 'off_math_101',
+          courseCode: 'MATH-01',
+          courseTitle: 'Mathematics Grade 9',
+          sectionId: 'sec_9a',
+          sectionName: 'Section A',
+          teacherName: 'Dr. Rao',
+          teacherEmployeeId: 'emp_rao',
+          title: 'Algebra Problem Set 1',
+          instructions: 'Complete exercises 1 through 15 on page 42.',
+          submissionType: 'ONLINE',
+          status: 'PUBLISHED',
+          dueDate: '2026-11-20',
+          dueTime: '17:00',
+          maxMarks: 100,
+          allowResubmission: true,
+          publishedAt: '2026-11-10T10:00:00Z',
+          closedAt: null,
+          totalRecipients: 28,
+          submittedCount: 20,
+          pendingCount: 8,
+          reviewedCount: 15,
+          lateCount: 2,
+          attachments: [
+            {
+              id: 'att_01',
+              fileId: 'fil_01',
+              fileName: 'algebra_pset1.pdf',
+              fileSizeBytes: 245000,
+              mimeType: 'application/pdf',
+            },
+          ],
+          createdAt: '2026-11-10T09:30:00Z',
+        },
+        {
+          id: 'hw_02',
+          courseOfferingId: 'off_math_101',
+          courseCode: 'MATH-01',
+          courseTitle: 'Mathematics Grade 9',
+          sectionId: 'sec_9a',
+          sectionName: 'Section A',
+          teacherName: 'Dr. Rao',
+          teacherEmployeeId: 'emp_rao',
+          title: 'Geometry Worksheet (Draft)',
+          instructions: 'Draw angles and measure proofs.',
+          submissionType: 'OFFLINE',
+          status: 'DRAFT',
+          dueDate: '2026-11-25',
+          dueTime: '15:00',
+          maxMarks: 50,
+          allowResubmission: false,
+          publishedAt: null,
+          closedAt: null,
+          totalRecipients: 28,
+          submittedCount: 0,
+          pendingCount: 28,
+          reviewedCount: 0,
+          lateCount: 0,
+          attachments: [],
+          createdAt: '2026-11-12T09:30:00Z',
+        },
+      ] as Array<Record<string, unknown>>,
+      submissions: [
+        {
+          id: 'sub_01',
+          studentId: 'stu_aarav_01',
+          admissionNumber: 'ADM-2024-001',
+          studentName: 'Aarav Sharma',
+          rollNumber: '01',
+          status: 'SUBMITTED',
+          submissionText: 'All equations solved with step-by-step proofs.',
+          submittedAt: '2026-11-11T14:20:00Z',
+          evaluatedAt: null,
+          marksObtained: null,
+          grade: null,
+          feedback: null,
+          resubmissionAllowed: true,
+          resubmissionCount: 0,
+          files: [
+            {
+              id: 'subfile_01',
+              fileId: 'fil_sub_01',
+              fileName: 'aarav_homework_ans.pdf',
+              fileSizeBytes: 180000,
+              mimeType: 'application/pdf',
+            },
+          ],
+        },
+      ] as Array<Record<string, unknown>>,
+      studentAssignments: [
+        {
+          id: 'hw_01',
+          courseOfferingId: 'off_math_101',
+          courseCode: 'MATH-01',
+          courseTitle: 'Mathematics Grade 9',
+          sectionName: 'Section A',
+          teacherName: 'Dr. Rao',
+          title: 'Algebra Problem Set 1',
+          instructions: 'Complete exercises 1 through 15 on page 42.',
+          submissionType: 'ONLINE',
+          dueDate: '2026-11-20',
+          dueTime: '17:00',
+          maxMarks: 100,
+          status: 'PUBLISHED',
+          submissionStatus: 'SUBMITTED',
+          submittedAt: '2026-11-11T14:20:00Z',
+          evaluatedAt: null,
+          marksObtained: null,
+          grade: null,
+          feedback: null,
+          resubmissionAllowed: true,
+          attachments: [
+            {
+              id: 'att_01',
+              fileId: 'fil_01',
+              fileName: 'algebra_pset1.pdf',
+              fileSizeBytes: 245000,
+              mimeType: 'application/pdf',
+            },
+          ],
+          mySubmissionFiles: [
+            {
+              id: 'subfile_01',
+              fileId: 'fil_sub_01',
+              fileName: 'aarav_homework_ans.pdf',
+              fileSizeBytes: 180000,
+              mimeType: 'application/pdf',
+            },
+          ],
+          mySubmissionText: 'All equations solved with step-by-step proofs.',
+        },
+      ] as Array<Record<string, unknown>>,
+    },
+    vault: {
+      authority: {
+        id: 'auth_01',
+        userId: 'u3',
+        title: 'SCHOOL_PRINCIPAL',
+        institutionType: 'SCHOOL',
+        status: 'ACTIVE',
+        appointedByUserId: 'u1',
+        appointedAt: '2026-11-01T00:00:00Z',
+        delegatedToUserId: null,
+        delegatedAt: null,
+        notes: null,
+        userDisplayName: 'Ada Admin',
+        userEmail: 'ada@campus.test',
+      },
+      devices: [
+        {
+          id: 'dev_01',
+          deviceNumber: 1,
+          deviceLabel: 'Admin MacBook Pro Touch ID',
+          deviceType: 'PLATFORM_AUTHENTICATOR',
+          status: 'ACTIVE',
+          publicKey: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA01',
+          aaguid: null,
+          enrolledAt: '2026-11-01T00:00:00Z',
+          lastUsedAt: '2026-11-12T10:00:00Z',
+        },
+      ] as Array<Record<string, unknown>>,
+      epoch: {
+        id: 'epoch_01',
+        epoch: 1,
+        status: 'ACTIVE',
+        smekPublicKey: 'SMEK_PUBKEY_MOCK_1',
+        createdAt: '2026-11-01T00:00:00Z',
+      },
+      ceremonies: [] as Array<Record<string, unknown>>,
+    },
+    documents: {
+      items: [
+        {
+          id: 'doc-001',
+          storage_class: 'GENERAL',
+          status: 'AVAILABLE',
+          classification: 'INTERNAL',
+          original_name: 'Academic_Transcript_2026.pdf',
+          content_type: 'application/pdf',
+          size_bytes: 524288,
+          sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+          created_at: '2026-10-15T10:00:00Z',
+          purpose: 'transcript',
+          entity_type: 'student',
+          entity_id: 'student-1',
+        },
+      ] as Array<Record<string, unknown>>,
+    },
   };
 
   const STRENGTH_RANK = { PASSWORD: 1, PASSWORD_REAUTH: 2, PASSWORD_MFA: 3 } as const;
@@ -837,7 +1245,12 @@ export function createFakeBackend(
       if (state.meMode === 'server') return err(500, 'INTERNAL_ERROR');
       if (!state.session) return err(401, 'UNAUTHORIZED');
       if (state.meMode === 'noaccess') return err(403, 'FORBIDDEN');
-      return json(200, { ...state.me, csrf_token: state.csrf, extra_unknown_field: 'dropped' });
+      return json(200, {
+        ...state.me,
+        entitled_modules: state.me.entitled_modules ?? ALL_DEFAULT_MODULES,
+        csrf_token: state.csrf,
+        extra_unknown_field: 'dropped',
+      });
     }
     if (path === '/auth/logout' && method === 'POST') {
       if (state.logoutMode === 'network') throw new TypeError('Failed to fetch');
@@ -3064,6 +3477,283 @@ export function createFakeBackend(
       }
       if (path.startsWith('/reports/fee-summary')) {
         return json(200, { data: state.reports.feeSummary });
+      }
+    }
+    if (path.startsWith('/parent/')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (path === '/parent/children' && method === 'GET') {
+        return json(200, { success: true, data: state.parent.children });
+      }
+      const summaryMatch = path.match(/^\/parent\/children\/([^/]+)\/summary$/);
+      if (summaryMatch && method === 'GET') {
+        return json(200, { success: true, data: state.parent.summary });
+      }
+      const attMatch = path.match(/^\/parent\/children\/([^/]+)\/attendance$/);
+      if (attMatch && method === 'GET') {
+        return json(200, { success: true, data: state.parent.attendance });
+      }
+      const acadMatch = path.match(/^\/parent\/children\/([^/]+)\/academics$/);
+      if (acadMatch && method === 'GET') {
+        return json(200, { success: true, data: state.parent.academics });
+      }
+      const examMatch = path.match(/^\/parent\/children\/([^/]+)\/examinations$/);
+      if (examMatch && method === 'GET') {
+        return json(200, { success: true, data: state.parent.examinations });
+      }
+      const feeMatch = path.match(/^\/parent\/children\/([^/]+)\/fees$/);
+      if (feeMatch && method === 'GET') {
+        return json(200, { success: true, data: state.parent.fees });
+      }
+    }
+    if (path.startsWith('/homework/')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (path === '/homework/attachments/upload' && method === 'POST') {
+        const body = typeof reqInit?.body === 'string' ? JSON.parse(reqInit.body) : {};
+        const fileId = `fil_att_${Date.now()}`;
+        return json(200, {
+          success: true,
+          data: {
+            id: fileId,
+            fileId,
+            fileName: body.fileName || 'worksheet.pdf',
+            fileSizeBytes: body.fileSizeBytes || 102400,
+            mimeType: body.mimeType || 'application/pdf',
+          },
+        });
+      }
+      if (path === '/homework/attachments/available-documents' && method === 'GET') {
+        return json(200, {
+          success: true,
+          data: [
+            {
+              id: 'fil_avail_1',
+              fileName: 'Algebra_Formula_Sheet.pdf',
+              fileSizeBytes: 245000,
+              mimeType: 'application/pdf',
+              createdAt: new Date().toISOString(),
+            },
+            {
+              id: 'fil_avail_2',
+              fileName: 'Calculus_Syllabus.docx',
+              fileSizeBytes: 180000,
+              mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        });
+      }
+      const dlMatch = path.match(/^\/homework\/attachments\/([^/?]+)\/download-url$/);
+      if (dlMatch && method === 'GET') {
+        const fileId = dlMatch[1];
+        return json(200, {
+          success: true,
+          data: {
+            fileId,
+            fileName: 'worksheet_download.pdf',
+            mimeType: 'application/pdf',
+            fileSizeBytes: 154000,
+            downloadUrl: `/api/v1/homework/attachments/${fileId}/content`,
+          },
+        });
+      }
+      if (path === '/homework/teacher/classes' && method === 'GET') {
+        return json(200, { success: true, data: state.homework.classes });
+      }
+      if (path.startsWith('/homework/teacher/preview-recipients') && method === 'GET') {
+        return json(200, { success: true, data: state.homework.recipients });
+      }
+      if (path.startsWith('/homework/teacher/assignments') && method === 'GET') {
+        const subsMatch = path.match(/^\/homework\/teacher\/assignments\/([^/?]+)\/submissions$/);
+        if (subsMatch) {
+          return json(200, { success: true, data: state.homework.submissions });
+        }
+        const detailMatch = path.match(/^\/homework\/teacher\/assignments\/([^/?]+)$/);
+        if (detailMatch) {
+          const id = detailMatch[1];
+          const hw = state.homework.teacherAssignments.find((h: any) => h.id === id);
+          if (!hw) return err(404, 'NOT_FOUND');
+          return json(200, { success: true, data: hw });
+        }
+        return json(200, { success: true, data: state.homework.teacherAssignments });
+      }
+      if (path === '/homework/teacher/assignments' && method === 'POST') {
+        const body = typeof reqInit?.body === 'string' ? JSON.parse(reqInit.body) : {};
+        const newHw = {
+          id: `hw_${state.homework.teacherAssignments.length + 1}`,
+          courseOfferingId: body.courseOfferingId,
+          courseCode: 'MATH-01',
+          courseTitle: 'Mathematics Grade 9',
+          sectionId: body.sectionId || 'sec_9a',
+          sectionName: 'Section A',
+          teacherName: 'Dr. Rao',
+          teacherEmployeeId: 'emp_rao',
+          title: body.title,
+          instructions: body.instructions,
+          submissionType: body.submissionType || 'ONLINE',
+          status: body.publishNow ? 'PUBLISHED' : 'DRAFT',
+          dueDate: body.dueDate || null,
+          dueTime: body.dueTime || null,
+          maxMarks: body.maxMarks || 100,
+          allowResubmission: body.allowResubmission ?? true,
+          publishedAt: body.publishNow ? new Date().toISOString() : null,
+          closedAt: null,
+          totalRecipients: 28,
+          submittedCount: 0,
+          pendingCount: 28,
+          reviewedCount: 0,
+          lateCount: 0,
+          attachments: body.attachments || [],
+          createdAt: new Date().toISOString(),
+        };
+        state.homework.teacherAssignments.push(newHw);
+        return json(201, { success: true, data: newHw });
+      }
+      const pubMatch = path.match(/^\/homework\/teacher\/assignments\/([^/?]+)\/publish$/);
+      if (pubMatch && method === 'POST') {
+        const hw = state.homework.teacherAssignments.find((h: any) => h.id === pubMatch[1]);
+        if (hw) {
+          hw.status = 'PUBLISHED';
+          hw.publishedAt = new Date().toISOString();
+        }
+        return json(200, { success: true });
+      }
+      const closeMatch = path.match(/^\/homework\/teacher\/assignments\/([^/?]+)\/close$/);
+      if (closeMatch && method === 'POST') {
+        const hw = state.homework.teacherAssignments.find((h: any) => h.id === closeMatch[1]);
+        if (hw) {
+          hw.status = 'CLOSED';
+          hw.closedAt = new Date().toISOString();
+        }
+        return json(200, { success: true });
+      }
+      const reviewMatch = path.match(/^\/homework\/teacher\/submissions\/([^/?]+)\/review$/);
+      if (reviewMatch && method === 'POST') {
+        const body = typeof reqInit?.body === 'string' ? JSON.parse(reqInit.body) : {};
+        const sub = state.homework.submissions.find((s: any) => s.id === reviewMatch[1]);
+        if (sub) {
+          sub.status = body.status || 'REVIEWED';
+          sub.marksObtained = body.marksObtained;
+          sub.grade = body.grade;
+          sub.feedback = body.feedback;
+          sub.resubmissionAllowed = body.resubmissionAllowed ?? sub.resubmissionAllowed;
+          sub.evaluatedAt = new Date().toISOString();
+        }
+        return json(200, { success: true });
+      }
+      if (path === '/homework/student/assignments' && method === 'GET') {
+        return json(200, { success: true, data: state.homework.studentAssignments });
+      }
+      const submitMatch = path.match(/^\/homework\/student\/assignments\/([^/?]+)\/submit$/);
+      if (submitMatch && method === 'POST') {
+        const body = typeof reqInit?.body === 'string' ? JSON.parse(reqInit.body) : {};
+        const hw = state.homework.studentAssignments.find((h: any) => h.id === submitMatch[1]);
+        if (hw) {
+          hw.submissionStatus = 'SUBMITTED';
+          hw.submittedAt = new Date().toISOString();
+          hw.mySubmissionText = body.submissionText || '';
+          hw.mySubmissionFiles = body.files || [];
+        }
+        return json(200, { success: true });
+      }
+      const parentHwMatch = path.match(/^\/homework\/parent\/children\/([^/?]+)\/assignments$/);
+      if (parentHwMatch && method === 'GET') {
+        return json(200, { success: true, data: state.homework.studentAssignments });
+      }
+    }
+    if (path.startsWith('/vault/')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (path === '/vault/authority' && method === 'GET') {
+        return json(200, { success: true, data: state.vault.authority });
+      }
+      if (path === '/vault/devices' && method === 'GET') {
+        const active = state.vault.devices.filter((d: any) => d.status === 'ACTIVE');
+        return json(200, {
+          success: true,
+          data: {
+            devices: state.vault.devices,
+            activeCount: active.length,
+            maxAllowed: 2,
+            canEnrollSecond: active.length === 1,
+            limitReached: active.length >= 2,
+          },
+        });
+      }
+      if (path === '/vault/devices/enroll' && method === 'POST') {
+        const reqBody = typeof reqInit?.body === 'string' ? JSON.parse(reqInit.body) : {};
+        const active = state.vault.devices.filter((d: any) => d.status === 'ACTIVE');
+        if (active.length >= 2) {
+          return json(400, { code: 'DEVICE_LIMIT_EXCEEDED', message: 'Maximum of 2 hardware authenticators reached.' });
+        }
+        const hasSlot1 = active.some((d: any) => d.deviceNumber === 1);
+        const deviceNumber = hasSlot1 ? 2 : 1;
+        const newDev = {
+          id: `dev_${state.vault.devices.length + 1}`,
+          deviceNumber,
+          deviceLabel: reqBody.deviceLabel || 'New Authenticator',
+          deviceType: reqBody.deviceType || 'PLATFORM_AUTHENTICATOR',
+          status: 'ACTIVE',
+          publicKey: reqBody.publicKey || 'MOCK_PUBKEY',
+          aaguid: null,
+          enrolledAt: new Date().toISOString(),
+          lastUsedAt: null,
+        };
+        state.vault.devices.push(newDev);
+        return json(201, { success: true, data: newDev });
+      }
+      const revokeMatch = path.match(/^\/vault\/devices\/([^/?]+)\/revoke$/);
+      if (revokeMatch && method === 'POST') {
+        const dev = state.vault.devices.find((d: any) => d.id === revokeMatch[1]);
+        if (dev) {
+          dev.status = 'REVOKED';
+        }
+        return json(200, { success: true, data: { revoked: true } });
+      }
+      if (path === '/vault/epoch' && method === 'GET') {
+        return json(200, { success: true, data: state.vault.epoch });
+      }
+      if (path === '/vault/recovery/ceremony' && method === 'POST') {
+        const c = {
+          ceremonyId: `cer_${Date.now()}`,
+          status: 'IN_PROGRESS',
+          requiredShares: 2,
+          presentedShares: 0,
+          createdAt: new Date().toISOString(),
+        };
+        state.vault.ceremonies.push(c);
+        return json(201, { success: true, data: c });
+      }
+      if (path === '/vault/recovery/share' && method === 'POST') {
+        return json(200, { success: true, data: { isComplete: true, sharesPresented: 2 } });
+      }
+    }
+    if (path.startsWith('/documents')) {
+      if (!state.session) return err(401, 'UNAUTHORIZED');
+      if (path === '/documents' && method === 'GET') {
+        return json(200, { success: true, data: state.documents.items });
+      }
+      const dlMatch = path.match(/^\/documents\/([^/?]+)\/download-url$/);
+      if (dlMatch && method === 'GET') {
+        return json(200, {
+          success: true,
+          data: {
+            downloadUrl: `https://storage.internal.example/files/${dlMatch[1]}?sig=mocked_presigned_url`,
+            expiresInSeconds: 300,
+          },
+        });
+      }
+      if (path === '/documents/uploads' && method === 'POST') {
+        const fileId = `doc-${Date.now()}`;
+        return json(201, {
+          success: true,
+          data: {
+            fileId,
+            uploadUrl: `https://storage.internal.example/uploads/${fileId}?sig=mocked_upload_url`,
+          },
+        });
+      }
+      const completeMatch = path.match(/^\/documents\/uploads\/([^/?]+)\/complete$/);
+      if (completeMatch && method === 'POST') {
+        return json(200, { success: true, data: { status: 'SCANNING' } });
       }
     }
     if (path.startsWith('/academics/') || /^\/students\/[^/]+\/term-enrollments/.test(path)) {

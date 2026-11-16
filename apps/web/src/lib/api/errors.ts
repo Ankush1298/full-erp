@@ -8,6 +8,8 @@ export type ApiErrorKind =
   | 'forbidden' // 403 (authorization)
   | 'csrf' // 403 CSRF_REJECTED (origin / token)
   | 'mfa_required' // 403 MFA_REQUIRED
+  | 'module_not_entitled' // 403 MODULE_NOT_ENTITLED
+  | 'institution_suspended' // 403 INSTITUTION_SUSPENDED
   | 'not_found' // 404
   | 'rate_limited' // 429
   | 'validation' // 400 / 413 / 422
@@ -46,10 +48,22 @@ export function kindForStatus(status: number, code: string | undefined): ApiErro
   if (status === 403) {
     if (code === 'CSRF_REJECTED') return 'csrf';
     if (code === 'MFA_REQUIRED') return 'mfa_required';
+    if (code === 'MODULE_NOT_ENTITLED') return 'module_not_entitled';
+    if (code === 'INSTITUTION_SUSPENDED') return 'institution_suspended';
     return 'forbidden';
   }
   if (status === 404) return 'not_found';
   if (status === 429) return 'rate_limited';
   if (status >= 500) return 'server';
   return 'validation';
+}
+
+export function isModuleNotEntitled(err: unknown): boolean {
+  if (!isApiError(err)) return false;
+  return err.kind === 'module_not_entitled' || err.code === 'MODULE_NOT_ENTITLED';
+}
+
+export function isInstitutionSuspended(err: unknown): boolean {
+  if (!isApiError(err)) return false;
+  return err.kind === 'institution_suspended' || err.code === 'INSTITUTION_SUSPENDED';
 }

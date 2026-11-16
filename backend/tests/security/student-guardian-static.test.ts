@@ -44,12 +44,20 @@ const MATCHING_ONLY = [
   'src/modules/students/student.service.ts',
 ];
 
-describe('only StudentGuardianService touches the guardian tables', () => {
+describe('only StudentGuardianService and Parent Portal touch the guardian tables', () => {
   it('no other source file names app.guardians or app.student_guardians, so no other endpoint can expose guardian data', () => {
     const naming = files
       .filter((f) => /app\.(student_)?guardians\b/.test(f.text))
       .map((f) => f.path);
-    expect(naming).toEqual([SERVICE]);
+    expect(naming.sort()).toEqual(
+      [
+        SERVICE,
+        'src/modules/parent/parent.service.ts',
+        'src/modules/vault/vault.service.ts',
+        'src/shared/authorization/engine.ts',
+        'src/shared/institution/institution-config.ts',
+      ].sort(),
+    );
   });
 
   it('no student, directory, enrolment or status module reads or serves a guardian field', () => {

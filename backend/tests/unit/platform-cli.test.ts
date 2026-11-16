@@ -8,6 +8,7 @@ import {
   createSupportGrant,
   createTenant,
   EMAIL_REGEX,
+  grantAuthority,
   parseArgs,
   seedTenant,
   SLUG_REGEX,
@@ -353,6 +354,115 @@ describe('Platform CLI (Unit)', () => {
       ).toThrow(SupportGrantsNotImplementedError);
       expect(() => createSupportGrant()).toThrow(/not implemented/);
       expect(SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE).not.toMatch(/signature/i);
+    });
+  });
+
+  describe('grantAuthority', () => {
+    it('requires tenant, approvedBy, and justification', async () => {
+      const mockDb = { query: vi.fn() };
+
+      await expect(
+        grantAuthority(mockDb, {
+          tenant: '',
+          authority: 'SECURITY_AUTHORITY',
+          approvedBy: 'super-admin@campusos.test',
+          justification: 'Audited ISA setup',
+        }),
+      ).rejects.toThrow('Tenant identifier (ID or slug) is required');
+
+      await expect(
+        grantAuthority(mockDb, {
+          tenant: 'apex-school',
+          authority: 'SECURITY_AUTHORITY',
+          approvedBy: '',
+          justification: 'Audited ISA setup',
+        }),
+      ).rejects.toThrow('--approved-by is required for critical authority delegation');
+
+      await expect(
+        grantAuthority(mockDb, {
+          tenant: 'apex-school',
+          authority: 'SECURITY_AUTHORITY',
+          approvedBy: 'super-admin@campusos.test',
+          justification: '',
+        }),
+      ).rejects.toThrow('--justification is required for critical authority delegation');
+    });
+
+    it('rejects invalid authority type', async () => {
+      const mockDb = { query: vi.fn() };
+      await expect(
+        grantAuthority(mockDb, {
+          tenant: 'apex-school',
+          authority: 'SUPER_ADMIN_AUTHORITY' as any,
+          approvedBy: 'super-admin@campusos.test',
+          justification: 'Audited setup',
+        }),
+      ).rejects.toThrow('Invalid authority type');
+    });
+
+    it('grants SECURITY_AUTHORITY permissions transactionally', async () => {
+      const mockDb = {
+        query: vi.fn().mockImplementation(async (sql: string, _params?: any[]) => {
+          if (sql.includes('SELECT id, name, slug FROM app.organizations')) {
+            return { rows: [{ id: 'org-123', name: 'Apex School', slug: 'apex-school' }] };
+          }
+          if (sql.includes('SELECT id FROM app.roles')) {
+            return { rows: [{ id: 'role-col-admin' }] };
+          }
+          return { rows: [] };
+        }),
+      };
+
+      const res = await grantAuthority(mockDb, {
+        tenant: 'apex-school',
+        authority: 'SECURITY_AUTHORITY',
+        approvedBy: 'board@apex-school.test',
+        justification: 'Board Resolution 2026/04 for Principal ISA appointment',
+      });
+
+      expect(res.organizationId).toBe('org-123');
+      expect(res.authority).toBe('SECURITY_AUTHORITY');
+      expect(res.roleCode).toBe('COLLEGE_ADMIN');
+      expect(res.grantedPermissions).toEqual([
+        'vault.authority.manage',
+        'vault.device.manage',
+        'vault.recovery.initiate',
+        'vault.grant.issue',
+      ]);
+
+      expect(mockDb.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockDb.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('grants FINANCIAL_GATEWAY_AUTHORITY permissions transactionally', async () => {
+      const mockDb = {
+        query: vi.fn().mockImplementation(async (sql: string, _params?: any[]) => {
+          if (sql.includes('SELECT id, name, slug FROM app.organizations')) {
+            return { rows: [{ id: 'org-456', name: 'Apex College', slug: 'apex-college' }] };
+          }
+          if (sql.includes('SELECT id FROM app.roles')) {
+            return { rows: [{ id: 'role-fin-admin' }] };
+          }
+          return { rows: [] };
+        }),
+      };
+
+      const res = await grantAuthority(mockDb, {
+        tenant: 'apex-college',
+        authority: 'FINANCIAL_GATEWAY_AUTHORITY',
+        roleCode: 'FINANCE_ADMIN',
+        approvedBy: 'bursar@apex-college.test',
+        justification: 'Merchant API gateway configuration',
+      });
+
+      expect(res.organizationId).toBe('org-456');
+      expect(res.authority).toBe('FINANCIAL_GATEWAY_AUTHORITY');
+      expect(res.roleCode).toBe('FINANCE_ADMIN');
+      expect(res.grantedPermissions).toEqual([
+        'fee.gateway.manage',
+        'fee.refund.initiate',
+      ]);
     });
   });
 });

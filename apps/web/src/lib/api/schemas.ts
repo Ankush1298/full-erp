@@ -19,6 +19,7 @@ export const MeResponseSchema = z.object({
   // Doc 44: display names for the caller's own roles; absent from older servers.
   institution_type: z.enum(['SCHOOL', 'COLLEGE', 'UNIVERSITY']).nullable().default(null),
   role_labels: z.record(z.string(), z.string()).default({}),
+  entitled_modules: z.array(z.string()).optional().default([]),
   csrf_token: z.string().min(16),
 });
 

@@ -46,7 +46,7 @@ describe('permission seed', () => {
       scope_mode: string | null;
     }>(
       `SELECT r.code, p.permission_code, p.scope_mode FROM app.roles r
-           LEFT JOIN app.role_permissions p ON p.organization_id = r.organization_id AND p.role_id = r.id WHERE r.organization_id = $1`,
+           LEFT JOIN app.role_permissions p ON p.organization_id = r.organization_id AND p.role_id = r.id WHERE r.organization_id = $1 AND r.code != 'PARENT'`,
       [ORG_C],
     );
     const actual: Record<string, Record<string, string>> = {};
@@ -57,13 +57,24 @@ describe('permission seed', () => {
     expect(actual).toEqual(ROLE_MATRIX);
   }, 60_000);
 
-  it('re-seeding removes a grant that is no longer in the matrix', async () => {
+  it('reconciliation preserves custom grants by default, and removes them when purgeOrphanGrants is true', async () => {
     await adminQuery(
       `INSERT INTO app.role_permissions (organization_id, role_id, permission_code, scope_mode)
-       SELECT organization_id, id, 'org.settings.read', 'GRANTED' FROM app.roles WHERE organization_id = $1 AND code = 'STAFF'`,
+       SELECT organization_id, id, 'org.settings.read', 'GRANTED' FROM app.roles WHERE organization_id = $1 AND code = 'STAFF'
+       ON CONFLICT DO NOTHING`,
       [ORG_C],
     );
+
+    // Default safe reconciliation preserves custom grant
     await seedTenantRoles(exec, ORG_C);
+    const preserved = await adminQuery(
+      `SELECT 1 FROM app.role_permissions p JOIN app.roles r ON r.id = p.role_id WHERE r.organization_id = $1 AND r.code = 'STAFF' AND p.permission_code = 'org.settings.read'`,
+      [ORG_C],
+    );
+    expect(preserved).toHaveLength(1);
+
+    // Explicit purge removes the grant that is no longer in the matrix
+    await seedTenantRoles(exec, ORG_C, { purgeOrphanGrants: true });
     const left = await adminQuery(
       `SELECT 1 FROM app.role_permissions p JOIN app.roles r ON r.id = p.role_id WHERE r.organization_id = $1 AND r.code = 'STAFF' AND p.permission_code = 'org.settings.read'`,
       [ORG_C],

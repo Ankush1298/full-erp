@@ -99,6 +99,7 @@ describe('0027: shape of the new objects', () => {
       'organization_id',
       'phone',
       'updated_at',
+      'user_id',
       'version',
     ]);
     const [p] = await adminQuery<{ sel: boolean; ins: boolean; del: boolean; trunc: boolean }>(

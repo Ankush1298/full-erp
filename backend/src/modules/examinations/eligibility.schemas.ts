@@ -169,13 +169,7 @@ export const ApprovalRulesSchema = z.object({
   results_workflow: z
     .enum(['DRAFT_REVIEW_PUBLISH', 'DIRECT_PUBLISH'])
     .default('DRAFT_REVIEW_PUBLISH'),
-  delegated_roles: z.array(z.string()).default([
-    'COLLEGE_ADMIN',
-    'CAMPUS_ADMIN',
-    'REGISTRAR',
-    'DEPARTMENT_ADMIN',
-    'HOD',
-  ]),
+  delegated_roles: z.array(z.string()).default([]),
   effective_date: z.string().optional(),
   notes: z.string().max(500).optional(),
 });

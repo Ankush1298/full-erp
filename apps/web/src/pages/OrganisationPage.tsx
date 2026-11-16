@@ -25,7 +25,6 @@ import {
 type Tab = 'campuses' | 'departments' | 'rooms';
 
 export function OrganisationPage() {
-  usePageTitle('Organisation Structure');
   const { client, identity } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('campuses');
   const [campuses, setCampuses] = useState<CampusItem[]>([]);
@@ -47,6 +46,36 @@ export function OrganisationPage() {
   const [rPending, setRPending] = useState(false);
 
   const canManageCampus = Boolean(identity && can(identity, 'org.campus.manage'));
+
+  const roles = identity?.roles ?? [];
+  const isPrincipal = roles.includes('COLLEGE_ADMIN');
+  const isCampusAdmin = roles.includes('CAMPUS_ADMIN');
+  const isHOD = roles.includes('HOD') || roles.includes('DEPARTMENT_ADMIN');
+  const isTeacher = roles.includes('FACULTY') && !isPrincipal && !isCampusAdmin;
+  const isStudentOrParent = (roles.includes('STUDENT') || roles.includes('PARENT')) && !isPrincipal && !isTeacher;
+
+  // Determine dynamic page header title and subtitle based on user role
+  let pageTitle = 'Organisation Structure';
+  let pageSubtitle = 'Institutional structure records, campuses, academic departments, and physical facilities.';
+
+  if (isPrincipal) {
+    pageTitle = 'Organisation Structure & Facilities Administration';
+    pageSubtitle = 'Full institutional management: configure campuses, academic departments, rooms, and facility operations.';
+  } else if (isCampusAdmin) {
+    pageTitle = 'Campus Facilities & Rooms Administration';
+    pageSubtitle = 'Campus infrastructure management: configure rooms, facilities, and campus operations.';
+  } else if (isHOD) {
+    pageTitle = 'Departmental Structure & Facility Directory';
+    pageSubtitle = 'Departmental academic structure and allocated classrooms, laboratories, and facilities.';
+  } else if (isTeacher) {
+    pageTitle = 'Campus & Classroom Facilities Directory';
+    pageSubtitle = 'Read-only institutional directory of classrooms, laboratories, lecture halls, and academic departments for timetable reference.';
+  } else if (isStudentOrParent) {
+    pageTitle = 'Campus & Department Directory';
+    pageSubtitle = 'Institutional directory of campuses, departments, and learning facilities.';
+  }
+
+  usePageTitle(pageTitle);
 
   const loadBaseData = useCallback(() => {
     setLoading(true);
@@ -137,8 +166,8 @@ export function OrganisationPage() {
   return (
     <>
       <PageHeader
-        title="Organisation Structure"
-        subtitle="Institutional structure records, campuses, academic departments, and physical facilities."
+        title={pageTitle}
+        subtitle={pageSubtitle}
         actions={
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <Button
@@ -165,6 +194,42 @@ export function OrganisationPage() {
           </div>
         }
       />
+
+      {/* Role Context Alert Banner */}
+      <div style={{ marginBottom: 'var(--space-4)' }}>
+        {isPrincipal && (
+          <Alert tone="info">
+            <strong>Institution Administrator (Principal):</strong> Full administrative access to
+            manage campuses, academic departments, and physical facilities. Changes take immediate
+            effect across timetables and scheduling.
+          </Alert>
+        )}
+        {isCampusAdmin && (
+          <Alert tone="info">
+            <strong>Campus Administrator:</strong> Scoped access to manage facilities and physical room
+            allocations for this campus.
+          </Alert>
+        )}
+        {isHOD && (
+          <Alert tone="info">
+            <strong>Department Head (HOD):</strong> Departmental structure view. Physical room
+            infrastructure is managed by Campus Operations.
+          </Alert>
+        )}
+        {isTeacher && (
+          <Alert tone="info">
+            <strong>Teacher / Faculty Directory:</strong> Read-only directory of institutional
+            classrooms, laboratories, and lecture halls for timetable reference. Room provisioning
+            is restricted to Campus Administrators and Principals.
+          </Alert>
+        )}
+        {isStudentOrParent && (
+          <Alert tone="info">
+            <strong>Institutional Directory:</strong> Read-only directory of campuses, departments,
+            and learning facilities.
+          </Alert>
+        )}
+      </div>
 
       {error && (
         <ErrorState
@@ -261,6 +326,9 @@ export function OrganisationPage() {
                   </option>
                 ))}
               </select>
+              {!canManageCampus && (
+                <Badge tone="neutral">Read-only facility directory</Badge>
+              )}
             </div>
 
             {canManageCampus && (
@@ -330,8 +398,37 @@ export function OrganisationPage() {
           {loadingRooms ? (
             <Spinner label="Loading rooms…" />
           ) : rooms.length === 0 ? (
-            <Card title="No rooms">
-              <p className="muted">No rooms have been added to this campus yet.</p>
+            <Card title="No rooms configured">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <p>
+                  No classrooms, lecture halls, or laboratories have been registered for this campus yet.
+                </p>
+                <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
+                  <p style={{ margin: '0 0 var(--space-1) 0' }}>
+                    <strong>What are rooms used for?</strong> Rooms represent physical spaces across campuses —
+                    such as lecture halls, computer/science laboratories, seminar rooms, and tutorial classrooms.
+                    They are linked to academic timetable periods, section assignments, and exam hall seating plans.
+                  </p>
+                  <p style={{ margin: '0' }}>
+                    <strong>Who configures rooms?</strong> Physical room infrastructure is created and maintained by{' '}
+                    <strong>Campus Administrators</strong> and <strong>Principals</strong> (<code>org.campus.manage</code>).
+                  </p>
+                </div>
+                {canManageCampus ? (
+                  <div style={{ marginTop: 'var(--space-2)' }}>
+                    <Button variant="primary" onClick={() => setShowAddRoom(true)}>
+                      + Create First Campus Room
+                    </Button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+                    <Badge tone="neutral">Restricted to Campus Administrators</Badge>
+                    <span className="muted" style={{ fontSize: '0.85rem' }}>
+                      Faculty members have read-only access for timetable referencing.
+                    </span>
+                  </div>
+                )}
+              </div>
             </Card>
           ) : (
             <div className="grid">

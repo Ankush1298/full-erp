@@ -4,6 +4,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { PageHeader } from '../components/ui/PageHeader';
+import { SegmentedNav } from '../components/ui/SegmentedNav';
 import { Spinner } from '../components/ui/Spinner';
 import { StatCard } from '../components/ui/StatCard';
 import { TextField } from '../components/ui/TextField';
@@ -11,7 +12,8 @@ import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useStepUp } from '../features/auth/StepUp';
 import { can } from '../features/auth/identity';
-import { isApiError } from '../lib/api/errors';
+import { isApiError, isModuleNotEntitled, isInstitutionSuspended } from '../lib/api/errors';
+import { FeatureUnavailableState, InstitutionSuspendedState } from '../components/ui/FeatureUnavailableState';
 import {
   amendPublishedExamResult,
   approveCandidateList,
@@ -110,6 +112,8 @@ export function ExaminationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isNotEntitled, setIsNotEntitled] = useState(false);
+  const [isSuspended, setIsSuspended] = useState(false);
 
   // Common lists
   const [examinations, setExaminations] = useState<ExaminationDto[]>([]);
@@ -233,7 +237,15 @@ export function ExaminationsPage() {
         }
       } catch (err) {
         if (!active) return;
-        setError(isApiError(err) ? err.message : 'Failed to load examinations.');
+        if (isModuleNotEntitled(err)) {
+          setIsNotEntitled(true);
+          setError(null);
+        } else if (isInstitutionSuspended(err)) {
+          setIsSuspended(true);
+          setError(null);
+        } else {
+          setError(isApiError(err) ? err.message : 'Failed to load examinations.');
+        }
       }
     }
 
@@ -287,7 +299,15 @@ export function ExaminationsPage() {
         }
       } catch (err) {
         if (!active) return;
-        setError(isApiError(err) ? err.message : 'Failed to load schedules.');
+        if (isModuleNotEntitled(err)) {
+          setIsNotEntitled(true);
+          setError(null);
+        } else if (isInstitutionSuspended(err)) {
+          setIsSuspended(true);
+          setError(null);
+        } else {
+          setError(isApiError(err) ? err.message : 'Failed to load schedules.');
+        }
       }
     }
 
@@ -323,7 +343,15 @@ export function ExaminationsPage() {
         }
       } catch (err) {
         if (!active) return;
-        setError(isApiError(err) ? err.message : 'Failed to load candidates or policy.');
+        if (isModuleNotEntitled(err)) {
+          setIsNotEntitled(true);
+          setError(null);
+        } else if (isInstitutionSuspended(err)) {
+          setIsSuspended(true);
+          setError(null);
+        } else {
+          setError(isApiError(err) ? err.message : 'Failed to load candidates or policy.');
+        }
       } finally {
         if (active) setLoadingCandidates(false);
       }
@@ -427,7 +455,15 @@ export function ExaminationsPage() {
         }
       } catch (err) {
         if (!active) return;
-        setError(isApiError(err) ? err.message : 'Failed to load examination results.');
+        if (isModuleNotEntitled(err)) {
+          setIsNotEntitled(true);
+          setError(null);
+        } else if (isInstitutionSuspended(err)) {
+          setIsSuspended(true);
+          setError(null);
+        } else {
+          setError(isApiError(err) ? err.message : 'Failed to load examination results.');
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -703,6 +739,7 @@ export function ExaminationsPage() {
           status: correctionTarget.status,
           reason: correctionReason.trim(),
           evidence_url: correctionEvidenceUrl.trim() || null,
+          evidence_exception: !correctionEvidenceUrl.trim(),
         });
         setSuccess(`Published result for ${correctionTarget.student_name} amended and republished successfully.`);
       } else {
@@ -712,6 +749,7 @@ export function ExaminationsPage() {
           status: correctionTarget.status,
           reason: correctionReason.trim(),
           evidence_url: correctionEvidenceUrl.trim() || null,
+          evidence_exception: !correctionEvidenceUrl.trim(),
         });
         setSuccess(`Submitted mark for ${correctionTarget.student_name} corrected successfully.`);
       }
@@ -804,7 +842,16 @@ export function ExaminationsPage() {
         subtitle="Configure examination schedules, evaluate candidate eligibility rules, record student evaluations, and publish verified academic records."
       />
 
-      {!isStudent && (
+      {isNotEntitled ? (
+        <FeatureUnavailableState
+          moduleKey="examinations"
+          moduleName="Examinations & Results"
+        />
+      ) : isSuspended ? (
+        <InstitutionSuspendedState />
+      ) : (
+        <>
+          {!isStudent && (
         <div className="stat-grid" style={{ marginBottom: 'var(--space-4)' }}>
           <StatCard
             label="Examinations"
@@ -837,101 +884,20 @@ export function ExaminationsPage() {
       {success && <Alert tone="success">{success}</Alert>}
 
       {/* Navigation Tabs - Modern Segmented Control Bar */}
-      <div className="bg-surface-muted/60 p-1.5 rounded-xl border border-border shadow-xs">
-        <nav className="flex flex-wrap gap-1.5" aria-label="Examination sections">
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setTab('setup')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                tab === 'setup'
-                  ? 'bg-brand-700 text-white shadow-xs'
-                  : 'text-muted hover:text-foreground hover:bg-surface/80'
-              }`}
-            >
-              Examination Setup
-            </button>
-          )}
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setTab('policies')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                tab === 'policies'
-                  ? 'bg-brand-700 text-white shadow-xs'
-                  : 'text-muted hover:text-foreground hover:bg-surface/80'
-              }`}
-            >
-              Examination Policies & Settings
-            </button>
-          )}
-          {(canManage || canEnterMarks) && (
-            <button
-              type="button"
-              onClick={() => setTab('candidates')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                tab === 'candidates'
-                  ? 'bg-brand-700 text-white shadow-xs'
-                  : 'text-muted hover:text-foreground hover:bg-surface/80'
-              }`}
-            >
-              Eligibility & Candidates
-            </button>
-          )}
-          {canEnterMarks && (
-            <button
-              type="button"
-              onClick={() => setTab('marks')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                tab === 'marks'
-                  ? 'bg-brand-700 text-white shadow-xs'
-                  : 'text-muted hover:text-foreground hover:bg-surface/80'
-              }`}
-            >
-              Marks Entry
-            </button>
-          )}
-          {canPublish && (
-            <button
-              type="button"
-              onClick={() => setTab('publish')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                tab === 'publish'
-                  ? 'bg-brand-700 text-white shadow-xs'
-                  : 'text-muted hover:text-foreground hover:bg-surface/80'
-              }`}
-            >
-              Review & Publish
-            </button>
-          )}
-          {canReadResults && !isStudent && (
-            <button
-              type="button"
-              onClick={() => setTab('register')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                tab === 'register'
-                  ? 'bg-brand-700 text-white shadow-xs'
-                  : 'text-muted hover:text-foreground hover:bg-surface/80'
-              }`}
-            >
-              Marks Register
-            </button>
-          )}
-          {(isStudent || canReadResults) && (
-            <button
-              type="button"
-              onClick={() => setTab('results')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                tab === 'results'
-                  ? 'bg-brand-700 text-white shadow-xs'
-                  : 'text-muted hover:text-foreground hover:bg-surface/80'
-              }`}
-            >
-              {isStudent ? 'My Results' : 'Student Results'}
-            </button>
-          )}
-        </nav>
-      </div>
+      <SegmentedNav
+        items={[
+          ...(canManage ? [{ id: 'setup' as const, label: 'Examination Setup' }] : []),
+          ...(canManage ? [{ id: 'policies' as const, label: 'Examination Policies & Settings' }] : []),
+          ...(canManage || canEnterMarks ? [{ id: 'candidates' as const, label: 'Eligibility & Candidates' }] : []),
+          ...(canEnterMarks ? [{ id: 'marks' as const, label: 'Marks Entry' }] : []),
+          ...(canPublish ? [{ id: 'publish' as const, label: 'Review & Publish' }] : []),
+          ...(canReadResults && !isStudent ? [{ id: 'register' as const, label: 'Marks Register' }] : []),
+          ...(isStudent || canReadResults ? [{ id: 'results' as const, label: isStudent ? 'My Results' : 'Student Results' }] : []),
+        ]}
+        activeId={tab}
+        onChange={(id) => setTab(id)}
+        ariaLabel="Examination sections"
+      />
 
       {/* Filter / Selector Bar (for non-student staff views) */}
       {!isStudent && tab !== 'results' && (
@@ -2615,6 +2581,8 @@ export function ExaminationsPage() {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

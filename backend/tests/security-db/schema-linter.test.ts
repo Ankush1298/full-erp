@@ -218,6 +218,7 @@ describe('schema linter (S-2)', () => {
     );
     expect(rows.map((r) => r.relname).sort()).toEqual([
       'academic_years',
+      'adult_guardian_consents',
       'attendance_record_revisions',
       'attendance_records',
       'audit_events',
@@ -246,9 +247,17 @@ describe('schema linter (S-2)', () => {
       'files',
       'guardians',
       'holidays',
+      'homework_assignments',
+      'homework_attachments',
+      'homework_submission_files',
+      'homework_submissions',
       'idempotency_keys',
       'import_job_rows',
       'import_jobs',
+      'institution_recovery_ceremonies',
+      'institution_recovery_custodians',
+      'institution_security_authorities',
+      'institution_vault_epochs',
       'invite_tokens',
       'mfa_enrollment_tickets',
       'notification_deliveries',
@@ -278,7 +287,10 @@ describe('schema linter (S-2)', () => {
       'timetable_slots',
       'user_mfa_factors',
       'user_recovery_codes',
+      'user_vault_devices',
       'users',
+      'vault_key_grants',
+      'vault_protected_records',
     ]);
   });
 

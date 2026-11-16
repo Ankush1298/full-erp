@@ -131,3 +131,32 @@ export const LinkDocumentResponseSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+
+export const DocumentListItemSchema = Type.Object(
+  {
+    id: UuidV7Schema,
+    originalName: Type.String(),
+    storageClass: StorageClassSchema,
+    classification: ClassificationSchema,
+    contentType: Type.Union([Type.String(), Type.Null()]),
+    sizeBytes: Type.Union([Type.Integer(), Type.Null()]),
+    status: Type.String(),
+    scanResult: Type.Union([Type.String(), Type.Null()]),
+    createdAt: Type.String(),
+    uploadedBy: UuidV7Schema,
+    entityType: Type.Union([Type.String(), Type.Null()]),
+    entityId: Type.Union([UuidV7Schema, Type.Null()]),
+    purpose: Type.Union([Type.String(), Type.Null()]),
+    visibility: Type.Union([VisibilitySchema, Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+export type DocumentListItem = Static<typeof DocumentListItemSchema>;
+
+export const ListDocumentsResponseSchema = Type.Object(
+  {
+    success: Type.Literal(true),
+    data: Type.Array(DocumentListItemSchema),
+  },
+  { additionalProperties: false },
+);

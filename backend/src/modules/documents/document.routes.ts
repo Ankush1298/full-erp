@@ -15,6 +15,7 @@ import {
   LinkDocumentBodySchema,
   type LinkDocumentBody,
   LinkDocumentResponseSchema,
+  ListDocumentsResponseSchema,
   StudentIdParamSchema,
   type StudentIdParam,
   UploadIdParamSchema,
@@ -99,6 +100,20 @@ export const registerDocumentRoutes: FastifyPluginAsync<DocumentRouteDeps> = asy
       return reply.status(200).send({ success: true, data });
     },
   );
+
+  app.get(
+    '/',
+    {
+      config: { permission: 'document.read' },
+      schema: { response: { 200: ListDocumentsResponseSchema } },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) => service.listDocuments(tx, ctx));
+      return reply.status(200).send({ success: true, data });
+    },
+  );
 };
 
 /**
@@ -113,6 +128,25 @@ export const registerStudentDocumentRoutes: FastifyPluginAsync<DocumentRouteDeps
   if (!opts.db || !opts.storage)
     throw new Error('Database and storage are required for document routes.');
   const service = new DocumentService(opts.storage);
+
+  app.get<{ Params: StudentIdParam }>(
+    '/:id/documents',
+    {
+      config: { permission: 'document.read' },
+      schema: {
+        params: StudentIdParamSchema,
+        response: { 200: ListDocumentsResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        service.listDocuments(tx, ctx, { studentId: req.params.id }),
+      );
+      return reply.status(200).send({ success: true, data });
+    },
+  );
 
   app.post<{ Params: StudentIdParam; Body: LinkDocumentBody }>(
     '/:id/documents',

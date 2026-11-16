@@ -73,4 +73,12 @@
   --nav-width: 15.5rem;
   --content-max: 88rem;
   --tap: 2.75rem; /* minimum touch target */
+
+  /* Compatibility & Semantic Aliases for Anesa Design System */
+  --color-border-subtle: var(--color-border);
+  --color-fg-default: var(--color-text);
+  --color-fg-muted: var(--color-muted);
+  --color-bg-subtle: var(--color-primary-soft);
+  --color-accent: var(--color-primary);
+  --color-accent-soft: var(--color-primary-soft);
 }
