@@ -79,10 +79,12 @@ describe('Homework Attachments: Dual-Mode Upload, DB Integrity & RBAC Access Flo
     student1Id = T.students.one;
     student2Id = T.students.two;
 
-    await adminQuery(
-      `UPDATE platform.identities SET password_hash = $1 WHERE id IN ($2, $3, $4)`,
-      [HASH, T.users.faculty, T.users.studentOne, T.users.studentTwo],
-    );
+    await adminQuery(`UPDATE platform.identities SET password_hash = $1 WHERE id IN ($2, $3, $4)`, [
+      HASH,
+      T.users.faculty,
+      T.users.studentOne,
+      T.users.studentTwo,
+    ]);
 
     employeeId = await insert('employees', {
       user_id: T.users.faculty,
@@ -160,10 +162,9 @@ describe('Homework Attachments: Dual-Mode Upload, DB Integrity & RBAC Access Flo
       status: 'DRAFT',
     });
 
-    await adminQuery(
-      `UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`,
-      [courseOfferingId],
-    );
+    await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+      courseOfferingId,
+    ]);
 
     await insert('faculty_assignments', {
       course_offering_id: courseOfferingId,
@@ -210,10 +211,10 @@ describe('Homework Attachments: Dual-Mode Upload, DB Integrity & RBAC Access Flo
       status: 'REGISTERED',
     });
 
-    await adminQuery(
-      `UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`,
-      [te1, te2],
-    );
+    await adminQuery(`UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`, [
+      te1,
+      te2,
+    ]);
 
     await insert('section_memberships', {
       student_id: student1Id,
@@ -280,7 +281,10 @@ describe('Homework Attachments: Dual-Mode Upload, DB Integrity & RBAC Access Flo
     });
 
     expect(r.statusCode).toBe(200);
-    const body = r.json<{ success: boolean; data: { fileId: string; fileName: string; mimeType: string } }>();
+    const body = r.json<{
+      success: boolean;
+      data: { fileId: string; fileName: string; mimeType: string };
+    }>();
     expect(body.success).toBe(true);
     expect(body.data.fileName).toBe('Calculus_Problem_Set_1.pdf');
     expect(body.data.mimeType).toBe('application/pdf');
@@ -392,7 +396,10 @@ describe('Homework Attachments: Dual-Mode Upload, DB Integrity & RBAC Access Flo
       },
     });
     expect(rUrl.statusCode).toBe(200);
-    const bodyUrl = rUrl.json<{ success: boolean; data: { downloadUrl: string; fileName: string } }>();
+    const bodyUrl = rUrl.json<{
+      success: boolean;
+      data: { downloadUrl: string; fileName: string };
+    }>();
     expect(bodyUrl.success).toBe(true);
     expect(bodyUrl.data.fileName).toBe('Calculus_Problem_Set_1.pdf');
     expect(bodyUrl.data.downloadUrl).toContain('/api/v1/homework/attachments/');

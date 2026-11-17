@@ -109,7 +109,7 @@ export async function createTenant(
   const tenantId = uuidv7();
 
   // 1. Insert organization (checking if institution_type column exists)
-  let hasTypeCol = false;
+  let hasTypeCol: boolean;
   try {
     const colCheck = await db.query(
       `SELECT 1 FROM information_schema.columns
@@ -288,10 +288,7 @@ export const AUTHORITY_PERMISSIONS: Record<AuthorityType, readonly string[]> = {
     'vault.recovery.initiate',
     'vault.grant.issue',
   ],
-  FINANCIAL_GATEWAY_AUTHORITY: [
-    'fee.gateway.manage',
-    'fee.refund.initiate',
-  ],
+  FINANCIAL_GATEWAY_AUTHORITY: ['fee.gateway.manage', 'fee.refund.initiate'],
 };
 
 /**
@@ -305,13 +302,17 @@ export async function grantAuthority(
 ): Promise<GrantAuthorityOutput> {
   const ident = input.tenant?.trim();
   if (!ident) throw new Error('Tenant identifier (ID or slug) is required.');
-  if (!input.approvedBy?.trim()) throw new Error('--approved-by is required for critical authority delegation.');
-  if (!input.justification?.trim()) throw new Error('--justification is required for critical authority delegation.');
+  if (!input.approvedBy?.trim())
+    throw new Error('--approved-by is required for critical authority delegation.');
+  if (!input.justification?.trim())
+    throw new Error('--justification is required for critical authority delegation.');
 
   const roleCode = (input.roleCode || 'COLLEGE_ADMIN').trim().toUpperCase();
   const perms = AUTHORITY_PERMISSIONS[input.authority];
   if (!perms) {
-    throw new Error(`Invalid authority type "${input.authority}". Must be SECURITY_AUTHORITY or FINANCIAL_GATEWAY_AUTHORITY.`);
+    throw new Error(
+      `Invalid authority type "${input.authority}". Must be SECURITY_AUTHORITY or FINANCIAL_GATEWAY_AUTHORITY.`,
+    );
   }
 
   const orgRes = await db.query(

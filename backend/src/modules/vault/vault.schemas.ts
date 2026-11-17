@@ -13,11 +13,7 @@ export const InstitutionTitleEnum = z.enum([
 
 export const InstitutionTypeEnum = z.enum(['SCHOOL', 'COLLEGE', 'UNIVERSITY']);
 
-export const DeviceTypeEnum = z.enum([
-  'SECURITY_KEY',
-  'PLATFORM_AUTHENTICATOR',
-  'SMART_CARD',
-]);
+export const DeviceTypeEnum = z.enum(['SECURITY_KEY', 'PLATFORM_AUTHENTICATOR', 'SMART_CARD']);
 
 export const CapabilityKeyNameEnum = z.enum([
   'CWK_STUDENTS_PII',

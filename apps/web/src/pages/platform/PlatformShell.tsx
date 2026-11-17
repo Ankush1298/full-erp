@@ -15,7 +15,14 @@ const NAV_ITEMS: NavItem[] = [
     path: '/platform',
     label: 'Executive Dashboard',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <rect width="7" height="9" x="3" y="3" rx="1" />
         <rect width="7" height="5" x="14" y="3" rx="1" />
         <rect width="7" height="9" x="14" y="12" rx="1" />
@@ -27,7 +34,14 @@ const NAV_ITEMS: NavItem[] = [
     path: '/platform/institutions',
     label: 'Institutions Directory',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
         <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
         <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
@@ -42,7 +56,14 @@ const NAV_ITEMS: NavItem[] = [
     path: '/platform/entitlements',
     label: 'Module Marketplace',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="m7.5 4.27 9 5.15" />
         <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
         <path d="m3.3 7 8.7 5 8.7-5" />
@@ -54,7 +75,14 @@ const NAV_ITEMS: NavItem[] = [
     path: '/platform/plans',
     label: 'SaaS Plans & Pricing',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <rect width="20" height="14" x="2" y="5" rx="2" />
         <line x1="2" x2="22" y1="10" y2="10" />
       </svg>
@@ -64,7 +92,14 @@ const NAV_ITEMS: NavItem[] = [
     path: '/platform/roles',
     label: 'Universal Role Matrix',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
         <circle cx="12" cy="11" r="2" />
         <path d="m12 13 1 3" />
@@ -75,7 +110,14 @@ const NAV_ITEMS: NavItem[] = [
     path: '/platform/audit',
     label: 'Platform Audit Stream',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4" />
         <path d="M19 17V5a2 2 0 0 0-2-2H4" />
         <path d="M15 8h-5" />
@@ -138,9 +180,9 @@ export const PlatformShell: React.FC = () => {
     let mounted = true;
     platformApi
       .getMe()
-      .then((res: any) => {
-        if (mounted && res?.authenticated) {
-          setAuthenticatedOperator(res.operator || { role: 'OPERATOR' });
+      .then((res) => {
+        if (mounted && res?.role) {
+          setAuthenticatedOperator({ role: res.role });
         }
       })
       .catch(() => {
@@ -202,7 +244,7 @@ export const PlatformShell: React.FC = () => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (globalSearch.trim()) {
-      navigate(`/platform/institutions?search=${encodeURIComponent(globalSearch.trim())}`);
+      void navigate(`/platform/institutions?search=${encodeURIComponent(globalSearch.trim())}`);
     }
   };
 
@@ -256,9 +298,7 @@ export const PlatformShell: React.FC = () => {
             </button>
           </div>
 
-          {!sidebarCollapsed && (
-            <div className="sidebar-section-title">PLATFORM MANAGEMENT</div>
-          )}
+          {!sidebarCollapsed && <div className="sidebar-section-title">PLATFORM MANAGEMENT</div>}
 
           {/* Navigation Links with Professional SVGs */}
           <nav className="platform-nav" aria-label="Main platform routes">
@@ -295,7 +335,16 @@ export const PlatformShell: React.FC = () => {
               title="Configure Security Credentials"
               aria-label="Configure Security Credentials"
             >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
@@ -303,7 +352,14 @@ export const PlatformShell: React.FC = () => {
           ) : (
             <div className="platform-security-card">
               <div className="security-card-illustration" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
@@ -322,7 +378,11 @@ export const PlatformShell: React.FC = () => {
 
           {/* Quick Exit to School ERP for Mobile Drawer */}
           <div className="sidebar-quick-actions">
-            <Link to="/dashboard" className="sidebar-exit-link" onClick={() => setMobileMenuOpen(false)}>
+            <Link
+              to="/dashboard"
+              className="sidebar-exit-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
               ← Return to Campus ERP
             </Link>
           </div>
@@ -371,7 +431,16 @@ export const PlatformShell: React.FC = () => {
           {/* Desktop Search Input */}
           <form onSubmit={handleSearchSubmit} className="platform-topbar-search">
             <span className="topbar-search-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" x2="16.65" y1="21" y2="16.65" />
               </svg>
@@ -390,7 +459,10 @@ export const PlatformShell: React.FC = () => {
           <div className="platform-topbar-actions">
             {/* Desktop-only expanded action badges */}
             <div className="desktop-actions">
-              <div className="platform-health-pill" title="Strict physical schema isolation enforced">
+              <div
+                className="platform-health-pill"
+                title="Strict physical schema isolation enforced"
+              >
                 <span className="platform-health-dot" />
                 <span className="platform-health-text">Zero-Access Isolation: Active</span>
               </div>
@@ -403,7 +475,7 @@ export const PlatformShell: React.FC = () => {
               >
                 <span className="operator-role-tag">OPERATOR</span>
                 <span className="operator-token-preview">
-                  {authenticatedOperator ? 'Session: Active' : `Key: ••••${tokenInput.slice(-4)}`}
+                  {authenticatedOperator ? 'Active' : tokenInput ? 'Configured' : 'Missing'}
                 </span>
               </button>
 
@@ -411,14 +483,20 @@ export const PlatformShell: React.FC = () => {
                 <button
                   type="button"
                   className="platform-btn-logout"
-                  onClick={handleLogout}
+                  onClick={() => {
+                    void handleLogout();
+                  }}
                   title="End Operator Session"
                 >
                   Sign Out
                 </button>
               )}
 
-              <Link to="/dashboard" className="platform-exit-link" title="Return to Institution Portal">
+              <Link
+                to="/dashboard"
+                className="platform-exit-link"
+                title="Return to Institution Portal"
+              >
                 ← Switch to School ERP
               </Link>
             </div>
@@ -433,7 +511,16 @@ export const PlatformShell: React.FC = () => {
                 aria-expanded={accountMenuOpen}
               >
                 <span className="mobile-operator-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
@@ -444,12 +531,18 @@ export const PlatformShell: React.FC = () => {
 
               {/* Mobile Account Popover Menu */}
               {accountMenuOpen && (
-                <div className="platform-account-popover" role="dialog" aria-label="Operator quick actions">
+                <div
+                  className="platform-account-popover"
+                  role="dialog"
+                  aria-label="Operator quick actions"
+                >
                   <div className="popover-header">
                     <div className="popover-identity">
                       <span className="operator-role-tag">OPERATOR ENCLAVE</span>
                       <span className="popover-token-info">
-                        {authenticatedOperator ? 'Active Session' : `Key: ••••${tokenInput.slice(-4)}`}
+                        {authenticatedOperator
+                          ? 'Active Session'
+                          : `Key: ••••${tokenInput.slice(-4)}`}
                       </span>
                     </div>
                     <div className="popover-health-badge">
@@ -484,7 +577,7 @@ export const PlatformShell: React.FC = () => {
                         className="popover-action-btn popover-action-logout"
                         onClick={() => {
                           setAccountMenuOpen(false);
-                          handleLogout();
+                          void handleLogout();
                         }}
                       >
                         Sign Out
@@ -507,12 +600,18 @@ export const PlatformShell: React.FC = () => {
 
       {/* Operator Credential & Session Modal */}
       {showTokenModal && (
-        <div className="platform-modal-backdrop" onClick={() => setShowTokenModal(false)}>
+        <div
+          className="platform-modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowTokenModal(false);
+          }}
+        >
           <div
             className="platform-modal"
             role="dialog"
+            aria-modal="true"
             aria-labelledby="token-modal-title"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="platform-modal-header">
               <h2 id="token-modal-title">Platform Operator Authentication</h2>
@@ -525,10 +624,15 @@ export const PlatformShell: React.FC = () => {
                 ×
               </button>
             </div>
-            <form onSubmit={handleSaveToken} className="platform-modal-body">
+            <form
+              onSubmit={(e) => {
+                void handleSaveToken(e);
+              }}
+              className="platform-modal-body"
+            >
               <p className="modal-desc">
-                The Platform Owner Control Center communicates through a dedicated platform administration
-                channel using independent credentials.
+                The Platform Owner Control Center communicates through a dedicated platform
+                administration channel using independent credentials.
               </p>
 
               {loginError && (

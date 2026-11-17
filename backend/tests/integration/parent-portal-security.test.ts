@@ -28,10 +28,7 @@ interface Session {
   csrf: string;
 }
 
-const s = {} as Record<
-  'parentA' | 'parentB' | 'parentMulti' | 'revokedParent',
-  Session
->;
+const s = {} as Record<'parentA' | 'parentB' | 'parentMulti' | 'revokedParent', Session>;
 
 let student1Id: string;
 let student2Id: string;
@@ -75,7 +72,12 @@ describe('Parent Portal Authentication, Child Linking & Security Isolation', () 
       { id: parentBUserId, email: parentBEmail, name: 'Parent Bob', status: 'ACTIVE' },
       { id: parentMultiUserId, email: parentMultiEmail, name: 'Parent Multi', status: 'ACTIVE' },
       { id: revokedParentUserId, email: revokedEmail, name: 'Parent Revoked', status: 'ACTIVE' },
-      { id: suspendedParentUserId, email: suspendedEmail, name: 'Parent Suspended', status: 'SUSPENDED' },
+      {
+        id: suspendedParentUserId,
+        email: suspendedEmail,
+        name: 'Parent Suspended',
+        status: 'SUSPENDED',
+      },
     ];
 
     for (const u of users) {
@@ -255,7 +257,10 @@ describe('Parent Portal Authentication, Child Linking & Security Isolation', () 
       },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: { child: { studentId: string }; fees: { totalOutstanding: number } } }>();
+    const body = res.json<{
+      success: boolean;
+      data: { child: { studentId: string }; fees: { totalOutstanding: number } };
+    }>();
     expect(body.success).toBe(true);
     expect(body.data.child.studentId).toBe(student1Id);
     expect(body.data.fees.totalOutstanding).toBe(2500000);
@@ -304,7 +309,10 @@ describe('Parent Portal Authentication, Child Linking & Security Isolation', () 
       },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: { summary: { totalOutstanding: number }; dues: Array<{ dueNumber: string }> } }>();
+    const body = res.json<{
+      success: boolean;
+      data: { summary: { totalOutstanding: number }; dues: Array<{ dueNumber: string }> };
+    }>();
     expect(body.data.summary.totalOutstanding).toBe(2500000);
     expect(body.data.dues).toHaveLength(1);
     expect(body.data.dues[0]!.dueNumber).toBe('DUE-A-001');

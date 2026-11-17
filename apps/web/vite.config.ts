@@ -9,7 +9,9 @@ import { defineConfig } from 'vitest/config';
 // backend's CSRF origin check (development fallback) compares Origin with the Host it receives, so Host must
 // remain the browser's host. In production the reverse proxy applies the same contract.
 const apiOrigin = process.env['DEV_API_ORIGIN'] ?? 'http://127.0.0.1:4000';
-const platformApiOrigin = process.env['DEV_PLATFORM_API_ORIGIN'] ?? (process.env['VITEST'] ? apiOrigin : 'http://127.0.0.1:4001');
+const platformApiOrigin =
+  process.env['DEV_PLATFORM_API_ORIGIN'] ??
+  (process.env['VITEST'] ? apiOrigin : 'http://127.0.0.1:4001');
 
 export default defineConfig({
   plugins: [react()],

@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { platformApi, type PlatformStats } from '../../lib/api/platform-api';
 
+function isDevMock(status: string): boolean {
+  return /mock|in-memory|sandbox|dev/i.test(status);
+}
+
 export const PlatformDashboardPage: React.FC = () => {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,9 +21,9 @@ export const PlatformDashboardPage: React.FC = () => {
           setLoading(false);
         }
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (mounted) {
-          setError(err.message);
+          setError(err instanceof Error ? err.message : 'Unknown error');
           setLoading(false);
         }
       });
@@ -53,7 +57,8 @@ export const PlatformDashboardPage: React.FC = () => {
     );
   }
 
-  const { institutions, subscriptions, moduleAdoption, operationalHealth, recentAuditAlerts } = stats;
+  const { institutions, subscriptions, moduleAdoption, operationalHealth, recentAuditAlerts } =
+    stats;
 
   return (
     <div className="platform-page">
@@ -62,11 +67,15 @@ export const PlatformDashboardPage: React.FC = () => {
         <div>
           <h2 className="platform-page-title">Executive Control Dashboard</h2>
           <p className="platform-page-desc">
-            Multi-tenant ERP operational telemetry, institutional adoption, and cross-realm security status.
+            Multi-tenant ERP operational telemetry, institutional adoption, and cross-realm security
+            status.
           </p>
         </div>
         <div className="platform-page-actions">
-          <Link to="/platform/institutions?action=new" className="platform-btn platform-btn-primary">
+          <Link
+            to="/platform/institutions?action=new"
+            className="platform-btn platform-btn-primary"
+          >
             + Provision Institution
           </Link>
         </div>
@@ -79,7 +88,16 @@ export const PlatformDashboardPage: React.FC = () => {
           <div className="stat-card-header">
             <span className="stat-card-label">Total Institutions</span>
             <span className="stat-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
                 <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
                 <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
@@ -89,7 +107,8 @@ export const PlatformDashboardPage: React.FC = () => {
           <div className="stat-card-body">
             <span className="stat-card-value">{institutions.total}</span>
             <span className="stat-card-helper">
-              {institutions.active} Active • {institutions.schools} Schools, {institutions.colleges} Colleges, {institutions.universities} Universities
+              {institutions.active} Active • {institutions.schools} Schools, {institutions.colleges}{' '}
+              Colleges, {institutions.universities} Universities
             </span>
           </div>
         </div>
@@ -99,7 +118,16 @@ export const PlatformDashboardPage: React.FC = () => {
           <div className="stat-card-header">
             <span className="stat-card-label">Active Subscriptions</span>
             <span className="stat-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect width="20" height="14" x="2" y="5" rx="2" />
                 <line x1="2" x2="22" y1="10" y2="10" />
               </svg>
@@ -118,7 +146,16 @@ export const PlatformDashboardPage: React.FC = () => {
           <div className="stat-card-header">
             <span className="stat-card-label">Operational Health</span>
             <span className="stat-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
               </svg>
             </span>
@@ -126,7 +163,8 @@ export const PlatformDashboardPage: React.FC = () => {
           <div className="stat-card-body">
             <span className="stat-card-value text-emerald-700">100% SLA</span>
             <span className="stat-card-helper">
-              Active Pool: {operationalHealth.databaseConnections} Handles • Uptime: {Math.floor(operationalHealth.serverUptimeSeconds / 60)}m
+              Active Pool: {operationalHealth.databaseConnections} Handles • Uptime:{' '}
+              {Math.floor(operationalHealth.serverUptimeSeconds / 60)}m
             </span>
           </div>
         </div>
@@ -136,7 +174,16 @@ export const PlatformDashboardPage: React.FC = () => {
           <div className="stat-card-header">
             <span className="stat-card-label">Security & Audit Alerts</span>
             <span className="stat-card-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </span>
@@ -151,15 +198,17 @@ export const PlatformDashboardPage: React.FC = () => {
       </div>
 
       {/* Main Content Grid: Fleet Overview + Infrastructure Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+      <div className="platform-dashboard-grid">
         {/* Left 2 Cols: Institutional Segments & Module Adoption */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="platform-dashboard-main">
           {/* Institutional Segments Card with Reference Gradient Pills */}
           <div className="platform-card">
             <div className="platform-card-header mb-4">
               <div>
                 <h3 className="card-title">Institutional Fleet Composition</h3>
-                <p className="card-subtitle">Active distribution across higher education and school segments</p>
+                <p className="card-subtitle">
+                  Active distribution across higher education and school segments
+                </p>
               </div>
             </div>
 
@@ -167,7 +216,17 @@ export const PlatformDashboardPage: React.FC = () => {
               <div className="fleet-gradient-pill fleet-gradient-pill--coral">
                 <div className="pill-top-row">
                   <span className="pill-badge">K-12 School</span>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
                     <path d="M6 12v5c3 3 9 3 12 0v-5" />
                   </svg>
@@ -181,7 +240,17 @@ export const PlatformDashboardPage: React.FC = () => {
               <div className="fleet-gradient-pill fleet-gradient-pill--peach">
                 <div className="pill-top-row">
                   <span className="pill-badge">Colleges & Poly</span>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
                     <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
                     <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
@@ -196,7 +265,17 @@ export const PlatformDashboardPage: React.FC = () => {
               <div className="fleet-gradient-pill fleet-gradient-pill--indigo">
                 <div className="pill-top-row">
                   <span className="pill-badge">Universities</span>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
                     <path d="M2 12h20" />
@@ -219,10 +298,17 @@ export const PlatformDashboardPage: React.FC = () => {
                   <h3 className="card-title">Cluster Telemetry & Load</h3>
                   <p className="card-subtitle">Monthly authenticated API throughput & workloads</p>
                 </div>
-                <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-700">2026</span>
+                <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-700">
+                  2026
+                </span>
               </div>
-              <div className="w-full flex-1 flex flex-col justify-end pt-2">
-                <svg viewBox="0 0 320 120" className="w-full h-32" fill="none" aria-label="Monthly Telemetry Load Bar Chart">
+              <div className="chart-bar-container">
+                <svg
+                  viewBox="0 0 320 120"
+                  className="chart-bar-svg"
+                  fill="none"
+                  aria-label="Monthly Telemetry Load Bar Chart"
+                >
                   <defs>
                     <linearGradient id="purpleBarGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#504175" />
@@ -234,8 +320,24 @@ export const PlatformDashboardPage: React.FC = () => {
                     </linearGradient>
                   </defs>
                   {/* Subtle grid lines */}
-                  <line x1="10" y1="20" x2="310" y2="20" stroke="#F1F0F5" strokeWidth="1" strokeDasharray="3 3" />
-                  <line x1="10" y1="60" x2="310" y2="60" stroke="#F1F0F5" strokeWidth="1" strokeDasharray="3 3" />
+                  <line
+                    x1="10"
+                    y1="20"
+                    x2="310"
+                    y2="20"
+                    stroke="#F1F0F5"
+                    strokeWidth="1"
+                    strokeDasharray="3 3"
+                  />
+                  <line
+                    x1="10"
+                    y1="60"
+                    x2="310"
+                    y2="60"
+                    stroke="#F1F0F5"
+                    strokeWidth="1"
+                    strokeDasharray="3 3"
+                  />
                   <line x1="10" y1="100" x2="310" y2="100" stroke="#E5E3EC" strokeWidth="1" />
 
                   {/* 12 Months Bicolor Rounded Bars */}
@@ -272,15 +374,28 @@ export const PlatformDashboardPage: React.FC = () => {
                         rx="4"
                         fill="url(#coralBarGrad)"
                       />
-                      <text x={bar.x + 5} y="114" fontSize="8" fill="#887F9E" textAnchor="middle" fontWeight="600">
+                      <text
+                        x={bar.x + 5}
+                        y="114"
+                        fontSize="8"
+                        fill="#887F9E"
+                        textAnchor="middle"
+                        fontWeight="600"
+                      >
                         {bar.m}
                       </text>
                     </g>
                   ))}
                 </svg>
                 <div className="chart-legend-row justify-center">
-                  <span><span className="chart-legend-dot" style={{ background: '#504175' }} />Core ERP Traffic</span>
-                  <span><span className="chart-legend-dot" style={{ background: '#FF6584' }} />Auth & Security Scans</span>
+                  <span>
+                    <span className="chart-legend-dot" style={{ background: '#504175' }} />
+                    Core ERP Traffic
+                  </span>
+                  <span>
+                    <span className="chart-legend-dot" style={{ background: '#FF6584' }} />
+                    Auth & Security Scans
+                  </span>
                 </div>
               </div>
             </div>
@@ -291,9 +406,14 @@ export const PlatformDashboardPage: React.FC = () => {
                 <h3 className="card-title">Global Telemetry & Health</h3>
                 <p className="card-subtitle">Active multi-tenant isolation compliance</p>
               </div>
-              <div className="w-full flex-1 flex flex-col items-center justify-center pt-2">
-                <div className="relative flex items-center justify-center">
-                  <svg width="120" height="120" viewBox="0 0 120 120" className="transform -rotate-90">
+              <div className="chart-donut-container">
+                <div className="chart-donut-wrap">
+                  <svg
+                    width="120"
+                    height="120"
+                    viewBox="0 0 120 120"
+                    className="chart-donut-svg"
+                  >
                     <circle cx="60" cy="60" r="46" stroke="#F1EDF8" strokeWidth="14" fill="none" />
                     {/* Ring segment 1: Purple (60%) */}
                     <circle
@@ -332,15 +452,24 @@ export const PlatformDashboardPage: React.FC = () => {
                       strokeLinecap="round"
                     />
                   </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-xl font-extrabold text-slate-800 leading-none">100%</span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">SLA Up</span>
+                  <div className="chart-donut-center">
+                    <span className="chart-donut-value">100%</span>
+                    <span className="chart-donut-label">SLA Up</span>
                   </div>
                 </div>
                 <div className="chart-legend-row justify-center mt-3">
-                  <span><span className="chart-legend-dot" style={{ background: '#504175' }} />Active Campuses</span>
-                  <span><span className="chart-legend-dot" style={{ background: '#12723A' }} />DB Pools</span>
-                  <span><span className="chart-legend-dot" style={{ background: '#FF6584' }} />Enclave</span>
+                  <span>
+                    <span className="chart-legend-dot" style={{ background: '#504175' }} />
+                    Active Campuses
+                  </span>
+                  <span>
+                    <span className="chart-legend-dot" style={{ background: '#12723A' }} />
+                    DB Pools
+                  </span>
+                  <span>
+                    <span className="chart-legend-dot" style={{ background: '#FF6584' }} />
+                    Enclave
+                  </span>
                 </div>
               </div>
             </div>
@@ -351,25 +480,33 @@ export const PlatformDashboardPage: React.FC = () => {
             <div className="platform-card-header mb-4 flex justify-between items-center">
               <div>
                 <h3 className="card-title">ERP Module Adoption Across Fleet</h3>
-                <p className="card-subtitle">Active tenant entitlements across the 14 official Anesa ERP capabilities</p>
+                <p className="card-subtitle">
+                  Active tenant entitlements across the 14 official Anesa ERP capabilities
+                </p>
               </div>
-              <Link to="/platform/entitlements" className="text-xs font-bold text-purple-900 hover:underline">
+              <Link
+                to="/platform/entitlements"
+                className="text-xs font-bold text-purple-900 hover:underline"
+              >
                 Marketplace Catalog →
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+            <div className="module-adoption-grid">
               {Object.entries(moduleAdoption).map(([key, count]) => {
-                const percentage = institutions.total > 0 ? Math.round((count / institutions.total) * 100) : 0;
+                const percentage =
+                  institutions.total > 0 ? Math.round((count / institutions.total) * 100) : 0;
                 return (
-                  <div key={key} className="flex flex-col gap-1">
-                    <div className="flex justify-between text-xs font-semibold text-slate-700">
+                  <div key={key} className="module-adoption-item">
+                    <div className="module-adoption-header">
                       <span>{key.replace('_', ' ').toUpperCase()}</span>
-                      <span className="text-slate-500">{count}/{institutions.total} ({percentage}%)</span>
+                      <span className="module-adoption-count">
+                        {count}/{institutions.total} ({percentage}%)
+                      </span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="module-adoption-track">
                       <div
-                        className="h-full bg-purple-900 rounded-full"
+                        className="module-adoption-bar"
                         style={{ width: `${Math.max(percentage, 6)}%` }}
                       />
                     </div>
@@ -384,9 +521,14 @@ export const PlatformDashboardPage: React.FC = () => {
             <div className="platform-card-header mb-4 flex justify-between items-center">
               <div>
                 <h3 className="card-title">Recent Security Events & Privilege Audits</h3>
-                <p className="card-subtitle">Immutable audit trail streamed from platform middleware</p>
+                <p className="card-subtitle">
+                  Immutable audit trail streamed from platform middleware
+                </p>
               </div>
-              <Link to="/platform/audit" className="text-xs font-bold text-purple-900 hover:underline">
+              <Link
+                to="/platform/audit"
+                className="text-xs font-bold text-purple-900 hover:underline"
+              >
                 Full Audit Stream →
               </Link>
             </div>
@@ -411,8 +553,12 @@ export const PlatformDashboardPage: React.FC = () => {
                   <tbody>
                     {recentAuditAlerts.map((alert) => (
                       <tr key={alert.id}>
-                        <td className="text-slate-500 text-xs">{new Date(alert.occurredAt).toLocaleString()}</td>
-                        <td className="font-semibold text-xs">{alert.organizationName || 'System'}</td>
+                        <td className="text-slate-500 text-xs">
+                          {new Date(alert.occurredAt).toLocaleString()}
+                        </td>
+                        <td className="font-semibold text-xs">
+                          {alert.organizationName || 'System'}
+                        </td>
                         <td>
                           <code className="text-xs px-1.5 py-0.5 rounded bg-slate-100 font-mono text-slate-800">
                             {alert.action}
@@ -425,7 +571,9 @@ export const PlatformDashboardPage: React.FC = () => {
                           </span>
                         </td>
                         <td>
-                          <span className="text-xs text-slate-500 font-medium">{alert.actorType}</span>
+                          <span className="text-xs text-slate-500 font-medium">
+                            {alert.actorType}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -437,7 +585,7 @@ export const PlatformDashboardPage: React.FC = () => {
         </div>
 
         {/* Right 1 Col: Infrastructure Services & Zero-Access Enclave */}
-        <div className="flex flex-col gap-6">
+        <div className="platform-dashboard-sidebar">
           {/* Spotlight Hero Card (Matching Reference Spotlight Layout) */}
           <div className="platform-spotlight-hero">
             <div className="spotlight-banner">
@@ -452,45 +600,55 @@ export const PlatformDashboardPage: React.FC = () => {
             </div>
 
             <div className="spotlight-body">
-              <div className="flex flex-col gap-3.5 text-xs">
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
-                  <span className="text-slate-600 font-medium">Database Subsystem</span>
-                  <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              <div className="spotlight-metrics-list">
+                <div className="spotlight-metric-row">
+                  <span className="spotlight-metric-label">Database Subsystem</span>
+                  <span className="status-tag status-tag--emerald">
                     {operationalHealth.database}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
-                  <span className="text-slate-600 font-medium">Active Connection Pool</span>
-                  <span className="font-bold text-slate-800">
+                <div className="spotlight-metric-row">
+                  <span className="spotlight-metric-label">Active Connection Pool</span>
+                  <span className="spotlight-metric-value">
                     {operationalHealth.databaseConnections} client handles
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
-                  <span className="text-slate-600 font-medium">Object Storage Engine</span>
-                  <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <div className="spotlight-metric-row">
+                  <span className="spotlight-metric-label">Object Storage Engine</span>
+                  <span className="status-tag status-tag--emerald">
                     {operationalHealth.storageDriver}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
-                  <span className="text-slate-600 font-medium">Malware Scanner</span>
-                  <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <div className="spotlight-metric-row">
+                  <span className="spotlight-metric-label">Malware Scanner</span>
+                  <span className="status-tag status-tag--emerald">
                     {operationalHealth.malwareScanner}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
-                  <span className="text-slate-600 font-medium">Email Gateway</span>
-                  <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <div className="spotlight-metric-row">
+                  <span className="spotlight-metric-label">Email Gateway</span>
+                  <span
+                    className={`status-tag ${isDevMock(operationalHealth.emailDelivery)
+                      ? 'status-tag--amber'
+                      : 'status-tag--emerald'
+                      }`}
+                    title={
+                      isDevMock(operationalHealth.emailDelivery)
+                        ? 'Development mock transport active'
+                        : 'Live transactional SMTP active'
+                    }
+                  >
                     {operationalHealth.emailDelivery}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600 font-medium">Continuous Process Uptime</span>
-                  <span className="font-bold text-slate-800">
+                <div className="spotlight-metric-row">
+                  <span className="spotlight-metric-label">Continuous Process Uptime</span>
+                  <span className="spotlight-metric-value">
                     {Math.floor(operationalHealth.serverUptimeSeconds / 60)} minutes
                   </span>
                 </div>
@@ -500,7 +658,9 @@ export const PlatformDashboardPage: React.FC = () => {
               <div className="guarded-guarantee-list mt-3">
                 <strong>Strict Multi-Tenant Separation Guarantee:</strong>
                 <p className="mt-1">
-                  Platform operations run in a dedicated administrative realm. Platform credentials have zero read access to student grades, exam answer scripts, parent PII, or School Vault keys.
+                  Platform operations run in a dedicated administrative realm. Platform credentials
+                  have zero read access to student grades, exam answer scripts, parent PII, or
+                  School Vault keys.
                 </p>
               </div>
             </div>
@@ -509,27 +669,75 @@ export const PlatformDashboardPage: React.FC = () => {
           {/* Quick Platform Actions Card */}
           <div className="platform-card">
             <h3 className="card-title mb-3">Operator Quick Actions</h3>
-            <div className="flex flex-col gap-2">
-              <Link to="/platform/institutions" className="platform-btn platform-btn-secondary text-left justify-start">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="operator-actions-list">
+              <Link
+                to="/platform/institutions"
+                className="platform-btn platform-btn-secondary text-left justify-start"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
                 </svg>
                 Manage Institutions Directory
               </Link>
-              <Link to="/platform/entitlements" className="platform-btn platform-btn-secondary text-left justify-start">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <Link
+                to="/platform/entitlements"
+                className="platform-btn platform-btn-secondary text-left justify-start"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
                 </svg>
                 Configure Module Entitlements
               </Link>
-              <Link to="/platform/plans" className="platform-btn platform-btn-secondary text-left justify-start">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <Link
+                to="/platform/plans"
+                className="platform-btn platform-btn-secondary text-left justify-start"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <rect width="20" height="14" x="2" y="5" rx="2" />
                 </svg>
                 Review SaaS Plans & Pricing
               </Link>
-              <Link to="/platform/audit" className="platform-btn platform-btn-secondary text-left justify-start">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <Link
+                to="/platform/audit"
+                className="platform-btn platform-btn-secondary text-left justify-start"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4" />
                 </svg>
                 View Platform Audit Stream

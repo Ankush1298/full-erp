@@ -201,9 +201,7 @@ describe('AuthorizationEngine Schema Compatibility (Pre-0051 & Post-0051)', () =
 
     await db.withTenant(studentCtx, async (tx) => {
       // Intentionally invalid query should throw standard Postgres error
-      await expect(
-        tx.query('SELECT nonexistent_col_12345 FROM app.guardians'),
-      ).rejects.toThrow();
+      await expect(tx.query('SELECT nonexistent_col_12345 FROM app.guardians')).rejects.toThrow();
     });
   });
 });

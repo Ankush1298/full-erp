@@ -164,7 +164,7 @@ describe('SmtpInvitationMailer', () => {
   }
 
   it('rejects recipient email containing CRLF or invalid format', async () => {
-    const fakeTransporter = createMockTransporter(vi.fn().mockResolvedValue({} as SentMessageInfo));
+    const fakeTransporter = createMockTransporter(vi.fn().mockResolvedValue({}));
     const mailer = new SmtpInvitationMailer(validConfig, fakeTransporter);
 
     const crlfMail = new InvitationMail(
@@ -187,7 +187,7 @@ describe('SmtpInvitationMailer', () => {
   });
 
   it('sanitizes recipient name and organization name to prevent header injection', async () => {
-    const sendMailSpy = vi.fn().mockResolvedValue({} as SentMessageInfo);
+    const sendMailSpy = vi.fn().mockResolvedValue({});
     const fakeTransporter = createMockTransporter(sendMailSpy);
     const mailer = new SmtpInvitationMailer(validConfig, fakeTransporter);
 

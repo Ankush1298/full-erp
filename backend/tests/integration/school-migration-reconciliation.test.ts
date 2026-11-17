@@ -21,10 +21,9 @@ beforeAll(async () => {
   const hash = await argon2.hash(PASSWORD);
   T = await createIsolatedTenant(hash);
   // Ensure organization is marked as SCHOOL
-  await adminQuery(
-    `UPDATE app.organizations SET institution_type = 'SCHOOL' WHERE id = $1`,
-    [T.orgId],
-  );
+  await adminQuery(`UPDATE app.organizations SET institution_type = 'SCHOOL' WHERE id = $1`, [
+    T.orgId,
+  ]);
 });
 
 afterAll(async () => {
@@ -61,11 +60,7 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
       `INSERT INTO app.organization_settings (organization_id, key, value, updated_by)
        VALUES ($1, 'authorization.denied_permissions', $2::jsonb, $3)
        ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value`,
-      [
-        T.orgId,
-        JSON.stringify({ STAFF: ['vault.device.enroll'] }),
-        T.users.admin,
-      ],
+      [T.orgId, JSON.stringify({ STAFF: ['vault.device.enroll'] }), T.users.admin],
     );
 
     // 4. Verify pre-reconciliation defect state: 0 rows for homework, gateway, and vault
@@ -259,7 +254,10 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
     // 3. Execute Migration 0054 SQL directly as app_migrator
     const fs = await import('fs');
     const path = await import('path');
-    const migrationPath = path.resolve(__dirname, '../../../database/migrations/0054_reconcile_institution_role_permissions.sql');
+    const migrationPath = path.resolve(
+      __dirname,
+      '../../../database/migrations/0054_reconcile_institution_role_permissions.sql',
+    );
     const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
     await adminQuery(migrationSql);
@@ -333,10 +331,9 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
 
   it('migration 0055 safely repairs missing PARENT roles across FORCE RLS barriers and provisions baseline capabilities', async () => {
     // 1. Simulate the exact production-like defect: PARENT role is missing from app.roles
-    await adminQuery(
-      `DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`,
-      [T.orgId],
-    );
+    await adminQuery(`DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`, [
+      T.orgId,
+    ]);
 
     const preRoles = await adminQuery(
       `SELECT 1 FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`,
@@ -352,7 +349,10 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
     const fs = await import('fs');
     const path = await import('path');
     const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(__dirname, '../../../database/migrations/0055_repair_missing_parent_roles.sql');
+    const migrationPath = path.resolve(
+      __dirname,
+      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+    );
     const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
     const migratorClient = new pg.Client({ connectionString: inject('dbMigratorUrl') });
@@ -456,24 +456,22 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
       `INSERT INTO app.organization_settings (organization_id, key, value, updated_by)
        VALUES ($1, 'authorization.denied_permissions', $2::jsonb, $3)
        ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value`,
-      [
-        T.orgId,
-        JSON.stringify({ PARENT: ['parent.fee.pay'] }),
-        T.users.admin,
-      ],
+      [T.orgId, JSON.stringify({ PARENT: ['parent.fee.pay'] }), T.users.admin],
     );
 
     // 2. Remove PARENT role so migration 0055 reconciles from scratch for this institution
-    await adminQuery(
-      `DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`,
-      [T.orgId],
-    );
+    await adminQuery(`DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`, [
+      T.orgId,
+    ]);
 
     // 3. Execute Migration 0055 SQL as app_migrator
     const fs = await import('fs');
     const path = await import('path');
     const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(__dirname, '../../../database/migrations/0055_repair_missing_parent_roles.sql');
+    const migrationPath = path.resolve(
+      __dirname,
+      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+    );
     const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
     const migratorClient = new pg.Client({ connectionString: inject('dbMigratorUrl') });
@@ -534,7 +532,10 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
     const fs = await import('fs');
     const path = await import('path');
     const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(__dirname, '../../../database/migrations/0055_repair_missing_parent_roles.sql');
+    const migrationPath = path.resolve(
+      __dirname,
+      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+    );
     const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
     const migratorClient = new pg.Client({ connectionString: inject('dbMigratorUrl') });
@@ -559,7 +560,10 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
     const fs = await import('fs');
     const path = await import('path');
     const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(__dirname, '../../../database/migrations/0055_repair_missing_parent_roles.sql');
+    const migrationPath = path.resolve(
+      __dirname,
+      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+    );
     const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
     // Simulate missing canonical permission in platform.permissions inside an isolated transaction

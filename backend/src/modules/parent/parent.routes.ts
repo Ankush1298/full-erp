@@ -14,6 +14,7 @@ import {
 } from './parent.schemas.js';
 
 export const registerParentRoutes: FastifyPluginAsync<{ db: Database }> = async (app, opts) => {
+  await Promise.resolve();
   if (!opts.db) {
     throw new Error('Database dependency is required for parent routes.');
   }

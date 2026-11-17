@@ -30,7 +30,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Principal / Headmaster',
     collegeLabel: 'Director / Principal',
     universityLabel: 'Vice Chancellor / President',
-    summary: 'Full executive institutional governance across curriculum, admissions, staff rosters, and compliance.',
+    summary:
+      'Full executive institutional governance across curriculum, admissions, staff rosters, and compliance.',
     isSystem: true,
   },
   {
@@ -41,7 +42,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Vice Principal / Academic In-Charge',
     collegeLabel: 'Registrar',
     universityLabel: 'University Registrar',
-    summary: 'Student directory, programs, cohorts, academic calendars, curriculum offerings, and verification.',
+    summary:
+      'Student directory, programs, cohorts, academic calendars, curriculum offerings, and verification.',
     isSystem: true,
   },
   {
@@ -52,7 +54,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Subject Coordinator / Department Head',
     collegeLabel: 'Head of Department (HOD)',
     universityLabel: 'Dean of Faculty / Chair',
-    summary: 'Curriculum delivery, faculty teaching assignments, department courses, and internal grade moderation.',
+    summary:
+      'Curriculum delivery, faculty teaching assignments, department courses, and internal grade moderation.',
     isSystem: true,
   },
   {
@@ -63,7 +66,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Class Teacher / Subject Teacher',
     collegeLabel: 'Professor / Assistant Professor',
     universityLabel: 'Faculty Fellow / Lecturer',
-    summary: 'Session attendance marking, homework publishing, student submission review, and term marks entry.',
+    summary:
+      'Session attendance marking, homework publishing, student submission review, and term marks entry.',
     isSystem: true,
   },
   {
@@ -74,7 +78,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Exam Coordinator / Examination In-Charge',
     collegeLabel: 'Controller of Examinations (COE)',
     universityLabel: 'Controller of Examinations',
-    summary: 'Exam cycle scheduling, hall ticket generation, grade scales, mark sheet validation, and result release.',
+    summary:
+      'Exam cycle scheduling, hall ticket generation, grade scales, mark sheet validation, and result release.',
     isSystem: true,
   },
   {
@@ -85,7 +90,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Bursar / Accounts Officer',
     collegeLabel: 'Finance Officer',
     universityLabel: 'Comptroller / Finance Director',
-    summary: 'Fee heads and quota policies, fee challan generation, transaction reconciliation, and ledger reporting.',
+    summary:
+      'Fee heads and quota policies, fee challan generation, transaction reconciliation, and ledger reporting.',
     isSystem: true,
   },
   {
@@ -96,7 +102,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Enrolled Pupil / Student',
     collegeLabel: 'Undergraduate / Postgraduate Student',
     universityLabel: 'University Candidate / Scholar',
-    summary: 'Self academic timetable, homework submission, verified grade cards, and student documents.',
+    summary:
+      'Self academic timetable, homework submission, verified grade cards, and student documents.',
     isSystem: true,
   },
   {
@@ -107,7 +114,8 @@ const CANONICAL_ROLES: RoleTemplate[] = [
     schoolLabel: 'Parent / Primary Guardian',
     collegeLabel: 'Guardian / Sponsor',
     universityLabel: 'Guardian (Optional)',
-    summary: 'Parent portal access, linked ward attendance tracking, homework oversight, and fee receipt downloads.',
+    summary:
+      'Parent portal access, linked ward attendance tracking, homework oversight, and fee receipt downloads.',
     isSystem: true,
   },
 ];
@@ -486,7 +494,9 @@ const CAPABILITIES_CATALOG: CapabilityDef[] = [
 ];
 
 export const PlatformRolesPage: React.FC = () => {
-  const [selectedInstType, setSelectedInstType] = useState<'SCHOOL' | 'COLLEGE' | 'UNIVERSITY'>('COLLEGE');
+  const [selectedInstType, setSelectedInstType] = useState<'SCHOOL' | 'COLLEGE' | 'UNIVERSITY'>(
+    'COLLEGE',
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState<string>('ALL');
 
@@ -511,13 +521,16 @@ export const PlatformRolesPage: React.FC = () => {
         <div>
           <h2 className="platform-page-title">Universal Role Templates & Scope Architecture</h2>
           <p className="platform-page-desc">
-            Anesa's canonical multi-tier institutional authorization model: role scopes, institution vocabulary mapping, and granular capability matrices.
+            Anesa's canonical multi-tier institutional authorization model: role scopes, institution
+            vocabulary mapping, and granular capability matrices.
           </p>
         </div>
 
         {/* Institution Type Preview Selector */}
         <div className="institution-type-toggle">
-          <span className="text-xs font-semibold text-slate-500 uppercase mr-2">Vocabulary View:</span>
+          <span className="text-xs font-semibold text-slate-500 uppercase mr-2">
+            Vocabulary View:
+          </span>
           <div className="filter-pill-group">
             <button
               type="button"
@@ -553,11 +566,16 @@ export const PlatformRolesPage: React.FC = () => {
         <div className="scopes-explainer-grid mt-4">
           <div className="scope-box">
             <span className="scope-name">ORGANIZATION</span>
-            <p>Institution-wide authority spanning all campuses, departments, programs, and staff.</p>
+            <p>
+              Institution-wide authority spanning all campuses, departments, programs, and staff.
+            </p>
           </div>
           <div className="scope-box">
             <span className="scope-name">CAMPUS</span>
-            <p>Restricted to physical campus facilities, students admitted to that campus, and local staff.</p>
+            <p>
+              Restricted to physical campus facilities, students admitted to that campus, and local
+              staff.
+            </p>
           </div>
           <div className="scope-box">
             <span className="scope-name">DEPARTMENT</span>
@@ -565,11 +583,17 @@ export const PlatformRolesPage: React.FC = () => {
           </div>
           <div className="scope-box">
             <span className="scope-name">ASSIGNED</span>
-            <p>Bound strictly to classes, sections, and courses assigned directly to the faculty member.</p>
+            <p>
+              Bound strictly to classes, sections, and courses assigned directly to the faculty
+              member.
+            </p>
           </div>
           <div className="scope-box">
             <span className="scope-name">SELF</span>
-            <p>Restricted strictly to the authenticated user's own identity or explicitly verified wards.</p>
+            <p>
+              Restricted strictly to the authenticated user's own identity or explicitly verified
+              wards.
+            </p>
           </div>
         </div>
       </div>
@@ -606,7 +630,8 @@ export const PlatformRolesPage: React.FC = () => {
           <div>
             <h3 className="card-title">Interactive Capabilities & Grants Matrix</h3>
             <p className="card-subtitle">
-              Inspect granular permissions across roles with capability search, action type tags, and scope indicators.
+              Inspect granular permissions across roles with capability search, action type tags,
+              and scope indicators.
             </p>
           </div>
 
@@ -623,18 +648,25 @@ export const PlatformRolesPage: React.FC = () => {
 
         {/* Group Filter Pills */}
         <div className="category-pills-row mt-4">
-          {['ALL', 'STUDENT', 'ACADEMIC', 'ATTENDANCE', 'EXAM', 'HOMEWORK', 'FINANCE', 'SYSTEM'].map(
-            (grp) => (
-              <button
-                key={grp}
-                type="button"
-                className={`category-filter-btn ${groupFilter === grp ? 'active' : ''}`}
-                onClick={() => setGroupFilter(grp)}
-              >
-                {grp}
-              </button>
-            )
-          )}
+          {[
+            'ALL',
+            'STUDENT',
+            'ACADEMIC',
+            'ATTENDANCE',
+            'EXAM',
+            'HOMEWORK',
+            'FINANCE',
+            'SYSTEM',
+          ].map((grp) => (
+            <button
+              key={grp}
+              type="button"
+              className={`category-filter-btn ${groupFilter === grp ? 'active' : ''}`}
+              onClick={() => setGroupFilter(grp)}
+            >
+              {grp}
+            </button>
+          ))}
         </div>
 
         {/* Matrix Table */}
@@ -676,12 +708,12 @@ export const PlatformRolesPage: React.FC = () => {
                             {grantScope === 'ORGANIZATION'
                               ? 'ORG'
                               : grantScope === 'CAMPUS'
-                              ? 'CAMP'
-                              : grantScope === 'DEPARTMENT'
-                              ? 'DEPT'
-                              : grantScope === 'ASSIGNED'
-                              ? 'ASSIGNED_ROLE'
-                              : 'SELF_USER'}
+                                ? 'CAMP'
+                                : grantScope === 'DEPARTMENT'
+                                  ? 'DEPT'
+                                  : grantScope === 'ASSIGNED'
+                                    ? 'ASSIGNED_ROLE'
+                                    : 'SELF_USER'}
                           </span>
                         ) : (
                           <span className="grant-empty">—</span>

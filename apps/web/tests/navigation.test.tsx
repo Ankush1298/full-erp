@@ -253,7 +253,14 @@ describe('entitlement-aware and role-aware navigation (Platform Owner module gat
       display_name: 'Tara Teacher',
       roles: ['FACULTY'],
       capabilities: ['session.read', 'homework.manage', 'attendance.session.mark'],
-      entitled_modules: ['students', 'academics', 'attendance', 'homework', 'examinations', 'finance'],
+      entitled_modules: [
+        'students',
+        'academics',
+        'attendance',
+        'homework',
+        'examinations',
+        'finance',
+      ],
     };
 
     await open(teacher);

@@ -30,7 +30,7 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         url: '/api/v1/platform/stats',
       });
       expect(res.statusCode).toBe(401);
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as { message?: string };
       expect(body.message).toContain('credentials');
     });
 
@@ -54,7 +54,7 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         },
       });
       expect(res.statusCode).toBe(200);
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as { success: boolean; data: { institutions: { total: number } } };
       expect(body.success).toBe(true);
       expect(body.data.institutions.total).toBeGreaterThanOrEqual(1);
     });
@@ -77,7 +77,7 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         payload: { operatorToken: VALID_TOKEN },
       });
       expect(loginRes.statusCode).toBe(200);
-      const loginBody = JSON.parse(loginRes.body);
+      const loginBody = JSON.parse(loginRes.body) as { success: boolean; authenticated: boolean };
       expect(loginBody.success).toBe(true);
       expect(loginBody.authenticated).toBe(true);
 
@@ -101,7 +101,7 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         },
       });
       expect(meRes.statusCode).toBe(200);
-      const meBody = JSON.parse(meRes.body);
+      const meBody = JSON.parse(meRes.body) as { authenticated: boolean; operator: { role: string } };
       expect(meBody.authenticated).toBe(true);
       expect(meBody.operator.role).toBe('OPERATOR');
 
@@ -163,10 +163,10 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         headers: { 'x-platform-token': VALID_TOKEN },
       });
       expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
+      const json = JSON.parse(res.body) as { data: Array<{ key: string }> };
       expect(json.data.length).toBe(14);
 
-      const keys = json.data.map((m: any) => m.key);
+      const keys = json.data.map((m) => m.key);
       expect(keys).toEqual(
         expect.arrayContaining([
           'students',
@@ -194,11 +194,11 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         headers: { 'x-platform-token': VALID_TOKEN },
       });
       expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
-      const bundles = Object.values(json.data) as any[];
+      const json = JSON.parse(res.body) as { data: Record<string, { name: string }> };
+      const bundles = Object.values(json.data);
       expect(bundles.length).toBe(4);
-      expect(bundles[0].name).toBe('Starter Core');
-      expect(bundles[2].name).toBe('Complete Institutional ERP');
+      expect(bundles[0]!.name).toBe('Starter Core');
+      expect(bundles[2]!.name).toBe('Complete Institutional ERP');
     });
   });
 
@@ -222,7 +222,9 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
       });
 
       expect(res.statusCode).toBe(201);
-      const json = JSON.parse(res.body);
+      const json = JSON.parse(res.body) as {
+        data: { id: string; slug: string; institutionType: string; status: string };
+      };
       expect(json.data.slug).toBe(testSlug);
       expect(json.data.institutionType).toBe('COLLEGE');
       expect(json.data.status).toBe('ACTIVE');
@@ -236,7 +238,14 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         headers: { 'x-platform-token': VALID_TOKEN },
       });
       expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
+      const json = JSON.parse(res.body) as {
+        data: {
+          name: string;
+          campuses: unknown[];
+          entitlements: { modules: unknown[] };
+          roles: unknown[];
+        };
+      };
       expect(json.data.name).toBe('Apex Polytechnic Institute');
       expect(json.data.campuses.length).toBe(1);
       expect(json.data.entitlements.modules.length).toBe(14);
@@ -287,11 +296,13 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
       });
 
       expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
+      const json = JSON.parse(res.body) as {
+        data: { planBundle: string; modules: Array<{ key: string; enabled: boolean }> };
+      };
       expect(json.data.planBundle).toBe('ACADEMIC_PLUS');
 
-      const attendanceMod = json.data.modules.find((m: any) => m.key === 'attendance');
-      expect(attendanceMod.enabled).toBe(true);
+      const attendanceMod = json.data.modules.find((m) => m.key === 'attendance');
+      expect(attendanceMod?.enabled).toBe(true);
     });
 
     it('reconciles canonical roles without overwriting institutional settings', async () => {
@@ -303,13 +314,13 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
       });
 
       expect(res.statusCode).toBe(200);
-      const json = JSON.parse(res.body);
+      const json = JSON.parse(res.body) as { data: { applied: boolean } };
       expect(json.data.applied).toBe(true);
     });
   });
 
   describe('Strict Zero-Access Trust Boundary Verification', () => {
-    it('platform service queries only tenant configuration, never private student or vault records', async () => {
+    it('platform service queries only tenant configuration, never private student or vault records', () => {
       // Direct inspection of PlatformService methods confirms it has NO student query methods
       const proto = Object.getOwnPropertyNames(PlatformService.prototype);
       expect(proto).not.toContain('getStudentMarks');

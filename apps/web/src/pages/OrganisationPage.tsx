@@ -52,24 +52,30 @@ export function OrganisationPage() {
   const isCampusAdmin = roles.includes('CAMPUS_ADMIN');
   const isHOD = roles.includes('HOD') || roles.includes('DEPARTMENT_ADMIN');
   const isTeacher = roles.includes('FACULTY') && !isPrincipal && !isCampusAdmin;
-  const isStudentOrParent = (roles.includes('STUDENT') || roles.includes('PARENT')) && !isPrincipal && !isTeacher;
+  const isStudentOrParent =
+    (roles.includes('STUDENT') || roles.includes('PARENT')) && !isPrincipal && !isTeacher;
 
   // Determine dynamic page header title and subtitle based on user role
   let pageTitle = 'Organisation Structure';
-  let pageSubtitle = 'Institutional structure records, campuses, academic departments, and physical facilities.';
+  let pageSubtitle =
+    'Institutional structure records, campuses, academic departments, and physical facilities.';
 
   if (isPrincipal) {
     pageTitle = 'Organisation Structure & Facilities Administration';
-    pageSubtitle = 'Full institutional management: configure campuses, academic departments, rooms, and facility operations.';
+    pageSubtitle =
+      'Full institutional management: configure campuses, academic departments, rooms, and facility operations.';
   } else if (isCampusAdmin) {
     pageTitle = 'Campus Facilities & Rooms Administration';
-    pageSubtitle = 'Campus infrastructure management: configure rooms, facilities, and campus operations.';
+    pageSubtitle =
+      'Campus infrastructure management: configure rooms, facilities, and campus operations.';
   } else if (isHOD) {
     pageTitle = 'Departmental Structure & Facility Directory';
-    pageSubtitle = 'Departmental academic structure and allocated classrooms, laboratories, and facilities.';
+    pageSubtitle =
+      'Departmental academic structure and allocated classrooms, laboratories, and facilities.';
   } else if (isTeacher) {
     pageTitle = 'Campus & Classroom Facilities Directory';
-    pageSubtitle = 'Read-only institutional directory of classrooms, laboratories, lecture halls, and academic departments for timetable reference.';
+    pageSubtitle =
+      'Read-only institutional directory of classrooms, laboratories, lecture halls, and academic departments for timetable reference.';
   } else if (isStudentOrParent) {
     pageTitle = 'Campus & Department Directory';
     pageSubtitle = 'Institutional directory of campuses, departments, and learning facilities.';
@@ -206,8 +212,8 @@ export function OrganisationPage() {
         )}
         {isCampusAdmin && (
           <Alert tone="info">
-            <strong>Campus Administrator:</strong> Scoped access to manage facilities and physical room
-            allocations for this campus.
+            <strong>Campus Administrator:</strong> Scoped access to manage facilities and physical
+            room allocations for this campus.
           </Alert>
         )}
         {isHOD && (
@@ -326,9 +332,7 @@ export function OrganisationPage() {
                   </option>
                 ))}
               </select>
-              {!canManageCampus && (
-                <Badge tone="neutral">Read-only facility directory</Badge>
-              )}
+              {!canManageCampus && <Badge tone="neutral">Read-only facility directory</Badge>}
             </div>
 
             {canManageCampus && (
@@ -401,17 +405,20 @@ export function OrganisationPage() {
             <Card title="No rooms configured">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <p>
-                  No classrooms, lecture halls, or laboratories have been registered for this campus yet.
+                  No classrooms, lecture halls, or laboratories have been registered for this campus
+                  yet.
                 </p>
                 <div style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
                   <p style={{ margin: '0 0 var(--space-1) 0' }}>
-                    <strong>What are rooms used for?</strong> Rooms represent physical spaces across campuses —
-                    such as lecture halls, computer/science laboratories, seminar rooms, and tutorial classrooms.
-                    They are linked to academic timetable periods, section assignments, and exam hall seating plans.
+                    <strong>What are rooms used for?</strong> Rooms represent physical spaces across
+                    campuses — such as lecture halls, computer/science laboratories, seminar rooms,
+                    and tutorial classrooms. They are linked to academic timetable periods, section
+                    assignments, and exam hall seating plans.
                   </p>
                   <p style={{ margin: '0' }}>
-                    <strong>Who configures rooms?</strong> Physical room infrastructure is created and maintained by{' '}
-                    <strong>Campus Administrators</strong> and <strong>Principals</strong> (<code>org.campus.manage</code>).
+                    <strong>Who configures rooms?</strong> Physical room infrastructure is created
+                    and maintained by <strong>Campus Administrators</strong> and{' '}
+                    <strong>Principals</strong> (<code>org.campus.manage</code>).
                   </p>
                 </div>
                 {canManageCampus ? (
@@ -421,7 +428,14 @@ export function OrganisationPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                      marginTop: 'var(--space-1)',
+                    }}
+                  >
                     <Badge tone="neutral">Restricted to Campus Administrators</Badge>
                     <span className="muted" style={{ fontSize: '0.85rem' }}>
                       Faculty members have read-only access for timetable referencing.

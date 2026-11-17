@@ -258,15 +258,28 @@ export class AuthService {
         [ctx.tenantId],
       );
       let entitledModules: string[] = [];
-      const entVal = entRow.rows[0]?.value as any;
+      const entVal = entRow.rows[0]?.value as
+        | {
+            modules?:
+              | Array<{ key?: string; enabled?: boolean } | string>
+              | Record<string, { enabled?: boolean } | boolean>;
+          }
+        | undefined;
       if (entVal) {
         if (Array.isArray(entVal.modules)) {
           entitledModules = entVal.modules
-            .filter((m: any) => m && m.enabled !== false)
-            .map((m: any) => (typeof m === 'string' ? m : m.key));
+            .filter(
+              (m): m is { key: string; enabled?: boolean } | string =>
+                Boolean(m) && (typeof m === 'string' || m.enabled !== false),
+            )
+            .map((m) => (typeof m === 'string' ? m : (m.key ?? '')))
+            .filter(Boolean);
         } else if (entVal.modules && typeof entVal.modules === 'object') {
           entitledModules = Object.entries(entVal.modules)
-            .filter(([, v]: any) => v && (v === true || v.enabled !== false))
+            .filter(
+              ([, v]) =>
+                Boolean(v) && (v === true || (typeof v === 'object' && v.enabled !== false)),
+            )
             .map(([k]) => k);
         }
       }

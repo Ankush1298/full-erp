@@ -164,7 +164,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
       failureReason: isSuccess
         ? undefined
         : data.error_description || `Payment status: ${data.status}`,
-      rawResponse: data as Record<string, unknown>,
+      rawResponse: data,
     };
   }
 
@@ -172,6 +172,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
     config: GatewayConfig,
     params: WebhookVerificationParams,
   ): Promise<WebhookProcessResult> {
+    await Promise.resolve();
     const signature =
       params.headers['x-razorpay-signature'] || params.headers['X-Razorpay-Signature'];
 
@@ -217,7 +218,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
     };
 
     try {
-      payload = JSON.parse(rawString);
+      payload = JSON.parse(rawString) as typeof payload;
     } catch {
       return {
         isValid: false,
@@ -247,7 +248,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
         gatewayPaymentRef,
         status: 'SUCCESS',
         amount,
-        rawEvent: payload as Record<string, unknown>,
+        rawEvent: payload,
       };
     }
 
@@ -261,7 +262,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
         status: 'FAILED',
         amount,
         failureReason: 'Payment failed event from Razorpay',
-        rawEvent: payload as Record<string, unknown>,
+        rawEvent: payload,
       };
     }
 
@@ -274,7 +275,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
         gatewayPaymentRef,
         status: 'REFUNDED',
         amount,
-        rawEvent: payload as Record<string, unknown>,
+        rawEvent: payload,
       };
     }
 
@@ -282,7 +283,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
       isValid: true,
       eventType: event,
       status: 'IGNORED',
-      rawEvent: payload as Record<string, unknown>,
+      rawEvent: payload,
     };
   }
 
@@ -321,7 +322,7 @@ export class RazorpayAdapter implements IPaymentGatewayAdapter {
       success: true,
       gatewayRefundRef: data.id,
       status: data.status === 'processed' ? 'SUCCESS' : 'PENDING',
-      rawResponse: data as Record<string, unknown>,
+      rawResponse: data,
     };
   }
 

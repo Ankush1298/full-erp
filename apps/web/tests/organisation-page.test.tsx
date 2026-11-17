@@ -1,11 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import {
-  ADMIN,
-  FACULTY_TEACHER,
-  createFakeBackend,
-} from './helpers/fakeBackend';
+import { ADMIN, FACULTY_TEACHER, createFakeBackend } from './helpers/fakeBackend';
 import { renderApp } from './helpers/render';
 
 describe('Organisation Structure & Facilities: Role Visibility & Least Privilege', () => {
@@ -27,9 +23,7 @@ describe('Organisation Structure & Facilities: Role Visibility & Least Privilege
     ).toBeInTheDocument();
 
     // Contextual alert banner
-    expect(
-      screen.getByText(/Institution Administrator \(Principal\):/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Institution Administrator \(Principal\):/i)).toBeInTheDocument();
 
     // Campuses and Departments tabs visible
     expect(screen.getByRole('button', { name: /Campuses/i })).toBeInTheDocument();
@@ -60,9 +54,7 @@ describe('Organisation Structure & Facilities: Role Visibility & Least Privilege
     ).toBeInTheDocument();
 
     // Contextual read-only directory banner
-    expect(
-      screen.getByText(/Teacher \/ Faculty Directory:/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Teacher \/ Faculty Directory:/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Room provisioning is restricted to Campus Administrators and Principals/i),
     ).toBeInTheDocument();
@@ -87,7 +79,8 @@ describe('Organisation Structure & Facilities: Role Visibility & Least Privilege
     // Override rooms route to return empty list
     const originalFetch = b.fetch.bind(b);
     b.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/rooms')) {
         return new Response(JSON.stringify({ success: true, data: [] }), {
           status: 200,
@@ -114,7 +107,8 @@ describe('Organisation Structure & Facilities: Role Visibility & Least Privilege
     const b = createFakeBackend({ session: true, me: teacherWithStructureRead });
     const originalFetch = b.fetch.bind(b);
     b.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/rooms')) {
         return new Response(JSON.stringify({ success: true, data: [] }), {
           status: 200,
@@ -130,7 +124,9 @@ describe('Organisation Structure & Facilities: Role Visibility & Least Privilege
 
     expect(await screen.findByText('No rooms configured')).toBeInTheDocument();
     expect(screen.getByText('Restricted to Campus Administrators')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '+ Create First Campus Room' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '+ Create First Campus Room' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add Room' })).not.toBeInTheDocument();
   });
 });

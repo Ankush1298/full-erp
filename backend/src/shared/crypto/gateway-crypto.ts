@@ -12,15 +12,24 @@ const IV_BYTES = 12;
 const TAG_BYTES = 16;
 const PURPOSE = 'anesa/payment-gateway-credentials';
 
+let configuredMasterKey: Buffer | null = null;
+
+export function configureGatewayMasterKey(key: string | Buffer): void {
+  if (Buffer.isBuffer(key)) {
+    configuredMasterKey = key;
+    return;
+  }
+  const trimmed = key.trim();
+  if (trimmed.length === 64 && /^[0-9a-fA-F]+$/.test(trimmed)) {
+    configuredMasterKey = Buffer.from(trimmed, 'hex');
+    return;
+  }
+  configuredMasterKey = createHash('sha256').update(trimmed, 'utf8').digest();
+}
+
 function getMasterKey(): Buffer {
-  const envKey = process.env.GATEWAY_ENCRYPTION_KEY || process.env.APP_SECRET;
-  if (envKey && envKey.trim().length > 0) {
-    const trimmed = envKey.trim();
-    if (trimmed.length === 64 && /^[0-9a-fA-F]+$/.test(trimmed)) {
-      return Buffer.from(trimmed, 'hex');
-    }
-    // Hash to 32 bytes
-    return createHash('sha256').update(trimmed, 'utf8').digest();
+  if (configuredMasterKey) {
+    return configuredMasterKey;
   }
   // Deterministic local development / test fallback key
   return createHash('sha256').update('anesa-local-dev-gateway-key-32bytes-secret', 'utf8').digest();
@@ -82,14 +91,16 @@ export function decryptGatewayCredentials<T = Record<string, unknown>>(
     decipher.setAAD(computeAad(organizationId));
     decipher.setAuthTag(tag);
 
-    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString(
+      'utf8',
+    );
 
     try {
       return JSON.parse(decrypted) as T;
     } catch {
       return decrypted as unknown as T;
     }
-  } catch (err) {
+  } catch {
     throw new AppError(
       500,
       'GATEWAY_CREDENTIALS_UNREADABLE',

@@ -19,6 +19,7 @@ import {
 } from './vault.schemas.js';
 
 export const registerVaultRoutes: FastifyPluginAsync<{ db: Database }> = async (app, opts) => {
+  await Promise.resolve();
   if (!opts.db) {
     throw new Error('Database dependency is required for vault routes.');
   }
@@ -32,7 +33,9 @@ export const registerVaultRoutes: FastifyPluginAsync<{ db: Database }> = async (
     async (req, reply) => {
       const ctx = req.tenantContext;
       if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
-      const data = await opts.db.withTenant(ctx, (tx) => VaultService.getSecurityAuthority(tx, ctx));
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        VaultService.getSecurityAuthority(tx, ctx),
+      );
       return reply.status(200).send({ success: true, data });
     },
   );
@@ -112,7 +115,9 @@ export const registerVaultRoutes: FastifyPluginAsync<{ db: Database }> = async (
       const ctx = req.tenantContext;
       if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
       const parsed = EnrollDeviceSchema.parse(req.body);
-      const data = await opts.db.withTenant(ctx, (tx) => VaultService.enrollDevice(tx, ctx, parsed));
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        VaultService.enrollDevice(tx, ctx, parsed),
+      );
       return reply.status(201).send({ success: true, data });
     },
   );
@@ -204,7 +209,9 @@ export const registerVaultRoutes: FastifyPluginAsync<{ db: Database }> = async (
       const ctx = req.tenantContext;
       if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
       const parsed = SetupCustodiansSchema.parse(req.body);
-      const data = await opts.db.withTenant(ctx, (tx) => VaultService.setupCustodians(tx, ctx, parsed));
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        VaultService.setupCustodians(tx, ctx, parsed),
+      );
       return reply.status(200).send({ success: true, data });
     },
   );
@@ -253,7 +260,9 @@ export const registerVaultRoutes: FastifyPluginAsync<{ db: Database }> = async (
       const ctx = req.tenantContext;
       if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
       const parsed = IssueKeyGrantSchema.parse(req.body);
-      const data = await opts.db.withTenant(ctx, (tx) => VaultService.issueKeyGrant(tx, ctx, parsed));
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        VaultService.issueKeyGrant(tx, ctx, parsed),
+      );
       return reply.status(201).send({ success: true, data });
     },
   );

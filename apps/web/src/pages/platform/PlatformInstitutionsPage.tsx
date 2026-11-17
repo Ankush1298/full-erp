@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { platformApi, type InstitutionItem } from '../../lib/api/platform-api';
 
@@ -17,7 +17,9 @@ export const PlatformInstitutionsPage: React.FC = () => {
   const [showModal, setShowModal] = useState(searchParams.get('action') === 'new');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
-  const [institutionType, setInstitutionType] = useState<'SCHOOL' | 'COLLEGE' | 'UNIVERSITY'>('SCHOOL');
+  const [institutionType, setInstitutionType] = useState<'SCHOOL' | 'COLLEGE' | 'UNIVERSITY'>(
+    'SCHOOL',
+  );
   const [adminEmail, setAdminEmail] = useState('');
   const [adminTitle, setAdminTitle] = useState('Principal');
   const [initialPlan, setInitialPlan] = useState('COMPLETE_ERP');
@@ -29,7 +31,7 @@ export const PlatformInstitutionsPage: React.FC = () => {
   const [actionType, setActionType] = useState<'SUSPEND' | 'REACTIVATE' | null>(null);
   const [processingAction, setProcessingAction] = useState(false);
 
-  const fetchInstitutions = () => {
+  const fetchInstitutions = useCallback(() => {
     setLoading(true);
     platformApi
       .listInstitutions({
@@ -38,18 +40,18 @@ export const PlatformInstitutionsPage: React.FC = () => {
         status: statusFilter || undefined,
       })
       .then((data) => {
-        setInstitutions(Array.isArray(data) ? data : (data as any).data || []);
+        setInstitutions(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch((err) => {
-        setError(err.message);
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Unknown error');
         setLoading(false);
       });
-  };
+  }, [search, typeFilter, statusFilter]);
 
   useEffect(() => {
     fetchInstitutions();
-  }, [typeFilter, statusFilter]);
+  }, [fetchInstitutions]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,8 +107,18 @@ export const PlatformInstitutionsPage: React.FC = () => {
   // Auto-slug generator
   const handleNameChange = (val: string) => {
     setName(val);
-    if (!slug || slug === name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')) {
-      const generated = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (
+      !slug ||
+      slug ===
+        name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+    ) {
+      const generated = val
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
       setSlug(generated);
     }
   };
@@ -118,7 +130,8 @@ export const PlatformInstitutionsPage: React.FC = () => {
         <div>
           <h2 className="platform-page-title">Institutions Directory</h2>
           <p className="platform-page-desc">
-            Manage provisioned Schools, Colleges, and Universities, inspect entitlements, and configure institutional policies.
+            Manage provisioned Schools, Colleges, and Universities, inspect entitlements, and
+            configure institutional policies.
           </p>
         </div>
         <div className="header-actions">
@@ -196,7 +209,18 @@ export const PlatformInstitutionsPage: React.FC = () => {
         </div>
       ) : institutions.length === 0 ? (
         <div className="empty-state-notice">
-          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 mx-auto mb-2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            width="32"
+            height="32"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-slate-400 mx-auto mb-2"
+            aria-hidden="true"
+          >
             <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
             <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
             <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
@@ -208,100 +232,108 @@ export const PlatformInstitutionsPage: React.FC = () => {
         <div className="platform-card p-0">
           <div className="platform-table-container">
             <table className="platform-table" aria-label="Institutions directory">
-            <thead>
-              <tr>
-                <th scope="col">Institution</th>
-                <th scope="col">Type</th>
-                <th scope="col">Status</th>
-                <th scope="col">Campuses</th>
-                <th scope="col">SaaS Plan</th>
-                <th scope="col">Provisioned</th>
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {institutions.map((inst) => (
-                <tr key={inst.id}>
-                  <td>
-                    <div className="institution-cell">
-                      <Link
-                        to={`/platform/institutions/${inst.id}`}
-                        className="font-semibold institution-name-link"
-                      >
-                        {inst.name}
-                      </Link>
-                      <span className="institution-slug text-muted">/{inst.slug}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`type-badge type-badge-${inst.institutionType.toLowerCase()}`}>
-                      {inst.institutionType}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`status-badge status-${inst.status.toLowerCase()}`}>
-                      {inst.status}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="campuses-count">{inst.campusesCount} Campus</span>
-                  </td>
-                  <td>
-                    <span className="plan-tag">{inst.planName || 'COMPLETE_ERP'}</span>
-                  </td>
-                  <td className="text-muted">{new Date(inst.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <div className="table-actions">
-                      <Link
-                        to={`/platform/institutions/${inst.id}`}
-                        className="action-btn action-manage"
-                        title="Configure modules and settings"
-                      >
-                        Manage
-                      </Link>
-                      {inst.status === 'ACTIVE' ? (
-                        <button
-                          type="button"
-                          className="action-btn action-suspend"
-                          onClick={() => {
-                            setActionTarget(inst);
-                            setActionType('SUSPEND');
-                          }}
-                          title="Safely suspend tenant access"
-                        >
-                          Suspend
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="action-btn action-reactivate"
-                          onClick={() => {
-                            setActionTarget(inst);
-                            setActionType('REACTIVATE');
-                          }}
-                          title="Restore tenant access"
-                        >
-                          Reactivate
-                        </button>
-                      )}
-                    </div>
-                  </td>
+              <thead>
+                <tr>
+                  <th scope="col">Institution</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Campuses</th>
+                  <th scope="col">SaaS Plan</th>
+                  <th scope="col">Provisioned</th>
+                  <th scope="col">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {institutions.map((inst) => (
+                  <tr key={inst.id}>
+                    <td>
+                      <div className="institution-cell">
+                        <Link
+                          to={`/platform/institutions/${inst.id}`}
+                          className="font-semibold institution-name-link"
+                        >
+                          {inst.name}
+                        </Link>
+                        <span className="institution-slug text-muted">/{inst.slug}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        className={`type-badge type-badge-${inst.institutionType.toLowerCase()}`}
+                      >
+                        {inst.institutionType}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status-badge status-${inst.status.toLowerCase()}`}>
+                        {inst.status}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="campuses-count">{inst.campusesCount} Campus</span>
+                    </td>
+                    <td>
+                      <span className="plan-tag">{inst.planName || 'COMPLETE_ERP'}</span>
+                    </td>
+                    <td className="text-muted">{new Date(inst.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <div className="table-actions">
+                        <Link
+                          to={`/platform/institutions/${inst.id}`}
+                          className="action-btn action-manage"
+                          title="Configure modules and settings"
+                        >
+                          Manage
+                        </Link>
+                        {inst.status === 'ACTIVE' ? (
+                          <button
+                            type="button"
+                            className="action-btn action-suspend"
+                            onClick={() => {
+                              setActionTarget(inst);
+                              setActionType('SUSPEND');
+                            }}
+                            title="Safely suspend tenant access"
+                          >
+                            Suspend
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="action-btn action-reactivate"
+                            onClick={() => {
+                              setActionTarget(inst);
+                              setActionType('REACTIVATE');
+                            }}
+                            title="Restore tenant access"
+                          >
+                            Reactivate
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
       {/* Provision New Institution Modal */}
       {showModal && (
-        <div className="platform-modal-backdrop" onClick={() => setShowModal(false)}>
+        <div
+          className="platform-modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+        >
           <div
             className="platform-modal modal-large"
             role="dialog"
+            aria-modal="true"
             aria-labelledby="provision-modal-title"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="platform-modal-header">
               <h2 id="provision-modal-title">Provision New Institution Tenant</h2>
@@ -315,7 +347,12 @@ export const PlatformInstitutionsPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="platform-modal-body">
+            <form
+              onSubmit={(e) => {
+                void handleCreate(e);
+              }}
+              className="platform-modal-body"
+            >
               {createError && (
                 <div className="form-error-alert" role="alert">
                   {createError}
@@ -347,7 +384,9 @@ export const PlatformInstitutionsPage: React.FC = () => {
                     className="platform-input font-mono"
                     required
                   />
-                  <span className="input-hint">Used for dedicated tenant routing: anesa.io/{slug || 'code'}</span>
+                  <span className="input-hint">
+                    Used for dedicated tenant routing: anesa.io/{slug || 'code'}
+                  </span>
                 </div>
               </div>
 
@@ -380,10 +419,18 @@ export const PlatformInstitutionsPage: React.FC = () => {
                     onChange={(e) => setInitialPlan(e.target.value)}
                     className="platform-select"
                   >
-                    <option value="STARTER_CORE">Starter Core (₹49,999/yr - Students & Attendance)</option>
-                    <option value="ACADEMIC_PLUS">Academic Plus (₹89,999/yr - Homework & Exams)</option>
-                    <option value="COMPLETE_ERP">Complete ERP (₹1,49,999/yr - All 14 Modules)</option>
-                    <option value="ENTERPRISE_SUITE">Enterprise Suite (Custom Dedicated Cloud)</option>
+                    <option value="STARTER_CORE">
+                      Starter Core (₹49,999/yr - Students & Attendance)
+                    </option>
+                    <option value="ACADEMIC_PLUS">
+                      Academic Plus (₹89,999/yr - Homework & Exams)
+                    </option>
+                    <option value="COMPLETE_ERP">
+                      Complete ERP (₹1,49,999/yr - All 14 Modules)
+                    </option>
+                    <option value="ENTERPRISE_SUITE">
+                      Enterprise Suite (Custom Dedicated Cloud)
+                    </option>
                   </select>
                 </div>
               </div>
@@ -412,7 +459,9 @@ export const PlatformInstitutionsPage: React.FC = () => {
                     onChange={(e) => setAdminTitle(e.target.value)}
                     className="platform-input"
                   />
-                  <span className="input-hint">Descriptive title only; authorization derives strictly from role code.</span>
+                  <span className="input-hint">
+                    Descriptive title only; authorization derives strictly from role code.
+                  </span>
                 </div>
               </div>
 
@@ -439,12 +488,18 @@ export const PlatformInstitutionsPage: React.FC = () => {
 
       {/* Confirmation Modal for Suspend / Reactivate */}
       {actionTarget && actionType && (
-        <div className="platform-modal-backdrop" onClick={() => setActionTarget(null)}>
+        <div
+          className="platform-modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActionTarget(null);
+          }}
+        >
           <div
             className="platform-modal"
             role="dialog"
+            aria-modal="true"
             aria-labelledby="confirm-action-title"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="platform-modal-header">
               <h2 id="confirm-action-title">
@@ -467,7 +522,8 @@ export const PlatformInstitutionsPage: React.FC = () => {
               {actionType === 'SUSPEND' ? (
                 <div className="warning-callout">
                   <strong>Warning:</strong> Suspending this institution will immediately block all
-                  faculty, students, and parent portal logins. Data remains strictly preserved and uncorrupted.
+                  faculty, students, and parent portal logins. Data remains strictly preserved and
+                  uncorrupted.
                 </div>
               ) : (
                 <div className="info-callout">
@@ -487,13 +543,15 @@ export const PlatformInstitutionsPage: React.FC = () => {
                   type="button"
                   disabled={processingAction}
                   className={`platform-btn ${actionType === 'SUSPEND' ? 'platform-btn-danger' : 'platform-btn-primary'}`}
-                  onClick={handleStatusChange}
+                  onClick={() => {
+                    void handleStatusChange();
+                  }}
                 >
                   {processingAction
                     ? 'Updating...'
                     : actionType === 'SUSPEND'
-                    ? 'Confirm Suspension'
-                    : 'Confirm Reactivation'}
+                      ? 'Confirm Suspension'
+                      : 'Confirm Reactivation'}
                 </button>
               </div>
             </div>

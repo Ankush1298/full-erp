@@ -94,62 +94,73 @@ describe('Payment Gateways & Online Fee Payments Integration Test', () => {
 
   beforeAll(async () => {
     // Mock global fetch for gateway external HTTP APIs
-    globalThis.fetch = vi.fn().mockImplementation(async (fetchUrl: string | URL | Request) => {
-      const u = typeof fetchUrl === 'string' ? fetchUrl : fetchUrl.toString();
+    globalThis.fetch = vi.fn().mockImplementation((fetchUrl: string | URL | Request) => {
+      const u =
+        typeof fetchUrl === 'string'
+          ? fetchUrl
+          : fetchUrl instanceof URL
+            ? fetchUrl.toString()
+            : fetchUrl.url;
       if (u.includes('/payments?count=1')) {
-        return {
+        return Promise.resolve({
           ok: true,
           status: 200,
-          json: async () => ({ items: [] }),
-          text: async () => JSON.stringify({ items: [] }),
-        } as unknown as Response;
+          json: () => Promise.resolve({ items: [] }),
+          text: () => Promise.resolve(JSON.stringify({ items: [] })),
+        });
       }
       if (u.includes('/orders')) {
-        return {
+        return Promise.resolve({
           ok: true,
           status: 200,
-          json: async () => ({
-            id: `order_rzp_${RUN}_123`,
-            amount: 1000000,
-            currency: 'INR',
-            status: 'created',
-          }),
-          text: async () => JSON.stringify({ id: `order_rzp_${RUN}_123`, amount: 1000000 }),
-        } as unknown as Response;
+          json: () =>
+            Promise.resolve({
+              id: `order_rzp_${RUN}_123`,
+              amount: 1000000,
+              currency: 'INR',
+              status: 'created',
+            }),
+          text: () =>
+            Promise.resolve(JSON.stringify({ id: `order_rzp_${RUN}_123`, amount: 1000000 })),
+        });
       }
       if (u.includes('/refund')) {
-        return {
+        return Promise.resolve({
           ok: true,
           status: 200,
-          json: async () => ({
-            id: `rfnd_rzp_${RUN}_999`,
-            status: 'processed',
-            amount: 1000000,
-          }),
-          text: async () => JSON.stringify({ id: `rfnd_rzp_${RUN}_999`, status: 'processed' }),
-        } as unknown as Response;
+          json: () =>
+            Promise.resolve({
+              id: `rfnd_rzp_${RUN}_999`,
+              status: 'processed',
+              amount: 1000000,
+            }),
+          text: () =>
+            Promise.resolve(JSON.stringify({ id: `rfnd_rzp_${RUN}_999`, status: 'processed' })),
+        });
       }
       if (u.includes('/payments/')) {
-        return {
+        return Promise.resolve({
           ok: true,
           status: 200,
-          json: async () => ({
-            id: `pay_mock_${RUN}_123`,
-            order_id: `order_rzp_${RUN}_123`,
-            status: 'captured',
-            amount: 1000000,
-            currency: 'INR',
-            method: 'upi',
-          }),
-          text: async () => JSON.stringify({ id: `pay_mock_${RUN}_123`, status: 'captured' }),
-        } as unknown as Response;
+          json: () =>
+            Promise.resolve({
+              id: `pay_mock_${RUN}_123`,
+              order_id: `order_rzp_${RUN}_123`,
+              status: 'captured',
+              amount: 1000000,
+              currency: 'INR',
+              method: 'upi',
+            }),
+          text: () =>
+            Promise.resolve(JSON.stringify({ id: `pay_mock_${RUN}_123`, status: 'captured' })),
+        });
       }
-      return {
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({ success: true }),
-        text: async () => JSON.stringify({ success: true }),
-      } as unknown as Response;
+        json: () => Promise.resolve({ success: true }),
+        text: () => Promise.resolve(JSON.stringify({ success: true })),
+      });
     });
 
     await app.ready();
@@ -267,12 +278,6 @@ describe('Payment Gateways & Online Fee Payments Integration Test', () => {
       webhook_secret: rzpWebhookSec,
       settings: {},
     });
-    if (
-      testRes.statusCode !== 200 ||
-      !testRes.json<{ data: { healthy: boolean } }>().data?.healthy
-    ) {
-      console.log('TEST RES FAILED:', testRes.statusCode, testRes.body);
-    }
     expect(testRes.statusCode).toBe(200);
     const health = testRes.json<{ data: { healthy: boolean; message: string } }>().data;
     expect(health.healthy).toBe(true);
@@ -288,9 +293,6 @@ describe('Payment Gateways & Online Fee Payments Integration Test', () => {
       description: 'Partial term payment',
     });
 
-    if (initRes.statusCode !== 201) {
-      console.log('INIT ERROR:', initRes.statusCode, initRes.body);
-    }
     expect(initRes.statusCode).toBe(201);
     const body = initRes.json<{
       data: {
@@ -336,9 +338,6 @@ describe('Payment Gateways & Online Fee Payments Integration Test', () => {
       gateway_signature: validSignature,
     });
 
-    if (verifyRes.statusCode !== 200) {
-      console.log('VERIFY ERROR:', verifyRes.statusCode, verifyRes.body);
-    }
     expect(verifyRes.statusCode).toBe(200);
     const verifyData = verifyRes.json<{
       data: {

@@ -66,7 +66,7 @@ describe('Platform Owner Isolation, Entitlements & Safety Suite (P0)', () => {
     expect(match).toBeTruthy();
     adminCookie = await mfaVerified(match![1]!);
 
-    const loginBody = JSON.parse(loginRes.body);
+    const loginBody = JSON.parse(loginRes.body) as { csrfToken?: string };
     adminCsrf = loginBody.csrfToken || 'test-csrf';
   });
 
@@ -88,7 +88,7 @@ describe('Platform Owner Isolation, Entitlements & Safety Suite (P0)', () => {
       });
       // Fails with 401 because ERP routes require institutional session cookies
       expect(res.statusCode).toBe(401);
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as { error?: { message?: string }; message?: string };
       const msg = body.error?.message || body.message || '';
       expect(msg).toContain('Missing authentication token');
     });
@@ -103,7 +103,7 @@ describe('Platform Owner Isolation, Entitlements & Safety Suite (P0)', () => {
         },
       });
       expect(res.statusCode).toBe(401);
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as { message?: string };
       expect(body.message).toContain('credentials');
     });
 
@@ -165,7 +165,11 @@ describe('Platform Owner Isolation, Entitlements & Safety Suite (P0)', () => {
       });
 
       expect(res.statusCode).toBe(403);
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as {
+        error?: { code?: string; message?: string };
+        code?: string;
+        message?: string;
+      };
       const errCode = body.error?.code || body.code;
       const errMsg = body.error?.message || body.message;
       expect(errCode).toBe('MODULE_NOT_ENTITLED');
@@ -236,7 +240,7 @@ describe('Platform Owner Isolation, Entitlements & Safety Suite (P0)', () => {
       });
 
       expect([401, 403]).toContain(res.statusCode);
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body) as { error?: { code?: string }; code?: string };
       const errCode = body.error?.code || body.code;
       expect(['INSTITUTION_SUSPENDED', 'UNAUTHORIZED']).toContain(errCode);
     });

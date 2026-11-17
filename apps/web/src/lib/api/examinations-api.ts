@@ -29,14 +29,9 @@ export const ScheduleStatusSchema = z.enum([
 ]);
 export type ScheduleStatus = z.infer<typeof ScheduleStatusSchema>;
 
-export const MarkStatusSchema = z.enum([
-  'ENTERED',
-  'ABSENT',
-  'EXEMPT',
-  'WITHHELD',
-  'DRAFT',
-  'SUBMITTED',
-]).or(z.string());
+export const MarkStatusSchema = z
+  .enum(['ENTERED', 'ABSENT', 'EXEMPT', 'WITHHELD', 'DRAFT', 'SUBMITTED'])
+  .or(z.string());
 export type MarkStatus = z.infer<typeof MarkStatusSchema>;
 
 export const ExaminationDtoSchema = z.object({
@@ -312,7 +307,14 @@ export async function correctExamMark(
   c: ApiClient,
   scheduleId: string,
   input: CorrectExamMarkInput,
-): Promise<{ success: boolean; student_id: string; marks_obtained: number | null; status: string; is_amendment?: boolean; corrected_at: string }> {
+): Promise<{
+  success: boolean;
+  student_id: string;
+  marks_obtained: number | null;
+  status: string;
+  is_amendment?: boolean;
+  corrected_at: string;
+}> {
   const res = await c.post(
     `/v1/examinations/schedules/${encodeURIComponent(scheduleId)}/marks/correct`,
     {
@@ -343,7 +345,14 @@ export async function amendPublishedExamResult(
   c: ApiClient,
   scheduleId: string,
   input: CorrectExamMarkInput,
-): Promise<{ success: boolean; student_id: string; marks_obtained: number | null; status: string; is_amendment: boolean; corrected_at: string }> {
+): Promise<{
+  success: boolean;
+  student_id: string;
+  marks_obtained: number | null;
+  status: string;
+  is_amendment: boolean;
+  corrected_at: string;
+}> {
   const res = await c.post(
     `/v1/examinations/schedules/${encodeURIComponent(scheduleId)}/marks/amend`,
     {
@@ -497,13 +506,9 @@ export const ApprovalRulesSchema = z.object({
   results_workflow: z
     .enum(['DRAFT_REVIEW_PUBLISH', 'DIRECT_PUBLISH'])
     .default('DRAFT_REVIEW_PUBLISH'),
-  delegated_roles: z.array(z.string()).default([
-    'COLLEGE_ADMIN',
-    'CAMPUS_ADMIN',
-    'REGISTRAR',
-    'DEPARTMENT_ADMIN',
-    'HOD',
-  ]),
+  delegated_roles: z
+    .array(z.string())
+    .default(['COLLEGE_ADMIN', 'CAMPUS_ADMIN', 'REGISTRAR', 'DEPARTMENT_ADMIN', 'HOD']),
   effective_date: z.string().optional(),
   notes: z.string().max(500).optional(),
 });
@@ -785,13 +790,10 @@ export async function duplicateExamPolicy(
   policyId: string,
   body?: { name?: string },
 ): Promise<EligibilityPolicyDto> {
-  const res = await c.post(
-    `/v1/examinations/policies/${encodeURIComponent(policyId)}/duplicate`,
-    {
-      schema: One(EligibilityPolicyDtoSchema),
-      body: body ?? {},
-    },
-  );
+  const res = await c.post(`/v1/examinations/policies/${encodeURIComponent(policyId)}/duplicate`, {
+    schema: One(EligibilityPolicyDtoSchema),
+    body: body ?? {},
+  });
   return res.data;
 }
 
@@ -799,13 +801,10 @@ export async function activateExamPolicy(
   c: ApiClient,
   policyId: string,
 ): Promise<EligibilityPolicyDto> {
-  const res = await c.post(
-    `/v1/examinations/policies/${encodeURIComponent(policyId)}/activate`,
-    {
-      schema: One(EligibilityPolicyDtoSchema),
-      body: {},
-    },
-  );
+  const res = await c.post(`/v1/examinations/policies/${encodeURIComponent(policyId)}/activate`, {
+    schema: One(EligibilityPolicyDtoSchema),
+    body: {},
+  });
   return res.data;
 }
 
@@ -813,13 +812,10 @@ export async function archiveExamPolicy(
   c: ApiClient,
   policyId: string,
 ): Promise<EligibilityPolicyDto> {
-  const res = await c.post(
-    `/v1/examinations/policies/${encodeURIComponent(policyId)}/archive`,
-    {
-      schema: One(EligibilityPolicyDtoSchema),
-      body: {},
-    },
-  );
+  const res = await c.post(`/v1/examinations/policies/${encodeURIComponent(policyId)}/archive`, {
+    schema: One(EligibilityPolicyDtoSchema),
+    body: {},
+  });
   return res.data;
 }
 

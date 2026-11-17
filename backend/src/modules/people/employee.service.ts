@@ -399,10 +399,7 @@ export class EmployeeService {
       return [];
     }
 
-    const conditions = [
-      'e.organization_id = $1',
-      "e.status = 'ACTIVE'",
-    ];
+    const conditions = ['e.organization_id = $1', "e.status = 'ACTIVE'"];
     const params: unknown[] = [ctx.tenantId];
 
     if (query.campusId) {

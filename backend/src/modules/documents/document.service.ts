@@ -118,7 +118,9 @@ export class DocumentService {
     const hash =
       params.sha256 && /^[0-9a-f]{64}$/.test(params.sha256)
         ? params.sha256
-        : createHash('sha256').update(fileId + baseName).digest('hex');
+        : createHash('sha256')
+            .update(fileId + baseName)
+            .digest('hex');
 
     await tx.query(
       `INSERT INTO app.files (
@@ -732,7 +734,7 @@ export class DocumentService {
     );
     const selfStudentId = studentCheck.rows[0]?.id;
 
-    let linkedChildIds: string[] = [];
+    let linkedChildIds: string[];
     try {
       const children = await ParentService.getChildren(tx, ctx);
       linkedChildIds = children.map((c) => c.studentId);
@@ -744,7 +746,7 @@ export class DocumentService {
       organization_id: ctx.tenantId,
     });
 
-    let sql = '';
+    let sql: string;
     const params: unknown[] = [ctx.tenantId];
 
     if (selfStudentId) {

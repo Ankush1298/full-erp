@@ -18,12 +18,10 @@ import {
   type ChildExaminations,
   type ChildFees,
 } from '../lib/api/parent-api';
-import {
-  fetchParentStudentHomework,
-  type StudentHomeworkItem,
-} from '../lib/api/homework-api';
+import { fetchParentStudentHomework, type StudentHomeworkItem } from '../lib/api/homework-api';
 
-type TabKey = 'overview' | 'attendance' | 'academics' | 'homework' | 'examinations' | 'fees' | 'profile';
+type TabKey =
+  'overview' | 'attendance' | 'academics' | 'homework' | 'examinations' | 'fees' | 'profile';
 
 const TABS: { id: TabKey; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -64,7 +62,9 @@ export function ParentPortalPage() {
   const [childHomework, setChildHomework] = useState<StudentHomeworkItem[]>([]);
 
   // Attendance filter
-  const [attendanceFilter, setAttendanceFilter] = useState<'ALL' | 'PRESENT' | 'ABSENT' | 'LATE'>('ALL');
+  const [attendanceFilter, setAttendanceFilter] = useState<'ALL' | 'PRESENT' | 'ABSENT' | 'LATE'>(
+    'ALL',
+  );
 
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
@@ -91,7 +91,7 @@ export function ParentPortalPage() {
         if (mounted) setLoading(false);
       }
     }
-    loadInitial();
+    void loadInitial();
     return () => {
       mounted = false;
     };
@@ -138,7 +138,7 @@ export function ParentPortalPage() {
         if (mounted) setTabLoading(false);
       }
     }
-    loadTabData();
+    void loadTabData();
     return () => {
       mounted = false;
     };
@@ -170,17 +170,19 @@ export function ParentPortalPage() {
   if (error && children.length === 0) {
     return (
       <div className="anesa-card" style={{ padding: '2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontSize: '1.25rem', color: 'var(--color-danger, #d73a49)', marginBottom: '0.75rem' }}>
+        <h2
+          style={{
+            fontSize: '1.25rem',
+            color: 'var(--color-danger, #d73a49)',
+            marginBottom: '0.75rem',
+          }}
+        >
           Parent Portal Access Notice
         </h2>
         <p style={{ color: 'var(--color-fg-muted)', maxWidth: '480px', margin: '0 auto 1.5rem' }}>
           {error}
         </p>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => window.location.reload()}
-        >
+        <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
           Retry Connection
         </button>
       </div>
@@ -206,11 +208,20 @@ export function ParentPortalPage() {
         >
           👨‍👩‍👧
         </div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--brand-primary, #504175)' }}>
+        <h2
+          style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            marginBottom: '0.5rem',
+            color: 'var(--brand-primary, #504175)',
+          }}
+        >
           Guardian Account Active
         </h2>
         <p style={{ color: 'var(--color-fg-muted)', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
-          Your parent/guardian account has been verified, but is not currently linked to an active enrolled student. Please contact the school admissions or administrative office to link your student profile.
+          Your parent/guardian account has been verified, but is not currently linked to an active
+          enrolled student. Please contact the school admissions or administrative office to link
+          your student profile.
         </p>
         <div style={{ display: 'inline-flex', gap: '0.75rem' }}>
           <a href="/help" className="btn btn-outline">
@@ -222,7 +233,10 @@ export function ParentPortalPage() {
   }
 
   return (
-    <div className="parent-portal" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div
+      className="parent-portal"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
+    >
       {/* Header Banner & Child Switcher */}
       <div
         className="anesa-card"
@@ -233,17 +247,55 @@ export function ParentPortalPage() {
           borderRadius: '12px',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.85 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.25rem',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.8125rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  opacity: 0.85,
+                }}
+              >
                 Anesa Campus OS • Family Portal
               </span>
             </div>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: '#ffffff' }}>
+            <h1
+              style={{
+                fontSize: '1.75rem',
+                fontWeight: 700,
+                margin: '0 0 0.5rem 0',
+                color: '#ffffff',
+              }}
+            >
               {activeChild?.displayName ?? 'Student Portal'}
             </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', fontSize: '0.875rem', opacity: 0.9 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                flexWrap: 'wrap',
+                fontSize: '0.875rem',
+                opacity: 0.9,
+              }}
+            >
               <span>Admission #{activeChild?.admissionNumber}</span>
               {activeChild?.programName && <span>• {activeChild.programName}</span>}
               {activeChild?.cohortName && <span>• {activeChild.cohortName}</span>}
@@ -256,7 +308,14 @@ export function ParentPortalPage() {
             <div style={{ minWidth: '220px' }}>
               <label
                 htmlFor="child-select"
-                style={{ display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem', opacity: 0.85 }}
+                style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '0.25rem',
+                  opacity: 0.85,
+                }}
               >
                 Select Student ({children.length} Linked)
               </label>
@@ -278,7 +337,11 @@ export function ParentPortalPage() {
                 }}
               >
                 {children.map((c) => (
-                  <option key={c.studentId} value={c.studentId} style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>
+                  <option
+                    key={c.studentId}
+                    value={c.studentId}
+                    style={{ color: '#1f2937', backgroundColor: '#ffffff' }}
+                  >
                     {c.displayName} ({c.relation})
                   </option>
                 ))}
@@ -292,7 +355,7 @@ export function ParentPortalPage() {
       <SegmentedNav
         items={TABS}
         activeId={activeTab}
-        onChange={(id) => setActiveTab(id as TabKey)}
+        onChange={(id) => setActiveTab(id)}
         ariaLabel="Parent Portal Navigation"
       />
 
@@ -318,7 +381,11 @@ export function ParentPortalPage() {
               label="Outstanding Dues"
               value={formatCurrency(summary?.fees.totalOutstanding ?? 0)}
               tone={(summary?.fees.totalOutstanding ?? 0) === 0 ? 'positive' : 'warning'}
-              detail={summary?.fees.nextDue ? `Next due: ${summary.fees.nextDue.dueDate}` : 'All dues clear'}
+              detail={
+                summary?.fees.nextDue
+                  ? `Next due: ${summary.fees.nextDue.dueDate}`
+                  : 'All dues clear'
+              }
               compact
             />
             <StatCard
@@ -338,7 +405,13 @@ export function ParentPortalPage() {
           </div>
 
           {/* Quick Action & Notice Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '1.5rem',
+            }}
+          >
             {/* Quick Fee Notice */}
             <div className="anesa-card">
               <div className="anesa-card-header">
@@ -352,7 +425,13 @@ export function ParentPortalPage() {
               <div className="anesa-card-body">
                 {(summary?.fees.totalOutstanding ?? 0) > 0 ? (
                   <div>
-                    <p style={{ margin: '0 0 1rem 0', color: 'var(--color-fg-muted)', fontSize: '0.875rem' }}>
+                    <p
+                      style={{
+                        margin: '0 0 1rem 0',
+                        color: 'var(--color-fg-muted)',
+                        fontSize: '0.875rem',
+                      }}
+                    >
                       You have an outstanding balance of{' '}
                       <strong>{formatCurrency(summary?.fees.totalOutstanding ?? 0)}</strong>.
                       {summary?.fees.nextDue && ` Due by ${summary.fees.nextDue.dueDate}.`}
@@ -376,8 +455,12 @@ export function ParentPortalPage() {
             {/* Latest Official Examination Results */}
             <div className="anesa-card">
               <div className="anesa-card-header">
-                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Latest Official Marks</h2>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>Published only</span>
+                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                  Latest Official Marks
+                </h2>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                  Published only
+                </span>
               </div>
               <div className="anesa-card-body" style={{ padding: 0 }}>
                 {summary && summary.examinations.latestPublished.length > 0 ? (
@@ -396,9 +479,19 @@ export function ParentPortalPage() {
                           <tr key={idx}>
                             <td style={{ fontWeight: 500 }}>{ex.courseName}</td>
                             <td style={{ color: 'var(--color-fg-muted)' }}>{ex.examName}</td>
-                            <td style={{ textAlign: 'right' }}>{ex.marksObtained}/{ex.maxMarks}</td>
                             <td style={{ textAlign: 'right' }}>
-                              <Badge tone={ex.grade === 'PASS' || ex.grade.startsWith('A') || ex.grade.startsWith('B') ? 'positive' : 'neutral'}>
+                              {ex.marksObtained}/{ex.maxMarks}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <Badge
+                                tone={
+                                  ex.grade === 'PASS' ||
+                                  ex.grade.startsWith('A') ||
+                                  ex.grade.startsWith('B')
+                                    ? 'positive'
+                                    : 'neutral'
+                                }
+                              >
                                 {ex.grade}
                               </Badge>
                             </td>
@@ -408,7 +501,14 @@ export function ParentPortalPage() {
                     </table>
                   </div>
                 ) : (
-                  <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-fg-muted)', fontSize: '0.875rem' }}>
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      textAlign: 'center',
+                      color: 'var(--color-fg-muted)',
+                      fontSize: '0.875rem',
+                    }}
+                  >
                     No officially published examination results for this session yet.
                   </div>
                 )}
@@ -453,7 +553,10 @@ export function ParentPortalPage() {
           </div>
 
           <div className="anesa-card">
-            <div className="anesa-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              className="anesa-card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Daily Session Log</h2>
               <div className="anesa-filter-group" style={{ display: 'flex', gap: '0.5rem' }}>
                 {(['ALL', 'PRESENT', 'ABSENT', 'LATE'] as const).map((filter) => (
@@ -511,7 +614,9 @@ export function ParentPortalPage() {
                   </table>
                 </div>
               ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
+                <div
+                  style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}
+                >
                   No attendance session records recorded for this student yet.
                 </div>
               )}
@@ -548,7 +653,9 @@ export function ParentPortalPage() {
           {/* Enrolled Courses */}
           <div className="anesa-card">
             <div className="anesa-card-header">
-              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Enrolled Subjects & Faculty</h2>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                Enrolled Subjects & Faculty
+              </h2>
               <span style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
                 {academics?.courses.length ?? 0} Courses
               </span>
@@ -580,7 +687,9 @@ export function ParentPortalPage() {
                   </table>
                 </div>
               ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
+                <div
+                  style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}
+                >
                   No active courses registered for this term yet.
                 </div>
               )}
@@ -589,9 +698,14 @@ export function ParentPortalPage() {
 
           {/* Child Homework & Assignments Preview */}
           <div className="anesa-card">
-            <div className="anesa-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              className="anesa-card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <div>
-                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Active Homework & Assignments</h2>
+                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                  Active Homework & Assignments
+                </h2>
                 <span style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
                   {childHomework.length} Tasks Recorded
                 </span>
@@ -647,7 +761,9 @@ export function ParentPortalPage() {
                                 {hw.marksObtained} {hw.grade ? `(${hw.grade})` : ''}
                               </span>
                             ) : (
-                              <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}>
+                              <span
+                                style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}
+                              >
                                 {hw.feedback || '—'}
                               </span>
                             )}
@@ -658,7 +774,9 @@ export function ParentPortalPage() {
                   </table>
                 </div>
               ) : (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
+                <div
+                  style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}
+                >
                   No homework assignments pending for this student.
                 </div>
               )}
@@ -679,7 +797,11 @@ export function ParentPortalPage() {
             />
             <StatCard
               label="Submitted"
-              value={childHomework.filter((h) => h.submissionStatus === 'SUBMITTED' || h.submissionStatus === 'REVIEWED').length}
+              value={
+                childHomework.filter(
+                  (h) => h.submissionStatus === 'SUBMITTED' || h.submissionStatus === 'REVIEWED',
+                ).length
+              }
               tone="emerald"
               helper="Work turned in"
             />
@@ -691,18 +813,33 @@ export function ParentPortalPage() {
             />
             <StatCard
               label="Evaluated"
-              value={childHomework.filter((h) => h.evaluatedAt !== null || h.marksObtained !== null).length}
+              value={
+                childHomework.filter((h) => h.evaluatedAt !== null || h.marksObtained !== null)
+                  .length
+              }
               tone="coral"
               helper="With grades/feedback"
             />
           </div>
 
           <div className="anesa-card">
-            <div className="anesa-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              className="anesa-card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <div>
-                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Curriculum Homework & Assignments</h2>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
-                  View assigned tasks, submission status, grades, and teacher feedback for your child.
+                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                  Curriculum Homework & Assignments
+                </h2>
+                <p
+                  style={{
+                    margin: '0.25rem 0 0 0',
+                    fontSize: '0.8125rem',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
+                  View assigned tasks, submission status, grades, and teacher feedback for your
+                  child.
                 </p>
               </div>
               <Badge tone="purple">{childHomework.length} Assignments</Badge>
@@ -726,7 +863,9 @@ export function ParentPortalPage() {
                       {childHomework.map((hw) => (
                         <tr key={hw.id}>
                           <td>
-                            <div style={{ fontWeight: 600, color: 'var(--brand-primary, #504175)' }}>
+                            <div
+                              style={{ fontWeight: 600, color: 'var(--brand-primary, #504175)' }}
+                            >
                               {hw.courseTitle}
                             </div>
                             <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
@@ -780,12 +919,20 @@ export function ParentPortalPage() {
                                 {hw.grade ? `(${hw.grade})` : ''}
                               </span>
                             ) : (
-                              <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}>
+                              <span
+                                style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}
+                              >
                                 {hw.submissionStatus === 'SUBMITTED' ? 'Under Evaluation' : '—'}
                               </span>
                             )}
                           </td>
-                          <td style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', maxWidth: '200px' }}>
+                          <td
+                            style={{
+                              fontSize: '0.8125rem',
+                              color: 'var(--color-fg-muted)',
+                              maxWidth: '200px',
+                            }}
+                          >
                             {hw.feedback || '—'}
                           </td>
                         </tr>
@@ -794,7 +941,9 @@ export function ParentPortalPage() {
                   </table>
                 </div>
               ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
+                <div
+                  style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}
+                >
                   No homework assignments recorded for this student yet.
                 </div>
               )}
@@ -808,10 +957,21 @@ export function ParentPortalPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Strictly Published Results */}
           <div className="anesa-card">
-            <div className="anesa-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              className="anesa-card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <div>
-                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Official Published Results</h2>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
+                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                  Official Published Results
+                </h2>
+                <p
+                  style={{
+                    margin: '0.25rem 0 0 0',
+                    fontSize: '0.8125rem',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
                   Only verified results published by the examination authority appear here.
                 </p>
               </div>
@@ -839,9 +999,19 @@ export function ParentPortalPage() {
                           <td style={{ fontWeight: 500 }}>{r.courseName}</td>
                           <td style={{ color: 'var(--color-fg-muted)' }}>{r.examName}</td>
                           <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.marksObtained}</td>
-                          <td style={{ textAlign: 'right', color: 'var(--color-fg-muted)' }}>{r.maxMarks}</td>
+                          <td style={{ textAlign: 'right', color: 'var(--color-fg-muted)' }}>
+                            {r.maxMarks}
+                          </td>
                           <td style={{ textAlign: 'right' }}>
-                            <Badge tone={r.grade === 'PASS' || r.grade.startsWith('A') || r.grade.startsWith('B') ? 'positive' : 'neutral'}>
+                            <Badge
+                              tone={
+                                r.grade === 'PASS' ||
+                                r.grade.startsWith('A') ||
+                                r.grade.startsWith('B')
+                                  ? 'positive'
+                                  : 'neutral'
+                              }
+                            >
                               {r.grade}
                             </Badge>
                           </td>
@@ -854,10 +1024,15 @@ export function ParentPortalPage() {
                   </table>
                 </div>
               ) : (
-                <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
-                  <p style={{ margin: '0 0 0.5rem 0', fontWeight: 500 }}>No published results yet</p>
+                <div
+                  style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}
+                >
+                  <p style={{ margin: '0 0 0.5rem 0', fontWeight: 500 }}>
+                    No published results yet
+                  </p>
                   <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                    Results for ongoing or past examination sessions will be visible as soon as they are approved and published.
+                    Results for ongoing or past examination sessions will be visible as soon as they
+                    are approved and published.
                   </p>
                 </div>
               )}
@@ -868,7 +1043,9 @@ export function ParentPortalPage() {
           {examinations && examinations.upcomingExams.length > 0 && (
             <div className="anesa-card">
               <div className="anesa-card-header">
-                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Scheduled Examinations</h2>
+                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                  Scheduled Examinations
+                </h2>
               </div>
               <div className="anesa-card-body" style={{ padding: 0 }}>
                 <div className="anesa-table-wrapper">
@@ -887,7 +1064,9 @@ export function ParentPortalPage() {
                           <td style={{ fontWeight: 500 }}>{u.examName}</td>
                           <td>{u.courseName}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>{u.date}</td>
-                          <td style={{ whiteSpace: 'nowrap', color: 'var(--color-fg-muted)' }}>{u.time}</td>
+                          <td style={{ whiteSpace: 'nowrap', color: 'var(--color-fg-muted)' }}>
+                            {u.time}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -922,17 +1101,30 @@ export function ParentPortalPage() {
               label="Total Outstanding"
               value={formatCurrency(fees?.summary.totalOutstanding ?? 0)}
               tone={(fees?.summary.totalOutstanding ?? 0) === 0 ? 'positive' : 'warning'}
-              detail={(fees?.summary.totalOutstanding ?? 0) === 0 ? 'Account settled' : 'Immediate balance due'}
+              detail={
+                (fees?.summary.totalOutstanding ?? 0) === 0
+                  ? 'Account settled'
+                  : 'Immediate balance due'
+              }
               compact
             />
           </div>
 
           {/* Dues Ledger */}
           <div className="anesa-card">
-            <div className="anesa-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              className="anesa-card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <div>
                 <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Fee Dues Ledger</h2>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
+                <p
+                  style={{
+                    margin: '0.25rem 0 0 0',
+                    fontSize: '0.8125rem',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
                   Breakdown of tuition, institutional and academic fees.
                 </p>
               </div>
@@ -995,7 +1187,9 @@ export function ParentPortalPage() {
                   </table>
                 </div>
               ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
+                <div
+                  style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}
+                >
                   No fee dues recorded for this account.
                 </div>
               )}
@@ -1006,7 +1200,9 @@ export function ParentPortalPage() {
           {fees && fees.receipts.length > 0 && (
             <div className="anesa-card">
               <div className="anesa-card-header">
-                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Official Payment Receipts</h2>
+                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                  Official Payment Receipts
+                </h2>
               </div>
               <div className="anesa-card-body" style={{ padding: 0 }}>
                 <div className="anesa-table-wrapper">
@@ -1045,28 +1241,58 @@ export function ParentPortalPage() {
 
       {/* 6. FAMILY PROFILE TAB */}
       {!tabLoading && activeTab === 'profile' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '1.5rem',
+          }}
+        >
           {/* Guardian Profile Card */}
           <div className="anesa-card">
             <div className="anesa-card-header">
               <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Guardian Account</h2>
               <Badge tone="positive">Verified</Badge>
             </div>
-            <div className="anesa-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
+            <div
+              className="anesa-card-body"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                fontSize: '0.875rem',
+              }}
+            >
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Guardian Name</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Guardian Name
+                </span>
                 <strong>{identity?.displayName || 'Registered Guardian'}</strong>
               </div>
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Relationship</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Relationship
+                </span>
                 <span>{activeChild?.relation || 'Guardian'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Primary Contact Status</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Primary Contact Status
+                </span>
                 <span>{activeChild?.isPrimary ? 'Primary Guardian' : 'Secondary Guardian'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Academic Access</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Academic Access
+                </span>
                 <span>{activeChild?.canViewAcademics ? 'Authorized' : 'Restricted'}</span>
               </div>
             </div>
@@ -1075,38 +1301,78 @@ export function ParentPortalPage() {
           {/* Student Record Card */}
           <div className="anesa-card">
             <div className="anesa-card-header">
-              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Enrolled Student Profile</h2>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+                Enrolled Student Profile
+              </h2>
               <Badge tone="brand">{activeChild?.status || 'ACTIVE'}</Badge>
             </div>
-            <div className="anesa-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
+            <div
+              className="anesa-card-body"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                fontSize: '0.875rem',
+              }}
+            >
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Full Student Name</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Full Student Name
+                </span>
                 <strong>{activeChild?.displayName}</strong>
               </div>
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Admission Number</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Admission Number
+                </span>
                 <span>{activeChild?.admissionNumber}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Campus</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Campus
+                </span>
                 <span>{activeChild?.campusName || 'Main Campus'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}>Program & Cohort</span>
-                <span>{activeChild?.programName || 'Standard Program'} • {activeChild?.cohortName || 'Active Cohort'}</span>
+                <span
+                  style={{ color: 'var(--color-fg-muted)', display: 'block', fontSize: '0.75rem' }}
+                >
+                  Program & Cohort
+                </span>
+                <span>
+                  {activeChild?.programName || 'Standard Program'} •{' '}
+                  {activeChild?.cohortName || 'Active Cohort'}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Help & Support Notice */}
           <div className="anesa-card" style={{ gridColumn: '1 / -1' }}>
-            <div className="anesa-card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div
+              className="anesa-card-body"
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem',
+              }}
+            >
               <div>
                 <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.9375rem', fontWeight: 600 }}>
                   Need to update your official contact details?
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
-                  To ensure child safety and statutory record compliance, updates to phone numbers, emergency contacts, or guardianship require verification through the administrative office.
+                  To ensure child safety and statutory record compliance, updates to phone numbers,
+                  emergency contacts, or guardianship require verification through the
+                  administrative office.
                 </p>
               </div>
               <a href="/help" className="btn btn-outline btn-sm">
@@ -1144,7 +1410,10 @@ export function ParentPortalPage() {
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
             }}
           >
-            <div className="anesa-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              className="anesa-card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600 }}>
                 {paymentSuccess ? 'Payment Successful' : 'Secure Fee Payment'}
               </h2>
@@ -1191,16 +1460,33 @@ export function ParentPortalPage() {
                   >
                     <span>Total Amount Payable:</span>
                     <strong style={{ fontSize: '1.25rem' }}>
-                      {formatCurrency(fees?.summary.totalOutstanding ?? summary?.fees.totalOutstanding ?? 0)}
+                      {formatCurrency(
+                        fees?.summary.totalOutstanding ?? summary?.fees.totalOutstanding ?? 0,
+                      )}
                     </strong>
                   </div>
 
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', marginBottom: '1.25rem' }}>
+                  <p
+                    style={{
+                      fontSize: '0.8125rem',
+                      color: 'var(--color-fg-muted)',
+                      marginBottom: '1.25rem',
+                    }}
+                  >
                     Select simulated payment gateway:
                   </p>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      marginBottom: '1.5rem',
+                    }}
+                  >
                     <label
+                      htmlFor="payment-method-upi"
+                      aria-label="UPI / QR Code"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1211,15 +1497,28 @@ export function ParentPortalPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <input type="radio" name="payment-method" defaultChecked />
+                      <input
+                        id="payment-method-upi"
+                        type="radio"
+                        name="payment-method"
+                        defaultChecked
+                      />
                       <div>
                         <strong>UPI / QR Code</strong>
-                        <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                        <span
+                          style={{
+                            display: 'block',
+                            fontSize: '0.75rem',
+                            color: 'var(--color-fg-muted)',
+                          }}
+                        >
                           Google Pay, PhonePe, Paytm
                         </span>
                       </div>
                     </label>
                     <label
+                      htmlFor="payment-method-card"
+                      aria-label="Net Banking / Debit Card"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1230,10 +1529,16 @@ export function ParentPortalPage() {
                         cursor: 'pointer',
                       }}
                     >
-                      <input type="radio" name="payment-method" />
+                      <input id="payment-method-card" type="radio" name="payment-method" />
                       <div>
                         <strong>Net Banking / Debit Card</strong>
-                        <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                        <span
+                          style={{
+                            display: 'block',
+                            fontSize: '0.75rem',
+                            color: 'var(--color-fg-muted)',
+                          }}
+                        >
                           All Major Indian Scheduled Banks
                         </span>
                       </div>

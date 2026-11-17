@@ -456,7 +456,14 @@ export class VaultService {
            custodian_name = EXCLUDED.custodian_name,
            custodian_role = EXCLUDED.custodian_role,
            status = 'ACTIVE'`,
-        [uuidv7(), ctx.tenantId, input.vaultEpochId, c.shareIndex, c.custodianName, c.custodianRole],
+        [
+          uuidv7(),
+          ctx.tenantId,
+          input.vaultEpochId,
+          c.shareIndex,
+          c.custodianName,
+          c.custodianRole,
+        ],
       );
     }
 
@@ -511,7 +518,11 @@ export class VaultService {
     }
 
     if (ceremony.presented_share_indices.includes(input.shareIndex)) {
-      throw new AppError(400, 'DUPLICATE_SHARE', 'This custodian share has already been presented.');
+      throw new AppError(
+        400,
+        'DUPLICATE_SHARE',
+        'This custodian share has already been presented.',
+      );
     }
 
     const updatedIndices = [...ceremony.presented_share_indices, input.shareIndex];
@@ -578,11 +589,7 @@ export class VaultService {
     };
   }
 
-  static async getActiveGrantsForDevice(
-    tx: TenantTx,
-    ctx: TrustedContext,
-    deviceId: string,
-  ) {
+  static async getActiveGrantsForDevice(tx: TenantTx, ctx: TrustedContext, deviceId: string) {
     const res = await tx.query<{
       id: string;
       capability_key_name: string;
@@ -688,7 +695,7 @@ export class VaultService {
       ciphertext: string;
       iv: string;
       auth_tag: string;
-      aad_context: any;
+      aad_context: unknown;
       created_at: Date;
     }>(
       `SELECT
@@ -723,7 +730,10 @@ export class VaultService {
       ciphertext: r.ciphertext,
       iv: r.iv,
       authTag: r.auth_tag,
-      aadContext: typeof r.aad_context === 'string' ? JSON.parse(r.aad_context) : r.aad_context,
+      aadContext:
+        typeof r.aad_context === 'string'
+          ? (JSON.parse(r.aad_context) as Record<string, unknown>)
+          : (r.aad_context as Record<string, unknown>),
       createdAt: r.created_at,
     };
   }
@@ -732,11 +742,7 @@ export class VaultService {
   // 7. Adult Student Consent Management
   // -----------------------------------------------------------------------------------------------
 
-  static async grantAdultConsent(
-    tx: TenantTx,
-    ctx: TrustedContext,
-    input: GrantAdultConsentInput,
-  ) {
+  static async grantAdultConsent(tx: TenantTx, ctx: TrustedContext, input: GrantAdultConsentInput) {
     // Assert user is a student
     const studentRes = await tx.query<{ id: string }>(
       `SELECT id FROM app.students WHERE organization_id = $1 AND user_id = $2`,
@@ -757,14 +763,7 @@ export class VaultService {
          expires_at = EXCLUDED.expires_at,
          updated_at = clock_timestamp()
        RETURNING id, granted_at`,
-      [
-        id,
-        ctx.tenantId,
-        studentId,
-        input.guardianId,
-        input.consentScope,
-        input.expiresAt ?? null,
-      ],
+      [id, ctx.tenantId, studentId, input.guardianId, input.consentScope, input.expiresAt ?? null],
     );
 
     return {

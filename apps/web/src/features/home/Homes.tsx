@@ -41,13 +41,9 @@ const COPY: Record<ShellKind, { title: string; lead: string }> = {
 
 export function HomePage() {
   const { client, identity } = useAuth();
-
-  if (identity?.roles.includes('PARENT')) {
-    return <ParentPortalPage />;
-  }
-
+  const isParent = identity?.roles.includes('PARENT') ?? false;
   const kind = identity ? shellKind(identity) : 'student';
-  usePageTitle(COPY[kind].title);
+  usePageTitle(isParent ? 'Parent Portal' : COPY[kind].title);
 
   // Institution real metric counts
   const [campusesCount, setCampusesCount] = useState<number | null>(null);
@@ -59,7 +55,7 @@ export function HomePage() {
   const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0);
 
   useEffect(() => {
-    if (!identity || kind === 'student') return;
+    if (!identity || kind === 'student' || isParent) return;
 
     let mounted = true;
 
@@ -127,9 +123,10 @@ export function HomePage() {
     return () => {
       mounted = false;
     };
-  }, [client, identity, kind]);
+  }, [client, identity, kind, isParent]);
 
   if (!identity) return null;
+  if (isParent) return <ParentPortalPage />;
 
   // Student view preserves the exact test requirements (labelled placeholders, no numbers)
   if (kind === 'student') {
@@ -160,10 +157,21 @@ export function HomePage() {
   }
 
   const roles = identity.roles;
-  const isTeacher = roles.includes('FACULTY') && !can(identity, 'org.campus.manage', 'org.department.manage', 'role.assignment.grant');
-  const isHod = roles.includes('HOD') && !can(identity, 'org.campus.manage', 'org.department.manage', 'role.assignment.grant');
-  const isGeneralStaff = roles.includes('STAFF') && !roles.includes('FACULTY') && !roles.includes('HOD') && !can(identity, 'org.campus.manage', 'org.department.manage', 'role.assignment.grant');
-  const isRegistrar = roles.includes('REGISTRAR') && !roles.includes('COLLEGE_ADMIN') && !roles.includes('CAMPUS_ADMIN');
+  const isTeacher =
+    roles.includes('FACULTY') &&
+    !can(identity, 'org.campus.manage', 'org.department.manage', 'role.assignment.grant');
+  const isHod =
+    roles.includes('HOD') &&
+    !can(identity, 'org.campus.manage', 'org.department.manage', 'role.assignment.grant');
+  const isGeneralStaff =
+    roles.includes('STAFF') &&
+    !roles.includes('FACULTY') &&
+    !roles.includes('HOD') &&
+    !can(identity, 'org.campus.manage', 'org.department.manage', 'role.assignment.grant');
+  const isRegistrar =
+    roles.includes('REGISTRAR') &&
+    !roles.includes('COLLEGE_ADMIN') &&
+    !roles.includes('CAMPUS_ADMIN');
 
   // Current calendar dates calculation
   const baseDate = new Date();
@@ -200,7 +208,16 @@ export function HomePage() {
             {/* Teacher Card 1: Assigned Classes (Coral) */}
             <div className="kpi-card kpi-card--coral">
               <div className="kpi-icon kpi-icon--coral" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
@@ -209,28 +226,56 @@ export function HomePage() {
                 <p className="kpi-title">Assigned Classes</p>
                 <p className="kpi-value">{offerings.length}</p>
               </div>
-              <NavLink to="/attendance" className="kpi-link-overlay" aria-label="View assigned classes" />
+              <NavLink
+                to="/attendance"
+                className="kpi-link-overlay"
+                aria-label="View assigned classes"
+              />
             </div>
 
             {/* Teacher Card 2: Today's Attendance (Emerald) */}
             <div className="kpi-card kpi-card--emerald">
               <div className="kpi-icon kpi-icon--emerald" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M9 11l3 3L22 4" />
                   <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                 </svg>
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Today's Attendance</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Mark Class</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Mark Class
+                </p>
               </div>
-              <NavLink to="/attendance" className="kpi-link-overlay" aria-label="Mark class attendance" />
+              <NavLink
+                to="/attendance"
+                className="kpi-link-overlay"
+                aria-label="Mark class attendance"
+              />
             </div>
 
             {/* Teacher Card 3: Marks & Evaluations (Deep Purple) */}
             <div className="kpi-card kpi-card--purple">
               <div className="kpi-icon kpi-icon--purple" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                   <line x1="16" y1="13" x2="8" y2="13" />
@@ -239,15 +284,30 @@ export function HomePage() {
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Student Marks</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Enter Marks</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Enter Marks
+                </p>
               </div>
-              <NavLink to="/examinations" className="kpi-link-overlay" aria-label="Enter examination marks" />
+              <NavLink
+                to="/examinations"
+                className="kpi-link-overlay"
+                aria-label="Enter examination marks"
+              />
             </div>
 
             {/* Teacher Card 4: Student Rosters (Amber) */}
             <div className="kpi-card kpi-card--amber">
               <div className="kpi-icon kpi-icon--amber" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -256,9 +316,15 @@ export function HomePage() {
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Class Rosters</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Rosters</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Rosters
+                </p>
               </div>
-              <NavLink to="/attendance" className="kpi-link-overlay" aria-label="View student rosters" />
+              <NavLink
+                to="/attendance"
+                className="kpi-link-overlay"
+                aria-label="View student rosters"
+              />
             </div>
           </>
         ) : isHod ? (
@@ -266,7 +332,16 @@ export function HomePage() {
             {/* HOD Card 1: Department Students (Deep Purple) */}
             <div className="kpi-card kpi-card--purple">
               <div className="kpi-icon kpi-icon--purple" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
                 </svg>
@@ -275,51 +350,100 @@ export function HomePage() {
                 <p className="kpi-title">Department Students</p>
                 <p className="kpi-value">{studentsCount !== null ? studentsCount : 'Directory'}</p>
               </div>
-              <NavLink to="/students" className="kpi-link-overlay" aria-label="View department students" />
+              <NavLink
+                to="/students"
+                className="kpi-link-overlay"
+                aria-label="View department students"
+              />
             </div>
 
             {/* HOD Card 2: Attendance Approvals (Emerald) */}
             <div className="kpi-card kpi-card--emerald">
               <div className="kpi-icon kpi-icon--emerald" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M9 11l3 3L22 4" />
                   <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                 </svg>
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Attendance Approvals</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Review</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Review
+                </p>
               </div>
-              <NavLink to="/attendance" className="kpi-link-overlay" aria-label="Review attendance corrections" />
+              <NavLink
+                to="/attendance"
+                className="kpi-link-overlay"
+                aria-label="Review attendance corrections"
+              />
             </div>
 
             {/* HOD Card 3: Examinations (Amber) */}
             <div className="kpi-card kpi-card--amber">
               <div className="kpi-icon kpi-icon--amber" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Examinations</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Manage</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Manage
+                </p>
               </div>
-              <NavLink to="/examinations" className="kpi-link-overlay" aria-label="Manage department examinations" />
+              <NavLink
+                to="/examinations"
+                className="kpi-link-overlay"
+                aria-label="Manage department examinations"
+              />
             </div>
 
             {/* HOD Card 4: Academic Courses (Coral) */}
             <div className="kpi-card kpi-card--coral">
               <div className="kpi-icon kpi-icon--coral" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
                   <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                 </svg>
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Courses & Curriculum</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Academics</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Academics
+                </p>
               </div>
-              <NavLink to="/academics" className="kpi-link-overlay" aria-label="View academic curriculum" />
+              <NavLink
+                to="/academics"
+                className="kpi-link-overlay"
+                aria-label="View academic curriculum"
+              />
             </div>
           </>
         ) : isGeneralStaff ? (
@@ -327,7 +451,16 @@ export function HomePage() {
             {/* General Staff Card 1: Notices (Deep Purple) */}
             <div className="kpi-card kpi-card--purple">
               <div className="kpi-icon kpi-icon--purple" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
@@ -336,20 +469,35 @@ export function HomePage() {
                 <p className="kpi-title">System Notices</p>
                 <p className="kpi-value">{notifications.length}</p>
               </div>
-              <NavLink to="/notifications" className="kpi-link-overlay" aria-label="View notifications" />
+              <NavLink
+                to="/notifications"
+                className="kpi-link-overlay"
+                aria-label="View notifications"
+              />
             </div>
 
             {/* General Staff Card 2: Documents (Emerald) */}
             <div className="kpi-card kpi-card--emerald">
               <div className="kpi-icon kpi-icon--emerald" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Documents Repository</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Files</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Files
+                </p>
               </div>
               <NavLink to="/documents" className="kpi-link-overlay" aria-label="Access documents" />
             </div>
@@ -357,16 +505,31 @@ export function HomePage() {
             {/* General Staff Card 3: Account & Security (Amber) */}
             <div className="kpi-card kpi-card--amber">
               <div className="kpi-icon kpi-icon--amber" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Account & Security</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Settings</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Settings
+                </p>
               </div>
-              <NavLink to="/account" className="kpi-link-overlay" aria-label="Manage account settings" />
+              <NavLink
+                to="/account"
+                className="kpi-link-overlay"
+                aria-label="Manage account settings"
+              />
             </div>
           </>
         ) : isRegistrar ? (
@@ -374,7 +537,16 @@ export function HomePage() {
             {/* Registrar Card 1: Registered Students (Deep Purple) */}
             <div className="kpi-card kpi-card--purple">
               <div className="kpi-icon kpi-icon--purple" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -385,28 +557,56 @@ export function HomePage() {
                 <p className="kpi-title">Registered Students</p>
                 <p className="kpi-value">{studentsCount !== null ? studentsCount : '—'}</p>
               </div>
-              <NavLink to="/students" className="kpi-link-overlay" aria-label="View student directory" />
+              <NavLink
+                to="/students"
+                className="kpi-link-overlay"
+                aria-label="View student directory"
+              />
             </div>
 
             {/* Registrar Card 2: Academic Programs (Coral) */}
             <div className="kpi-card kpi-card--coral">
               <div className="kpi-icon kpi-icon--coral" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
                   <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                 </svg>
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Programs & Cohorts</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Academics</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Academics
+                </p>
               </div>
-              <NavLink to="/academics" className="kpi-link-overlay" aria-label="View academic programs" />
+              <NavLink
+                to="/academics"
+                className="kpi-link-overlay"
+                aria-label="View academic programs"
+              />
             </div>
 
             {/* Registrar Card 3: Admissions Processing (Emerald) */}
             <div className="kpi-card kpi-card--emerald">
               <div className="kpi-icon kpi-icon--emerald" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="8.5" cy="7" r="4" />
                   <line x1="20" y1="8" x2="20" y2="14" />
@@ -415,15 +615,30 @@ export function HomePage() {
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Admissions Office</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Onboarding</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Onboarding
+                </p>
               </div>
-              <NavLink to="/students" className="kpi-link-overlay" aria-label="Student onboarding" />
+              <NavLink
+                to="/students"
+                className="kpi-link-overlay"
+                aria-label="Student onboarding"
+              />
             </div>
 
             {/* Registrar Card 4: Imports (Amber) */}
             <div className="kpi-card kpi-card--amber">
               <div className="kpi-icon kpi-icon--amber" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
@@ -431,7 +646,9 @@ export function HomePage() {
               </div>
               <div className="kpi-details">
                 <p className="kpi-title">Bulk Imports</p>
-                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>Pipelines</p>
+                <p className="kpi-value" style={{ fontSize: 'var(--text-lg)' }}>
+                  Pipelines
+                </p>
               </div>
               <NavLink to="/imports" className="kpi-link-overlay" aria-label="Data imports" />
             </div>
@@ -460,7 +677,11 @@ export function HomePage() {
                 <p className="kpi-value">{campusesCount !== null ? campusesCount : '—'}</p>
               </div>
               {can(identity, 'org.structure.read', 'org.campus.manage') ? (
-                <NavLink to="/organisation" className="kpi-link-overlay" aria-label="View campuses" />
+                <NavLink
+                  to="/organisation"
+                  className="kpi-link-overlay"
+                  aria-label="View campuses"
+                />
               ) : null}
             </div>
 
@@ -518,7 +739,11 @@ export function HomePage() {
                 <p className="kpi-value">{usersCount !== null ? usersCount : '—'}</p>
               </div>
               {can(identity, 'user.account.read') ? (
-                <NavLink to="/users" className="kpi-link-overlay" aria-label="View users and staff" />
+                <NavLink
+                  to="/users"
+                  className="kpi-link-overlay"
+                  aria-label="View users and staff"
+                />
               ) : null}
             </div>
 
@@ -707,14 +932,43 @@ export function HomePage() {
                 </NavLink>
               </div>
 
-              <div className="teacher-offerings-list" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+              <div
+                className="teacher-offerings-list"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-3)',
+                  marginTop: 'var(--space-4)',
+                }}
+              >
                 {offerings.length > 0 ? (
                   offerings.map((offering) => (
-                    <article key={offering.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                    <article
+                      key={offering.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: 'var(--space-3) var(--space-4)',
+                        background: 'var(--color-surface)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    >
                       <div>
-                        <h3 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600 }}>{offering.titleSnapshot}</h3>
-                        <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                          {offering.codeSnapshot} {offering.groupLabel ? `• ${offering.groupLabel}` : ''} • {offering.termName}
+                        <h3 style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 600 }}>
+                          {offering.titleSnapshot}
+                        </h3>
+                        <p
+                          style={{
+                            margin: 'var(--space-1) 0 0',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-text-muted)',
+                          }}
+                        >
+                          {offering.codeSnapshot}{' '}
+                          {offering.groupLabel ? `• ${offering.groupLabel}` : ''} •{' '}
+                          {offering.termName}
                         </p>
                       </div>
                       <span className="term-badge" style={{ textTransform: 'capitalize' }}>
@@ -723,7 +977,13 @@ export function HomePage() {
                     </article>
                   ))
                 ) : (
-                  <div style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  <div
+                    style={{
+                      padding: 'var(--space-6) var(--space-4)',
+                      textAlign: 'center',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
                     <p>No teaching classes assigned for the active term.</p>
                   </div>
                 )}
@@ -731,7 +991,10 @@ export function HomePage() {
             </section>
 
             {/* Teacher Academic Tasks Panel */}
-            <section className="dashboard-panel highlights-panel" aria-label="Teaching Quick Actions">
+            <section
+              className="dashboard-panel highlights-panel"
+              aria-label="Teaching Quick Actions"
+            >
               <div className="panel-header">
                 <h2 className="panel-title">Academic Checklist & Tasks</h2>
                 <span className="term-badge">Active Session</span>
@@ -740,7 +1003,14 @@ export function HomePage() {
                 <NavLink to="/attendance" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--emerald">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </div>
@@ -754,7 +1024,14 @@ export function HomePage() {
                 <NavLink to="/examinations" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--purple">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M12 20h9" />
                         <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                       </svg>
@@ -769,7 +1046,14 @@ export function HomePage() {
                 <NavLink to="/documents" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--amber">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                         <polyline points="14 2 14 8 20 8" />
                       </svg>
@@ -786,7 +1070,10 @@ export function HomePage() {
         ) : isHod ? (
           <div className="dashboard-col-right">
             {/* HOD Department Academic Oversight Panel */}
-            <section className="dashboard-panel performance-panel" aria-label="Department Oversight">
+            <section
+              className="dashboard-panel performance-panel"
+              aria-label="Department Oversight"
+            >
               <div className="panel-header">
                 <div>
                   <h2 className="panel-title">Department Academic Oversight</h2>
@@ -800,7 +1087,14 @@ export function HomePage() {
                 <NavLink to="/attendance" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--emerald">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M9 11l3 3L22 4" />
                         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                       </svg>
@@ -815,7 +1109,14 @@ export function HomePage() {
                 <NavLink to="/examinations" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--purple">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                       </svg>
                     </div>
@@ -829,14 +1130,23 @@ export function HomePage() {
                 <NavLink to="/students" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--amber">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                         <circle cx="9" cy="7" r="4" />
                       </svg>
                     </div>
                     <h3 className="highlight-name">Students</h3>
                     <p className="highlight-sub">Department Roster</p>
-                    <p className="highlight-metric">{studentsCount !== null ? studentsCount : 'Directory'}</p>
+                    <p className="highlight-metric">
+                      {studentsCount !== null ? studentsCount : 'Directory'}
+                    </p>
                     <span className="highlight-rank-pill">Roster</span>
                   </div>
                 </NavLink>
@@ -857,7 +1167,14 @@ export function HomePage() {
                 <NavLink to="/documents" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--emerald">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                         <polyline points="14 2 14 8 20 8" />
                       </svg>
@@ -872,7 +1189,14 @@ export function HomePage() {
                 <NavLink to="/notifications" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--purple">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                         <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                       </svg>
@@ -887,7 +1211,14 @@ export function HomePage() {
                 <NavLink to="/account" style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="highlight-card highlight-card--amber">
                     <div className="highlight-avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
                       </svg>

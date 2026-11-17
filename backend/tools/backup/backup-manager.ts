@@ -4,9 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import pg from 'pg';
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
-import {
-  assertDisposableTestDatabase,
-} from '../../src/shared/database/test-guard.js';
+import { assertDisposableTestDatabase } from '../../src/shared/database/test-guard.js';
 
 import type { BackupMetadata } from '../../src/shared/backup/types.js';
 export type { BackupMetadata } from '../../src/shared/backup/types.js';
@@ -23,7 +21,7 @@ export interface VerifyBackupResult {
   backupId: string;
   integrityVerified: boolean;
   catalogCheck: boolean;
-  metadata: BackupMetadata;
+  metadata: BackupMetadata | null;
   errors: string[];
 }
 
@@ -115,7 +113,9 @@ export class BackupManager {
    * Executes a full PostgreSQL backup, encrypts it using AES-256-GCM,
    * generates SHA-256 checksums, and stores immutable metadata.
    */
-  async createBackup(options: BackupOptions): Promise<{ metadata: BackupMetadata; filePath: string; metaPath: string }> {
+  async createBackup(
+    options: BackupOptions,
+  ): Promise<{ metadata: BackupMetadata; filePath: string; metaPath: string }> {
     const parsed = new URL(options.databaseUrl);
     const dbName = decodeURIComponent(parsed.pathname.slice(1));
     const host = parsed.hostname;
@@ -132,22 +132,24 @@ export class BackupManager {
     // 1. Query source DB for schema version, server version, and institution count
     const sourceClient = new pg.Client({ connectionString: options.databaseUrl });
     await sourceClient.connect();
-    let serverVersion = 'unknown';
-    let schemaVersion = '0000';
-    let institutionCount = 0;
+    let serverVersion: string;
+    let schemaVersion: string;
+    let institutionCount: number;
 
     try {
       const verRes = await sourceClient.query<{ server_version: string }>('SHOW server_version');
       serverVersion = verRes.rows[0]?.server_version ?? 'unknown';
 
-      const migRes = await sourceClient.query<{ version: string }>(
-        `SELECT version FROM platform.schema_migrations ORDER BY applied_at DESC, version DESC LIMIT 1`,
-      ).catch(() => ({ rows: [] }));
+      const migRes = await sourceClient
+        .query<{ version: string }>(
+          `SELECT version FROM platform.schema_migrations ORDER BY applied_at DESC, version DESC LIMIT 1`,
+        )
+        .catch(() => ({ rows: [] }));
       schemaVersion = migRes.rows[0]?.version ?? 'none';
 
-      const orgRes = await sourceClient.query<{ count: string }>(
-        `SELECT count(*)::text as count FROM app.organizations`,
-      ).catch(() => ({ rows: [{ count: '0' }] }));
+      const orgRes = await sourceClient
+        .query<{ count: string }>(`SELECT count(*)::text as count FROM app.organizations`)
+        .catch(() => ({ rows: [{ count: '0' }] }));
       institutionCount = parseInt(orgRes.rows[0]?.count ?? '0', 10);
     } finally {
       await sourceClient.end();
@@ -155,11 +157,16 @@ export class BackupManager {
 
     // 2. Run pg_dump into memory buffer
     const pgDumpArgs = [
-      '-h', host,
-      '-p', String(port),
-      '-U', user,
-      '-d', dbName,
-      '-F', 'c', // Custom archive format
+      '-h',
+      host,
+      '-p',
+      String(port),
+      '-U',
+      user,
+      '-d',
+      dbName,
+      '-F',
+      'c', // Custom archive format
       '--no-owner',
       '--no-privileges',
     ];
@@ -173,8 +180,8 @@ export class BackupManager {
       const chunks: Buffer[] = [];
       const errChunks: Buffer[] = [];
 
-      proc.stdout.on('data', (c) => chunks.push(c));
-      proc.stderr.on('data', (c) => errChunks.push(c));
+      proc.stdout.on('data', (c: Buffer) => chunks.push(c));
+      proc.stderr.on('data', (c: Buffer) => errChunks.push(c));
 
       proc.on('close', (code) => {
         if (code === 0) {
@@ -254,12 +261,12 @@ export class BackupManager {
         backupId: 'unknown',
         integrityVerified: false,
         catalogCheck: false,
-        metadata: null as any,
+        metadata: null,
         errors: [`Metadata file not found: ${metaFilePath}`],
       };
     }
 
-    const metadata: BackupMetadata = JSON.parse(fs.readFileSync(metaFilePath, 'utf-8'));
+    const metadata = JSON.parse(fs.readFileSync(metaFilePath, 'utf-8')) as BackupMetadata;
     const encFilePath = metaFilePath.replace(/\.meta\.json$/, '.dump.enc');
 
     if (!fs.existsSync(encFilePath)) {
@@ -299,7 +306,9 @@ export class BackupManager {
         errors.push('Plaintext SHA-256 checksum mismatch after decryption.');
       }
     } catch (decErr) {
-      errors.push(`Decryption failed (tampering, invalid key, or corrupted authentication tag): ${(decErr as Error).message}`);
+      errors.push(
+        `Decryption failed (tampering, invalid key, or corrupted authentication tag): ${(decErr as Error).message}`,
+      );
     }
 
     // 4. Verify catalog readability using pg_restore --list
@@ -311,7 +320,7 @@ export class BackupManager {
             stdio: ['pipe', 'ignore', 'pipe'],
           });
           const errChunks: Buffer[] = [];
-          proc.stderr.on('data', (c) => errChunks.push(c));
+          proc.stderr.on('data', (c: Buffer) => errChunks.push(c));
           proc.on('close', (code) => {
             if (code === 0) resolve();
             else {
@@ -320,6 +329,9 @@ export class BackupManager {
             }
           });
           proc.on('error', (err) => reject(err));
+          proc.stdin.on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code !== 'EPIPE') reject(err);
+          });
           proc.stdin.write(plaintextBuffer);
           proc.stdin.end();
         });
@@ -369,11 +381,18 @@ export class BackupManager {
     // 1. Verify integrity before attempting restore
     const verifyResult = await this.verifyBackup(metaFilePath, options.encryptionKey);
     if (!verifyResult.valid) {
-      throw new Error(`Refusing to restore invalid or tampered backup: ${verifyResult.errors.join('; ')}`);
+      throw new Error(
+        `Refusing to restore invalid or tampered backup: ${verifyResult.errors.join('; ')}`,
+      );
     }
 
     // 2. Decrypt backup stream
     const metadata = verifyResult.metadata;
+    if (!metadata) {
+      throw new Error(
+        `Backup verification failed: metadata is missing or corrupted (${metaFilePath})`,
+      );
+    }
     const encFilePath = metaFilePath.replace(/\.meta\.json$/, '.dump.enc');
     const ciphertext = fs.readFileSync(encFilePath);
 
@@ -394,10 +413,14 @@ export class BackupManager {
     const password = decodeURIComponent(parsed.password);
 
     const restoreArgs = [
-      '-h', host,
-      '-p', String(port),
-      '-U', user,
-      '-d', targetDb,
+      '-h',
+      host,
+      '-p',
+      String(port),
+      '-U',
+      user,
+      '-d',
+      targetDb,
       '--no-owner',
       '--no-privileges',
     ];
@@ -409,7 +432,7 @@ export class BackupManager {
       });
 
       const errChunks: Buffer[] = [];
-      proc.stderr.on('data', (c) => errChunks.push(c));
+      proc.stderr.on('data', (c: Buffer) => errChunks.push(c));
 
       proc.on('close', (code) => {
         // Exit code 0 is clean; code 1 may occur for harmless warnings (e.g. relation already exists)
@@ -421,6 +444,9 @@ export class BackupManager {
         }
       });
       proc.on('error', (err) => reject(err));
+      proc.stdin.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code !== 'EPIPE') reject(err);
+      });
 
       proc.stdin.write(plaintext);
       proc.stdin.end();
@@ -429,18 +455,20 @@ export class BackupManager {
     // 4. Verify post-restore consistency on target
     const targetClient = new pg.Client({ connectionString: options.targetDatabaseUrl });
     await targetClient.connect();
-    let migrationLedgerHead = 'none';
-    let institutionCount = 0;
+    let migrationLedgerHead: string;
+    let institutionCount: number;
 
     try {
-      const migRes = await targetClient.query<{ version: string }>(
-        `SELECT version FROM platform.schema_migrations ORDER BY applied_at DESC, version DESC LIMIT 1`,
-      ).catch(() => ({ rows: [] }));
+      const migRes = await targetClient
+        .query<{ version: string }>(
+          `SELECT version FROM platform.schema_migrations ORDER BY applied_at DESC, version DESC LIMIT 1`,
+        )
+        .catch(() => ({ rows: [] }));
       migrationLedgerHead = migRes.rows[0]?.version ?? 'none';
 
-      const orgRes = await targetClient.query<{ count: string }>(
-        `SELECT count(*)::text as count FROM app.organizations`,
-      ).catch(() => ({ rows: [{ count: '0' }] }));
+      const orgRes = await targetClient
+        .query<{ count: string }>(`SELECT count(*)::text as count FROM app.organizations`)
+        .catch(() => ({ rows: [{ count: '0' }] }));
       institutionCount = parseInt(orgRes.rows[0]?.count ?? '0', 10);
     } finally {
       await targetClient.end();
@@ -459,18 +487,21 @@ export class BackupManager {
   /**
    * Lists all discovered backup artifacts sorted newest to oldest.
    */
-  listBackups(storageDir?: string): { metaPath: string; metadata: BackupMetadata; mtime: number }[] {
+  listBackups(
+    storageDir?: string,
+  ): { metaPath: string; metadata: BackupMetadata; mtime: number }[] {
     const targetDir = storageDir || this.defaultStorageDir;
     if (!fs.existsSync(targetDir)) return [];
 
-    const metaFiles = fs.readdirSync(targetDir)
+    const metaFiles = fs
+      .readdirSync(targetDir)
       .filter((f) => f.endsWith('.meta.json'))
       .map((f) => path.join(targetDir, f));
 
     const backups: { metaPath: string; metadata: BackupMetadata; mtime: number }[] = [];
     for (const metaPath of metaFiles) {
       try {
-        const metadata: BackupMetadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+        const metadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as BackupMetadata;
         const stat = fs.statSync(metaPath);
         backups.push({ metaPath, metadata, mtime: stat.mtimeMs });
       } catch {
@@ -490,7 +521,10 @@ export class BackupManager {
    * Scans backup storage directory and safely removes expired backup artifacts
    * while always preserving at least the most recent valid backup.
    */
-  pruneExpiredBackups(retentionDays?: number, storageDir?: string): { prunedCount: number; remainingCount: number; prunedIds: string[] } {
+  pruneExpiredBackups(
+    retentionDays?: number,
+    storageDir?: string,
+  ): { prunedCount: number; remainingCount: number; prunedIds: string[] } {
     const targetDir = storageDir || this.defaultStorageDir;
     const backups = this.listBackups(targetDir);
     if (backups.length === 0) return { prunedCount: 0, remainingCount: 0, prunedIds: [] };
@@ -540,7 +574,9 @@ export class BackupManager {
     // 2. Verify backup integrity before restore
     const verifyRes = await this.verifyBackup(backupRes.metaPath, options.encryptionKey);
     if (!verifyRes.valid) {
-      throw new Error(`DR Rehearsal aborted: Backup integrity check failed: ${verifyRes.errors.join('; ')}`);
+      throw new Error(
+        `DR Rehearsal aborted: Backup integrity check failed: ${verifyRes.errors.join('; ')}`,
+      );
     }
 
     // 3. Create disposable database on serverAdminUrl

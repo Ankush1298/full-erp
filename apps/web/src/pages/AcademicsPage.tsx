@@ -98,6 +98,7 @@ import {
   usePeriodLabel,
 } from '../lib/terminology';
 import { SetupWizardTab } from './AcademicSetupWizard';
+import { RolloverTab } from '../features/academics/RolloverTab';
 
 type Tab =
   | 'calendar'
@@ -105,6 +106,7 @@ type Tab =
   | 'sections'
   | 'offerings'
   | 'enrolment'
+  | 'rollover'
   | 'electives'
   | 'holidays'
   | 'wizard'
@@ -4973,7 +4975,12 @@ export function AcademicsPage() {
     ['courses', plural(labels.course)],
     ['sections', plural(labels.section)],
     ['offerings', 'Offerings'],
-    ...(canEnrolRead ? ([['enrolment', 'Enrolment']] as Array<[Tab, string]>) : []),
+    ...(canEnrolRead
+      ? ([
+          ['enrolment', 'Enrolment'],
+          ['rollover', 'Session Rollover & Promotion'],
+        ] as Array<[Tab, string]>)
+      : []),
     ...(canProgramRead
       ? ([
           ['electives', 'Electives'],
@@ -5039,6 +5046,9 @@ export function AcademicsPage() {
             canManage={canEnrol}
             canAssignProgram={Boolean(identity && can(identity, 'student.program.assign'))}
           />
+        )}
+        {tab === 'rollover' && canEnrolRead && (
+          <RolloverTab client={client} canManage={canEnrol} />
         )}
         {tab === 'electives' && canProgramRead && (
           <ElectivesTab

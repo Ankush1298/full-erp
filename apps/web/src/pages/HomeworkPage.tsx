@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type FormEvent } from 'react';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -10,7 +10,10 @@ import { usePageTitle } from '../components/usePageTitle';
 import { useAuth } from '../features/auth/AuthProvider';
 import { can } from '../features/auth/identity';
 import { isApiError, isModuleNotEntitled, isInstitutionSuspended } from '../lib/api/errors';
-import { FeatureUnavailableState, InstitutionSuspendedState } from '../components/ui/FeatureUnavailableState';
+import {
+  FeatureUnavailableState,
+  InstitutionSuspendedState,
+} from '../components/ui/FeatureUnavailableState';
 import {
   fetchTeacherClasses,
   previewRecipients,
@@ -132,7 +135,7 @@ export function HomeworkPage() {
   const [selectedHwForView, setSelectedHwForView] = useState<StudentHomeworkItem | null>(null);
 
   // Initial Data Load
-  const reloadData = async () => {
+  const reloadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -164,11 +167,11 @@ export function HomeworkPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canManage, isStudent, client, createCourseOfferingId, canRead]);
 
   useEffect(() => {
     void reloadData();
-  }, [client, canManage, canRead, isStudent]);
+  }, [reloadData]);
 
   // Recipient preview update when class selection changes in Create Modal
   useEffect(() => {
@@ -197,7 +200,7 @@ export function HomeworkPage() {
   };
 
   // Teacher: Handle real file selection from computer
-  const handleTeacherFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTeacherFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setAttachmentError(null);
@@ -474,7 +477,7 @@ export function HomeworkPage() {
   };
 
   // Student: Handle real file selection from computer
-  const handleStudentFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStudentFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null);
@@ -602,7 +605,8 @@ export function HomeworkPage() {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = hw.title.toLowerCase().includes(q);
-        const matchCourse = hw.courseTitle.toLowerCase().includes(q) || hw.courseCode.toLowerCase().includes(q);
+        const matchCourse =
+          hw.courseTitle.toLowerCase().includes(q) || hw.courseCode.toLowerCase().includes(q);
         if (!matchTitle && !matchCourse) return false;
       }
       return true;
@@ -614,7 +618,10 @@ export function HomeworkPage() {
     const totalClasses = classes.length;
     const published = teacherAssignments.filter((h) => h.status === 'PUBLISHED').length;
     const drafts = teacherAssignments.filter((h) => h.status === 'DRAFT').length;
-    const pendingReview = teacherAssignments.reduce((acc, h) => acc + (h.submittedCount - h.reviewedCount), 0);
+    const pendingReview = teacherAssignments.reduce(
+      (acc, h) => acc + (h.submittedCount - h.reviewedCount),
+      0,
+    );
     const totalPendingSubmissions = teacherAssignments.reduce((acc, h) => acc + h.pendingCount, 0);
     return { totalClasses, published, drafts, pendingReview, totalPendingSubmissions };
   }, [classes, teacherAssignments]);
@@ -635,7 +642,8 @@ export function HomeworkPage() {
       if (studentSearchQuery.trim()) {
         const q = studentSearchQuery.toLowerCase();
         const matchTitle = hw.title.toLowerCase().includes(q);
-        const matchCourse = hw.courseTitle.toLowerCase().includes(q) || hw.courseCode.toLowerCase().includes(q);
+        const matchCourse =
+          hw.courseTitle.toLowerCase().includes(q) || hw.courseCode.toLowerCase().includes(q);
         const matchTeacher = hw.teacherName.toLowerCase().includes(q);
         if (!matchTitle && !matchCourse && !matchTeacher) return false;
       }
@@ -648,7 +656,9 @@ export function HomeworkPage() {
     const totalAssigned = studentAssignments.length;
     const pending = studentAssignments.filter((h) => h.submissionStatus === 'PENDING').length;
     const submitted = studentAssignments.filter((h) => h.submissionStatus === 'SUBMITTED').length;
-    const reviewed = studentAssignments.filter((h) => h.submissionStatus === 'REVIEWED' || h.evaluatedAt !== null).length;
+    const reviewed = studentAssignments.filter(
+      (h) => h.submissionStatus === 'REVIEWED' || h.evaluatedAt !== null,
+    ).length;
     return { totalAssigned, pending, submitted, reviewed };
   }, [studentAssignments]);
 
@@ -683,104 +693,520 @@ export function HomeworkPage() {
       />
 
       {isNotEntitled ? (
-        <FeatureUnavailableState
-          moduleKey="homework"
-          moduleName="Homework & Coursework"
-        />
+        <FeatureUnavailableState moduleKey="homework" moduleName="Homework & Coursework" />
       ) : isSuspended ? (
         <InstitutionSuspendedState />
       ) : (
         <>
           {/* Global Alerts */}
-      {feedbackMessage && (
-        <Alert tone="info">
-          {feedbackMessage}
-        </Alert>
-      )}
-      {error && (
-        <Alert tone="error">
-          {error}
-        </Alert>
-      )}
+          {feedbackMessage && <Alert tone="info">{feedbackMessage}</Alert>}
+          {error && <Alert tone="error">{error}</Alert>}
 
-      {loading && (
-        <div style={{ padding: '3rem', textAlign: 'center' }}>
-          <Spinner />
-          <p style={{ marginTop: '0.75rem', color: 'var(--color-fg-muted)' }}>
-            Loading homework records...
-          </p>
-        </div>
-      )}
+          {loading && (
+            <div style={{ padding: '3rem', textAlign: 'center' }}>
+              <Spinner />
+              <p style={{ marginTop: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                Loading homework records...
+              </p>
+            </div>
+          )}
 
-      {/* ─── TEACHER EXPERIENCE ─────────────────────────────────────────────────── */}
-      {!loading && canManage && !isStudent && (
-        <>
-          {/* KPI Stat Cards */}
-          <div className="anesa-stat-grid anesa-stat-grid--4">
-            <StatCard
-              label="Assigned Classes"
-              value={teacherStats.totalClasses}
-              tone="purple"
-              helper="Teaching sections"
-            />
-            <StatCard
-              label="Active Homework"
-              value={teacherStats.published}
-              tone="emerald"
-              helper="Published assignments"
-            />
-            <StatCard
-              label="Drafts"
-              value={teacherStats.drafts}
-              tone="amber"
-              helper="Awaiting publish"
-            />
-            <StatCard
-              label="Submissions to Review"
-              value={teacherStats.pendingReview}
-              tone="coral"
-              helper="Ungraded work"
-            />
-          </div>
+          {/* ─── TEACHER EXPERIENCE ─────────────────────────────────────────────────── */}
+          {!loading && canManage && !isStudent && (
+            <>
+              {/* KPI Stat Cards */}
+              <div className="anesa-stat-grid anesa-stat-grid--4">
+                <StatCard
+                  label="Assigned Classes"
+                  value={teacherStats.totalClasses}
+                  tone="purple"
+                  helper="Teaching sections"
+                />
+                <StatCard
+                  label="Active Homework"
+                  value={teacherStats.published}
+                  tone="emerald"
+                  helper="Published assignments"
+                />
+                <StatCard
+                  label="Drafts"
+                  value={teacherStats.drafts}
+                  tone="amber"
+                  helper="Awaiting publish"
+                />
+                <StatCard
+                  label="Submissions to Review"
+                  value={teacherStats.pendingReview}
+                  tone="coral"
+                  helper="Ungraded work"
+                />
+              </div>
 
-          {/* Segmented Navigation */}
-          <SegmentedNav
-            activeId={activeTeacherTab}
-            onChange={(val) => setActiveTeacherTab(val as TeacherTab)}
-            items={[
-              { id: 'all', label: 'All Assignments', badge: teacherAssignments.length },
-              {
-                id: 'published',
-                label: 'Published',
-                badge: teacherAssignments.filter((h) => h.status === 'PUBLISHED').length,
-              },
-              {
-                id: 'drafts',
-                label: 'Drafts',
-                badge: teacherAssignments.filter((h) => h.status === 'DRAFT').length,
-              },
-              {
-                id: 'closed',
-                label: 'Closed',
-                badge: teacherAssignments.filter((h) => h.status === 'CLOSED').length,
-              },
-              { id: 'classes', label: 'My Classes', badge: classes.length },
-            ]}
-          />
+              {/* Segmented Navigation */}
+              <SegmentedNav
+                activeId={activeTeacherTab}
+                onChange={(val) => setActiveTeacherTab(val)}
+                items={[
+                  { id: 'all', label: 'All Assignments', badge: teacherAssignments.length },
+                  {
+                    id: 'published',
+                    label: 'Published',
+                    badge: teacherAssignments.filter((h) => h.status === 'PUBLISHED').length,
+                  },
+                  {
+                    id: 'drafts',
+                    label: 'Drafts',
+                    badge: teacherAssignments.filter((h) => h.status === 'DRAFT').length,
+                  },
+                  {
+                    id: 'closed',
+                    label: 'Closed',
+                    badge: teacherAssignments.filter((h) => h.status === 'CLOSED').length,
+                  },
+                  { id: 'classes', label: 'My Classes', badge: classes.length },
+                ]}
+              />
 
-          {/* TAB 1-4: ASSIGNMENTS TABLE */}
-          {activeTeacherTab !== 'classes' && (
-            <div className="anesa-card">
-              <div className="anesa-card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px' }}>
+              {/* TAB 1-4: ASSIGNMENTS TABLE */}
+              {activeTeacherTab !== 'classes' && (
+                <div className="anesa-card">
+                  <div className="anesa-card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        flex: 1,
+                        minWidth: '240px',
+                      }}
+                    >
+                      <input
+                        type="search"
+                        className="anesa-input"
+                        placeholder="Search by title or subject..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{
+                          maxWidth: '320px',
+                          width: '100%',
+                          height: '2.5rem',
+                          padding: '0 0.75rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      />
+                      <select
+                        className="anesa-select"
+                        aria-label="Filter by class offering"
+                        value={selectedOfferingFilter}
+                        onChange={(e) => setSelectedOfferingFilter(e.target.value)}
+                        style={{
+                          height: '2.5rem',
+                          padding: '0 0.75rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-surface)',
+                        }}
+                      >
+                        <option value="ALL">All Classes & Sections</option>
+                        {classes.map((c) => (
+                          <option key={c.courseOfferingId} value={c.courseOfferingId}>
+                            {c.courseTitle} {c.sectionName ? `(${c.sectionName})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
+                      Showing {filteredTeacherAssignments.length} of {teacherAssignments.length}{' '}
+                      assignments
+                    </div>
+                  </div>
+
+                  <div className="anesa-card-body" style={{ padding: 0 }}>
+                    {filteredTeacherAssignments.length > 0 ? (
+                      <div className="anesa-table-wrapper">
+                        <table className="anesa-table">
+                          <thead>
+                            <tr>
+                              <th>Assignment Title</th>
+                              <th>Subject & Section</th>
+                              <th>Due Date</th>
+                              <th>Type</th>
+                              <th>Status</th>
+                              <th>Submissions</th>
+                              <th style={{ textAlign: 'right' }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredTeacherAssignments.map((hw) => (
+                              <tr key={hw.id}>
+                                <td>
+                                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                                    {hw.title}
+                                  </div>
+                                  {hw.instructions && (
+                                    <div
+                                      style={{
+                                        fontSize: '0.8125rem',
+                                        color: 'var(--color-fg-muted)',
+                                        maxWidth: '300px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {hw.instructions}
+                                    </div>
+                                  )}
+                                  {hw.attachments.length > 0 && (
+                                    <div
+                                      style={{
+                                        marginTop: '0.25rem',
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: '0.25rem',
+                                      }}
+                                    >
+                                      {hw.attachments.map((att) => (
+                                        <button
+                                          key={att.id}
+                                          type="button"
+                                          onClick={() => {
+                                            void handleDownloadAttachment(att.fileId, att.fileName);
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: '1px solid var(--color-border)',
+                                            borderRadius: '4px',
+                                            padding: '2px 6px',
+                                            fontSize: '0.75rem',
+                                            color: 'var(--color-primary, #0969da)',
+                                            cursor: 'pointer',
+                                          }}
+                                        >
+                                          ⬇️ {att.fileName}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                                <td>
+                                  <div style={{ fontWeight: 500 }}>{hw.courseTitle}</div>
+                                  <div
+                                    style={{
+                                      fontSize: '0.8125rem',
+                                      color: 'var(--color-fg-muted)',
+                                    }}
+                                  >
+                                    {hw.courseCode} {hw.sectionName ? `• ${hw.sectionName}` : ''}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{ whiteSpace: 'nowrap' }}>
+                                    {hw.dueDate ? (
+                                      hw.dueDate
+                                    ) : (
+                                      <span style={{ color: 'var(--color-fg-muted)' }}>
+                                        No due date
+                                      </span>
+                                    )}
+                                  </div>
+                                  {hw.dueTime && (
+                                    <div
+                                      style={{
+                                        fontSize: '0.75rem',
+                                        color: 'var(--color-fg-muted)',
+                                      }}
+                                    >
+                                      {hw.dueTime}
+                                    </div>
+                                  )}
+                                </td>
+                                <td>
+                                  <Badge tone={hw.submissionType === 'ONLINE' ? 'info' : 'neutral'}>
+                                    {hw.submissionType}
+                                  </Badge>
+                                </td>
+                                <td>
+                                  <Badge
+                                    tone={
+                                      hw.status === 'PUBLISHED'
+                                        ? 'positive'
+                                        : hw.status === 'DRAFT'
+                                          ? 'warning'
+                                          : 'neutral'
+                                    }
+                                  >
+                                    {hw.status}
+                                  </Badge>
+                                </td>
+                                <td>
+                                  <div
+                                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                  >
+                                    <span style={{ fontWeight: 600 }}>{hw.submittedCount}</span>
+                                    <span
+                                      style={{
+                                        color: 'var(--color-fg-muted)',
+                                        fontSize: '0.8125rem',
+                                      }}
+                                    >
+                                      / {hw.totalRecipients}
+                                    </span>
+                                  </div>
+                                  {hw.reviewedCount > 0 && (
+                                    <div
+                                      style={{
+                                        fontSize: '0.75rem',
+                                        color: 'var(--color-emerald-ink)',
+                                      }}
+                                    >
+                                      {hw.reviewedCount} graded
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <div
+                                    style={{
+                                      display: 'inline-flex',
+                                      gap: '0.5rem',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    {hw.status === 'DRAFT' && (
+                                      <Button
+                                        variant="primary"
+                                        onClick={() => {
+                                          void handlePublishAssignment(hw.id);
+                                        }}
+                                        disabled={actionLoading}
+                                      >
+                                        Publish
+                                      </Button>
+                                    )}
+                                    {hw.status === 'PUBLISHED' && (
+                                      <>
+                                        <Button
+                                          variant="secondary"
+                                          onClick={() => {
+                                            void handleOpenReview(hw);
+                                          }}
+                                          disabled={actionLoading}
+                                        >
+                                          Review ({hw.submittedCount})
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          onClick={() => {
+                                            void handleCloseAssignment(hw.id);
+                                          }}
+                                          disabled={actionLoading}
+                                        >
+                                          Close Assignment
+                                        </Button>
+                                      </>
+                                    )}
+                                    {hw.status === 'CLOSED' && (
+                                      <Button
+                                        variant="secondary"
+                                        onClick={() => {
+                                          void handleOpenReview(hw);
+                                        }}
+                                        disabled={actionLoading}
+                                      >
+                                        View Submissions
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: '3rem',
+                          textAlign: 'center',
+                          color: 'var(--color-fg-muted)',
+                        }}
+                      >
+                        No homework assignments match the selected filters.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: MY CLASSES VIEW */}
+              {activeTeacherTab === 'classes' && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                    gap: '1.25rem',
+                  }}
+                >
+                  {classes.map((cls) => (
+                    <div
+                      key={cls.courseOfferingId}
+                      className="anesa-card"
+                      style={{ display: 'flex', flexDirection: 'column' }}
+                    >
+                      <div className="anesa-card-header">
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 600 }}>
+                            {cls.courseTitle}
+                          </h3>
+                          <div
+                            style={{
+                              fontSize: '0.8125rem',
+                              color: 'var(--color-fg-muted)',
+                              marginTop: '0.25rem',
+                            }}
+                          >
+                            {cls.courseCode} • {cls.termName}
+                          </div>
+                        </div>
+                        <Badge tone="purple">{cls.teachingRole}</Badge>
+                      </div>
+                      <div
+                        className="anesa-card-body"
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <span style={{ color: 'var(--color-fg-muted)' }}>Section:</span>
+                          <span style={{ fontWeight: 600 }}>
+                            {cls.sectionName || 'All Sections'}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <span style={{ color: 'var(--color-fg-muted)' }}>Cohort:</span>
+                          <span style={{ fontWeight: 500 }}>{cls.cohortName || 'General'}</span>
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <span style={{ color: 'var(--color-fg-muted)' }}>Enrolled Students:</span>
+                          <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                            {cls.studentCount} Students
+                          </span>
+                        </div>
+                        <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+                          <Button
+                            variant="primary"
+                            onClick={() => handleQuickCreateFromClass(cls)}
+                            style={{ width: '100%' }}
+                          >
+                            + Assign Homework to Class
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ─── STUDENT EXPERIENCE ─────────────────────────────────────────────────── */}
+          {!loading && (isStudent || (!canManage && canRead)) && (
+            <>
+              {/* KPI Stat Cards */}
+              <div className="anesa-stat-grid anesa-stat-grid--4">
+                <StatCard
+                  label="Total Assigned"
+                  value={studentStats.totalAssigned}
+                  tone="purple"
+                  helper="All course tasks"
+                />
+                <StatCard
+                  label="Pending Work"
+                  value={studentStats.pending}
+                  tone="amber"
+                  helper="To be submitted"
+                />
+                <StatCard
+                  label="Submitted"
+                  value={studentStats.submitted}
+                  tone="emerald"
+                  helper="Awaiting review"
+                />
+                <StatCard
+                  label="Graded & Reviewed"
+                  value={studentStats.reviewed}
+                  tone="coral"
+                  helper="With feedback"
+                />
+              </div>
+
+              {/* Segmented Navigation */}
+              <SegmentedNav
+                activeId={activeStudentTab}
+                onChange={(val) => setActiveStudentTab(val)}
+                items={[
+                  { id: 'all', label: 'All Tasks', badge: studentAssignments.length },
+                  {
+                    id: 'pending',
+                    label: 'Pending',
+                    badge: studentAssignments.filter((h) => h.submissionStatus === 'PENDING')
+                      .length,
+                  },
+                  {
+                    id: 'submitted',
+                    label: 'Submitted',
+                    badge: studentAssignments.filter((h) => h.submissionStatus === 'SUBMITTED')
+                      .length,
+                  },
+                  {
+                    id: 'reviewed',
+                    label: 'Reviewed',
+                    badge: studentAssignments.filter(
+                      (h) => h.submissionStatus === 'REVIEWED' || h.evaluatedAt !== null,
+                    ).length,
+                  },
+                  {
+                    id: 'overdue',
+                    label: 'Overdue',
+                    badge: studentAssignments.filter((h) => h.submissionStatus === 'OVERDUE')
+                      .length,
+                  },
+                ]}
+              />
+
+              {/* Student Assignments Table */}
+              <div className="anesa-card">
+                <div className="anesa-card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                   <input
                     type="search"
                     className="anesa-input"
-                    placeholder="Search by title or subject..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search homework by subject, title, or teacher..."
+                    value={studentSearchQuery}
+                    onChange={(e) => setStudentSearchQuery(e.target.value)}
                     style={{
-                      maxWidth: '320px',
+                      maxWidth: '360px',
                       width: '100%',
                       height: '2.5rem',
                       padding: '0 0.75rem',
@@ -788,1057 +1214,516 @@ export function HomeworkPage() {
                       border: '1px solid var(--color-border)',
                     }}
                   />
-                  <select
-                    className="anesa-select"
-                    aria-label="Filter by class offering"
-                    value={selectedOfferingFilter}
-                    onChange={(e) => setSelectedOfferingFilter(e.target.value)}
-                    style={{
-                      height: '2.5rem',
-                      padding: '0 0.75rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                      backgroundColor: 'var(--color-surface)',
-                    }}
-                  >
-                    <option value="ALL">All Classes & Sections</option>
-                    {classes.map((c) => (
-                      <option key={c.courseOfferingId} value={c.courseOfferingId}>
-                        {c.courseTitle} {c.sectionName ? `(${c.sectionName})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
+                    Showing {filteredStudentAssignments.length} of {studentAssignments.length} tasks
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
-                  Showing {filteredTeacherAssignments.length} of {teacherAssignments.length} assignments
-                </div>
-              </div>
 
-              <div className="anesa-card-body" style={{ padding: 0 }}>
-                {filteredTeacherAssignments.length > 0 ? (
-                  <div className="anesa-table-wrapper">
-                    <table className="anesa-table">
-                      <thead>
-                        <tr>
-                          <th>Assignment Title</th>
-                          <th>Subject & Section</th>
-                          <th>Due Date</th>
-                          <th>Type</th>
-                          <th>Status</th>
-                          <th>Submissions</th>
-                          <th style={{ textAlign: 'right' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTeacherAssignments.map((hw) => (
-                          <tr key={hw.id}>
-                            <td>
-                              <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{hw.title}</div>
-                              {hw.instructions && (
+                <div className="anesa-card-body" style={{ padding: 0 }}>
+                  {filteredStudentAssignments.length > 0 ? (
+                    <div className="anesa-table-wrapper">
+                      <table className="anesa-table">
+                        <thead>
+                          <tr>
+                            <th>Subject & Teacher</th>
+                            <th>Homework Title & Details</th>
+                            <th>Due Date</th>
+                            <th>Submission Type</th>
+                            <th>Status</th>
+                            <th>Grade / Score</th>
+                            <th style={{ textAlign: 'right' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredStudentAssignments.map((hw) => (
+                            <tr key={hw.id}>
+                              <td>
                                 <div
                                   style={{
-                                    fontSize: '0.8125rem',
-                                    color: 'var(--color-fg-muted)',
-                                    maxWidth: '300px',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
+                                    fontWeight: 600,
+                                    color: 'var(--brand-primary, #504175)',
                                   }}
                                 >
-                                  {hw.instructions}
+                                  {hw.courseTitle}
                                 </div>
-                              )}
-                              {hw.attachments.length > 0 && (
-                                <div style={{ marginTop: '0.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                                  {hw.attachments.map((att) => (
-                                    <button
-                                      key={att.id}
-                                      type="button"
-                                      onClick={() => handleDownloadAttachment(att.fileId, att.fileName)}
-                                      style={{
-                                        background: 'none',
-                                        border: '1px solid var(--color-border)',
-                                        borderRadius: '4px',
-                                        padding: '2px 6px',
-                                        fontSize: '0.75rem',
-                                        color: 'var(--color-primary, #0969da)',
-                                        cursor: 'pointer',
-                                      }}
-                                    >
-                                      ⬇️ {att.fileName}
-                                    </button>
-                                  ))}
+                                <div
+                                  style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}
+                                >
+                                  {hw.teacherName} {hw.sectionName ? `• ${hw.sectionName}` : ''}
                                 </div>
-                              )}
-                            </td>
-                            <td>
-                              <div style={{ fontWeight: 500 }}>{hw.courseTitle}</div>
-                              <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
-                                {hw.courseCode} {hw.sectionName ? `• ${hw.sectionName}` : ''}
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ whiteSpace: 'nowrap' }}>
-                                {hw.dueDate ? hw.dueDate : <span style={{ color: 'var(--color-fg-muted)' }}>No due date</span>}
-                              </div>
-                              {hw.dueTime && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>{hw.dueTime}</div>
-                              )}
-                            </td>
-                            <td>
-                              <Badge tone={hw.submissionType === 'ONLINE' ? 'info' : 'neutral'}>
-                                {hw.submissionType}
-                              </Badge>
-                            </td>
-                            <td>
-                              <Badge
-                                tone={
-                                  hw.status === 'PUBLISHED'
-                                    ? 'positive'
-                                    : hw.status === 'DRAFT'
-                                      ? 'warning'
-                                      : 'neutral'
-                                }
-                              >
-                                {hw.status}
-                              </Badge>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontWeight: 600 }}>{hw.submittedCount}</span>
-                                <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}>
-                                  / {hw.totalRecipients}
-                                </span>
-                              </div>
-                              {hw.reviewedCount > 0 && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--color-emerald-ink)' }}>
-                                  {hw.reviewedCount} graded
-                                </div>
-                              )}
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
-                                {hw.status === 'DRAFT' && (
-                                  <Button
-                                    variant="primary"
-                                    onClick={() => handlePublishAssignment(hw.id)}
-                                    disabled={actionLoading}
-                                  >
-                                    Publish
-                                  </Button>
-                                )}
-                                {hw.status === 'PUBLISHED' && (
-                                  <>
-                                    <Button
-                                      variant="secondary"
-                                      onClick={() => handleOpenReview(hw)}
-                                      disabled={actionLoading}
-                                    >
-                                      Review ({hw.submittedCount})
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      onClick={() => handleCloseAssignment(hw.id)}
-                                      disabled={actionLoading}
-                                    >
-                                      Close Assignment
-                                    </Button>
-                                  </>
-                                )}
-                                {hw.status === 'CLOSED' && (
-                                  <Button
-                                    variant="secondary"
-                                    onClick={() => handleOpenReview(hw)}
-                                    disabled={actionLoading}
-                                  >
-                                    View Submissions
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
-                    No homework assignments match the selected filters.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: MY CLASSES VIEW */}
-          {activeTeacherTab === 'classes' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-              {classes.map((cls) => (
-                <div key={cls.courseOfferingId} className="anesa-card" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div className="anesa-card-header">
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 600 }}>{cls.courseTitle}</h3>
-                      <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', marginTop: '0.25rem' }}>
-                        {cls.courseCode} • {cls.termName}
-                      </div>
-                    </div>
-                    <Badge tone="purple">{cls.teachingRole}</Badge>
-                  </div>
-                  <div className="anesa-card-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                      <span style={{ color: 'var(--color-fg-muted)' }}>Section:</span>
-                      <span style={{ fontWeight: 600 }}>{cls.sectionName || 'All Sections'}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                      <span style={{ color: 'var(--color-fg-muted)' }}>Cohort:</span>
-                      <span style={{ fontWeight: 500 }}>{cls.cohortName || 'General'}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                      <span style={{ color: 'var(--color-fg-muted)' }}>Enrolled Students:</span>
-                      <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{cls.studentCount} Students</span>
-                    </div>
-                    <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
-                      <Button
-                        variant="primary"
-                        onClick={() => handleQuickCreateFromClass(cls)}
-                        style={{ width: '100%' }}
-                      >
-                        + Assign Homework to Class
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ─── STUDENT EXPERIENCE ─────────────────────────────────────────────────── */}
-      {!loading && (isStudent || (!canManage && canRead)) && (
-        <>
-          {/* KPI Stat Cards */}
-          <div className="anesa-stat-grid anesa-stat-grid--4">
-            <StatCard
-              label="Total Assigned"
-              value={studentStats.totalAssigned}
-              tone="purple"
-              helper="All course tasks"
-            />
-            <StatCard
-              label="Pending Work"
-              value={studentStats.pending}
-              tone="amber"
-              helper="To be submitted"
-            />
-            <StatCard
-              label="Submitted"
-              value={studentStats.submitted}
-              tone="emerald"
-              helper="Awaiting review"
-            />
-            <StatCard
-              label="Graded & Reviewed"
-              value={studentStats.reviewed}
-              tone="coral"
-              helper="With feedback"
-            />
-          </div>
-
-          {/* Segmented Navigation */}
-          <SegmentedNav
-            activeId={activeStudentTab}
-            onChange={(val) => setActiveStudentTab(val as StudentTab)}
-            items={[
-              { id: 'all', label: 'All Tasks', badge: studentAssignments.length },
-              {
-                id: 'pending',
-                label: 'Pending',
-                badge: studentAssignments.filter((h) => h.submissionStatus === 'PENDING').length,
-              },
-              {
-                id: 'submitted',
-                label: 'Submitted',
-                badge: studentAssignments.filter((h) => h.submissionStatus === 'SUBMITTED').length,
-              },
-              {
-                id: 'reviewed',
-                label: 'Reviewed',
-                badge: studentAssignments.filter((h) => h.submissionStatus === 'REVIEWED' || h.evaluatedAt !== null).length,
-              },
-              {
-                id: 'overdue',
-                label: 'Overdue',
-                badge: studentAssignments.filter((h) => h.submissionStatus === 'OVERDUE').length,
-              },
-            ]}
-          />
-
-          {/* Student Assignments Table */}
-          <div className="anesa-card">
-            <div className="anesa-card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-              <input
-                type="search"
-                className="anesa-input"
-                placeholder="Search homework by subject, title, or teacher..."
-                value={studentSearchQuery}
-                onChange={(e) => setStudentSearchQuery(e.target.value)}
-                style={{
-                  maxWidth: '360px',
-                  width: '100%',
-                  height: '2.5rem',
-                  padding: '0 0.75rem',
-                  borderRadius: 'var(--radius, 6px)',
-                  border: '1px solid var(--color-border)',
-                }}
-              />
-              <div style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
-                Showing {filteredStudentAssignments.length} of {studentAssignments.length} tasks
-              </div>
-            </div>
-
-            <div className="anesa-card-body" style={{ padding: 0 }}>
-              {filteredStudentAssignments.length > 0 ? (
-                <div className="anesa-table-wrapper">
-                  <table className="anesa-table">
-                    <thead>
-                      <tr>
-                        <th>Subject & Teacher</th>
-                        <th>Homework Title & Details</th>
-                        <th>Due Date</th>
-                        <th>Submission Type</th>
-                        <th>Status</th>
-                        <th>Grade / Score</th>
-                        <th style={{ textAlign: 'right' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredStudentAssignments.map((hw) => (
-                        <tr key={hw.id}>
-                          <td>
-                            <div style={{ fontWeight: 600, color: 'var(--brand-primary, #504175)' }}>
-                              {hw.courseTitle}
-                            </div>
-                            <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
-                              {hw.teacherName} {hw.sectionName ? `• ${hw.sectionName}` : ''}
-                            </div>
-                          </td>
-                          <td>
-                            <div style={{ fontWeight: 600 }}>{hw.title}</div>
-                            {hw.instructions && (
-                              <div
-                                style={{
-                                  fontSize: '0.8125rem',
-                                  color: 'var(--color-fg-muted)',
-                                  maxWidth: '280px',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {hw.instructions}
-                              </div>
-                            )}
-                            {hw.attachments.length > 0 && (
-                              <div style={{ marginTop: '0.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                                {hw.attachments.map((att) => (
-                                  <button
-                                    key={att.id}
-                                    type="button"
-                                    onClick={() => handleDownloadAttachment(att.fileId, att.fileName)}
+                              </td>
+                              <td>
+                                <div style={{ fontWeight: 600 }}>{hw.title}</div>
+                                {hw.instructions && (
+                                  <div
                                     style={{
-                                      background: 'none',
-                                      border: '1px solid var(--color-border)',
-                                      borderRadius: '4px',
-                                      padding: '2px 6px',
-                                      fontSize: '0.75rem',
-                                      color: 'var(--color-primary, #0969da)',
-                                      cursor: 'pointer',
+                                      fontSize: '0.8125rem',
+                                      color: 'var(--color-fg-muted)',
+                                      maxWidth: '280px',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
                                     }}
                                   >
-                                    ⬇️ {att.fileName}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td>
-                            <div style={{ whiteSpace: 'nowrap' }}>
-                              {hw.dueDate ? hw.dueDate : <span style={{ color: 'var(--color-fg-muted)' }}>No due date</span>}
-                            </div>
-                            {hw.dueTime && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>{hw.dueTime}</div>
-                            )}
-                          </td>
-                          <td>
-                            <Badge tone={hw.submissionType === 'ONLINE' ? 'info' : 'neutral'}>
-                              {hw.submissionType}
-                            </Badge>
-                          </td>
-                          <td>
-                            <Badge
-                              tone={
-                                hw.submissionStatus === 'SUBMITTED'
-                                  ? 'info'
-                                  : hw.submissionStatus === 'REVIEWED'
-                                    ? 'positive'
-                                    : hw.submissionStatus === 'OVERDUE'
-                                      ? 'danger'
-                                      : 'warning'
-                              }
-                            >
-                              {hw.submissionStatus}
-                            </Badge>
-                          </td>
-                          <td>
-                            {hw.marksObtained !== null && hw.marksObtained !== undefined ? (
-                              <div>
-                                <span style={{ fontWeight: 700, color: 'var(--color-emerald-ink)' }}>
-                                  {hw.marksObtained}
-                                </span>
-                                {hw.maxMarks && (
-                                  <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}>
-                                    {' '}/ {hw.maxMarks}
+                                    {hw.instructions}
+                                  </div>
+                                )}
+                                {hw.attachments.length > 0 && (
+                                  <div
+                                    style={{
+                                      marginTop: '0.25rem',
+                                      display: 'flex',
+                                      flexWrap: 'wrap',
+                                      gap: '0.25rem',
+                                    }}
+                                  >
+                                    {hw.attachments.map((att) => (
+                                      <button
+                                        key={att.id}
+                                        type="button"
+                                        onClick={() => {
+                                          void handleDownloadAttachment(att.fileId, att.fileName);
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: '1px solid var(--color-border)',
+                                          borderRadius: '4px',
+                                          padding: '2px 6px',
+                                          fontSize: '0.75rem',
+                                          color: 'var(--color-primary, #0969da)',
+                                          cursor: 'pointer',
+                                        }}
+                                      >
+                                        ⬇️ {att.fileName}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <div style={{ whiteSpace: 'nowrap' }}>
+                                  {hw.dueDate ? (
+                                    hw.dueDate
+                                  ) : (
+                                    <span style={{ color: 'var(--color-fg-muted)' }}>
+                                      No due date
+                                    </span>
+                                  )}
+                                </div>
+                                {hw.dueTime && (
+                                  <div
+                                    style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}
+                                  >
+                                    {hw.dueTime}
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <Badge tone={hw.submissionType === 'ONLINE' ? 'info' : 'neutral'}>
+                                  {hw.submissionType}
+                                </Badge>
+                              </td>
+                              <td>
+                                <Badge
+                                  tone={
+                                    hw.submissionStatus === 'SUBMITTED'
+                                      ? 'info'
+                                      : hw.submissionStatus === 'REVIEWED'
+                                        ? 'positive'
+                                        : hw.submissionStatus === 'OVERDUE'
+                                          ? 'danger'
+                                          : 'warning'
+                                  }
+                                >
+                                  {hw.submissionStatus}
+                                </Badge>
+                              </td>
+                              <td>
+                                {hw.marksObtained !== null && hw.marksObtained !== undefined ? (
+                                  <div>
+                                    <span
+                                      style={{ fontWeight: 700, color: 'var(--color-emerald-ink)' }}
+                                    >
+                                      {hw.marksObtained}
+                                    </span>
+                                    {hw.maxMarks && (
+                                      <span
+                                        style={{
+                                          color: 'var(--color-fg-muted)',
+                                          fontSize: '0.8125rem',
+                                        }}
+                                      >
+                                        {' '}
+                                        / {hw.maxMarks}
+                                      </span>
+                                    )}
+                                    {hw.grade && (
+                                      <span style={{ marginLeft: '0.5rem' }}>
+                                        <Badge tone="positive">{hw.grade}</Badge>
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span
+                                    style={{
+                                      color: 'var(--color-fg-muted)',
+                                      fontSize: '0.8125rem',
+                                    }}
+                                  >
+                                    {hw.submissionStatus === 'SUBMITTED' ? 'Under Evaluation' : '—'}
                                   </span>
                                 )}
-                                {hw.grade && (
-                                  <span style={{ marginLeft: '0.5rem' }}>
-                                    <Badge tone="positive">{hw.grade}</Badge>
-                                  </span>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                {hw.submissionType === 'ONLINE' &&
+                                (hw.submissionStatus === 'PENDING' || hw.resubmissionAllowed) ? (
+                                  <Button
+                                    variant="primary"
+                                    onClick={() => {
+                                      setSelectedHwForSubmit(hw);
+                                      setSubmitText(hw.mySubmissionText || '');
+                                      setSubmitFiles([]);
+                                    }}
+                                  >
+                                    {hw.submissionStatus === 'PENDING' ? 'Submit Work' : 'Resubmit'}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="secondary"
+                                    onClick={() => setSelectedHwForView(hw)}
+                                  >
+                                    View Details
+                                  </Button>
                                 )}
-                              </div>
-                            ) : (
-                              <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}>
-                                {hw.submissionStatus === 'SUBMITTED' ? 'Under Evaluation' : '—'}
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            {hw.submissionType === 'ONLINE' && (hw.submissionStatus === 'PENDING' || hw.resubmissionAllowed) ? (
-                              <Button
-                                variant="primary"
-                                onClick={() => {
-                                  setSelectedHwForSubmit(hw);
-                                  setSubmitText(hw.mySubmissionText || '');
-                                  setSubmitFiles([]);
-                                }}
-                              >
-                                {hw.submissionStatus === 'PENDING' ? 'Submit Work' : 'Resubmit'}
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="secondary"
-                                onClick={() => setSelectedHwForView(hw)}
-                              >
-                                View Details
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
-                  No homework assignments match the selected tab.
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ─── MODAL: CREATE HOMEWORK (TEACHER) ─────────────────────────────────────── */}
-      {showCreateModal && (
-        <div style={modalOverlayStyle} onClick={() => setShowCreateModal(false)}>
-          <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>Create Homework Assignment</h2>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
-              >
-                ×
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void handleCreateSubmit(true);
-              }}
-              style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
-            >
-              {/* Class & Section Selection */}
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                  Assigned Class & Section *
-                </label>
-                <select
-                  className="anesa-select"
-                  aria-label="Assigned Class & Section"
-                  value={createCourseOfferingId}
-                  onChange={(e) => handleClassSelectionChange(e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '2.5rem',
-                    padding: '0 0.75rem',
-                    borderRadius: 'var(--radius, 6px)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                  required
-                >
-                  {classes.map((c) => (
-                    <option key={c.courseOfferingId} value={c.courseOfferingId}>
-                      {c.courseTitle} — {c.sectionName || 'All Sections'} ({c.studentCount} students)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Recipient Preview Box */}
-              {recipientPreview && (
-                <div
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: 'var(--radius-sm, 6px)',
-                    backgroundColor: 'var(--color-primary-soft, #f2eef9)',
-                    border: '1px solid var(--color-border)',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>
-                      🎯 <strong>{recipientPreview.totalCount} Students</strong> in{' '}
-                      {recipientPreview.courseTitle}{' '}
-                      {recipientPreview.sectionName ? `(${recipientPreview.sectionName})` : ''} will receive this homework.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowRecipientList(!showRecipientList)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-primary)',
-                        cursor: 'pointer',
-                        fontSize: '0.8125rem',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {showRecipientList ? 'Hide List' : 'Preview Students'}
-                    </button>
-                  </div>
-                  {showRecipientList && (
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
                     <div
                       style={{
-                        marginTop: '0.75rem',
-                        maxHeight: '120px',
-                        overflowY: 'auto',
-                        padding: '0.5rem',
-                        backgroundColor: '#ffffff',
-                        borderRadius: '4px',
-                        border: '1px solid var(--color-border)',
+                        padding: '3rem',
+                        textAlign: 'center',
+                        color: 'var(--color-fg-muted)',
                       }}
                     >
-                      <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.8125rem' }}>
-                        {recipientPreview.students.map((st) => (
-                          <li key={st.studentId}>
-                            {st.displayName} ({st.admissionNumber}) {st.rollNumber ? `• Roll: ${st.rollNumber}` : ''}
-                          </li>
-                        ))}
-                      </ul>
+                      No homework assignments match the selected tab.
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+            </>
+          )}
 
-              {/* Title */}
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                  Homework Title *
-                </label>
-                <input
-                  type="text"
-                  className="anesa-input"
-                  placeholder="e.g. Chapter 4 Problem Set: Linear Equations"
-                  value={createTitle}
-                  onChange={(e) => setCreateTitle(e.target.value)}
+          {/* ─── MODAL: CREATE HOMEWORK (TEACHER) ─────────────────────────────────────── */}
+          {showCreateModal && (
+            <div
+              style={modalOverlayStyle}
+              role="presentation"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowCreateModal(false);
+              }}
+            >
+              <div
+                style={modalCardStyle}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-homework-title"
+              >
+                <div
                   style={{
-                    width: '100%',
-                    height: '2.5rem',
-                    padding: '0 0.75rem',
-                    borderRadius: 'var(--radius, 6px)',
-                    border: '1px solid var(--color-border)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1.25rem',
                   }}
-                  required
-                />
-              </div>
+                >
+                  <h2
+                    id="create-homework-title"
+                    style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}
+                  >
+                    Create Homework Assignment
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Close modal"
+                  >
+                    ×
+                  </button>
+                </div>
 
-              {/* Instructions */}
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                  Instructions & Guidelines
-                </label>
-                <textarea
-                  className="anesa-textarea"
-                  rows={4}
-                  placeholder="Detailed instructions for students, reading references, submission requirements..."
-                  value={createInstructions}
-                  onChange={(e) => setCreateInstructions(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.625rem',
-                    borderRadius: 'var(--radius, 6px)',
-                    border: '1px solid var(--color-border)',
-                    fontFamily: 'inherit',
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleCreateSubmit(true);
                   }}
-                />
-              </div>
+                  style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+                >
+                  {/* Class & Section Selection */}
+                  <div>
+                    <label
+                      htmlFor="create-homework-class-select"
+                      style={{
+                        display: 'block',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        marginBottom: '0.375rem',
+                      }}
+                    >
+                      Assigned Class & Section *
+                    </label>
+                    <select
+                      id="create-homework-class-select"
+                      className="anesa-select"
+                      aria-label="Assigned Class & Section"
+                      value={createCourseOfferingId}
+                      onChange={(e) => handleClassSelectionChange(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '2.5rem',
+                        padding: '0 0.75rem',
+                        borderRadius: 'var(--radius, 6px)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                      required
+                    >
+                      {classes.map((c) => (
+                        <option key={c.courseOfferingId} value={c.courseOfferingId}>
+                          {c.courseTitle} — {c.sectionName || 'All Sections'} ({c.studentCount}{' '}
+                          students)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Submission Type Toggle */}
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                  Submission Mode
-                </label>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <label
-                    style={{
-                      flex: 1,
-                      padding: '0.625rem 1rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: `1.5px solid ${createSubmissionType === 'ONLINE' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                      backgroundColor: createSubmissionType === 'ONLINE' ? 'var(--color-primary-soft)' : 'transparent',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontWeight: 500,
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="submissionType"
-                      checked={createSubmissionType === 'ONLINE'}
-                      onChange={() => setCreateSubmissionType('ONLINE')}
-                    />
-                    Online Submission (Files / Text)
-                  </label>
-                  <label
-                    style={{
-                      flex: 1,
-                      padding: '0.625rem 1rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: `1.5px solid ${createSubmissionType === 'OFFLINE' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                      backgroundColor: createSubmissionType === 'OFFLINE' ? 'var(--color-primary-soft)' : 'transparent',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontWeight: 500,
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="submissionType"
-                      checked={createSubmissionType === 'OFFLINE'}
-                      onChange={() => setCreateSubmissionType('OFFLINE')}
-                    />
-                    Offline / In-Class Submission
-                  </label>
-                </div>
-              </div>
-
-              {/* Due Date & Time, Max Marks */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    className="anesa-input"
-                    value={createDueDate}
-                    onChange={(e) => setCreateDueDate(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '2.5rem',
-                      padding: '0 0.5rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                    Due Time
-                  </label>
-                  <input
-                    type="time"
-                    className="anesa-input"
-                    value={createDueTime}
-                    onChange={(e) => setCreateDueTime(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '2.5rem',
-                      padding: '0 0.5rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                    Maximum Marks
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="anesa-input"
-                    value={createMaxMarks}
-                    onChange={(e) => setCreateMaxMarks(e.target.value === '' ? '' : Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      height: '2.5rem',
-                      padding: '0 0.5rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Allow Resubmission */}
-              {createSubmissionType === 'ONLINE' && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={createAllowResubmission}
-                    onChange={(e) => setCreateAllowResubmission(e.target.checked)}
-                  />
-                  <span>Allow students to resubmit if revisions are requested</span>
-                </label>
-              )}
-
-              {/* Attachments Section */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem' }}>
-                  Teacher Attachments (Worksheets, Reference PDFs, Reading Materials)
-                </label>
-                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
-                  Upload worksheets or materials directly from your computer (PDF, Word, Images, max 25MB) or attach from your institution library.
-                </p>
-
-                {/* Hidden native file input */}
-                <input
-                  type="file"
-                  ref={teacherFileInputRef}
-                  onChange={handleTeacherFileSelected}
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                  style={{ display: 'none' }}
-                />
-
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    onClick={() => teacherFileInputRef.current?.click()}
-                    disabled={uploadingAttachment}
-                  >
-                    {uploadingAttachment ? 'Uploading...' : '📁 Upload from Computer'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleOpenDocLibrary}
-                    disabled={uploadingAttachment}
-                  >
-                    📚 Select from Library
-                  </Button>
-                </div>
-
-                {/* Manual Reference Entry */}
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <input
-                    type="text"
-                    className="anesa-input"
-                    placeholder="Or enter document name / file ID (e.g. worksheet_algebra.pdf)"
-                    value={createAttachmentName}
-                    onChange={(e) => setCreateAttachmentName(e.target.value)}
-                    style={{
-                      flex: 1,
-                      height: '2.5rem',
-                      padding: '0 0.75rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleAddAttachment}
-                    disabled={uploadingAttachment}
-                  >
-                    + Add File
-                  </Button>
-                </div>
-
-                {attachmentError && (
-                  <Alert tone="error">{attachmentError}</Alert>
-                )}
-
-                {/* Attached Files List */}
-                {createAttachments.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: '0.5rem',
-                      padding: '0.75rem',
-                      backgroundColor: 'var(--color-surface-sunken, #f8f9fa)',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.5rem' }}>
-                      Attached Files ({createAttachments.length}):
-                    </div>
-                    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                      {createAttachments.map((att, idx) => (
-                        <li
-                          key={idx}
+                  {/* Recipient Preview Box */}
+                  {recipientPreview && (
+                    <div
+                      style={{
+                        padding: '0.75rem 1rem',
+                        borderRadius: 'var(--radius-sm, 6px)',
+                        backgroundColor: 'var(--color-primary-soft, #f2eef9)',
+                        border: '1px solid var(--color-border)',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span>
+                          🎯 <strong>{recipientPreview.totalCount} Students</strong> in{' '}
+                          {recipientPreview.courseTitle}{' '}
+                          {recipientPreview.sectionName ? `(${recipientPreview.sectionName})` : ''}{' '}
+                          will receive this homework.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowRecipientList(!showRecipientList)}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.375rem 0.5rem',
-                            backgroundColor: 'var(--color-surface, #ffffff)',
-                            borderRadius: '4px',
-                            border: '1px solid var(--color-border)',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-primary)',
+                            cursor: 'pointer',
                             fontSize: '0.8125rem',
+                            fontWeight: 600,
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-                            <span>📄</span>
-                            <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {att.fileName}
-                            </span>
-                            <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.75rem' }}>
-                              ({(att.fileSizeBytes / 1024).toFixed(1)} KB)
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setCreateAttachments(createAttachments.filter((_, i) => i !== idx))}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--color-danger, #b42318)',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                          {showRecipientList ? 'Hide List' : 'Preview Students'}
+                        </button>
+                      </div>
+                      {showRecipientList && (
+                        <div
+                          style={{
+                            marginTop: '0.75rem',
+                            maxHeight: '120px',
+                            overflowY: 'auto',
+                            padding: '0.5rem',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '4px',
+                            border: '1px solid var(--color-border)',
+                          }}
+                        >
+                          <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.8125rem' }}>
+                            {recipientPreview.students.map((st) => (
+                              <li key={st.studentId}>
+                                {st.displayName} ({st.admissionNumber}){' '}
+                                {st.rollNumber ? `• Roll: ${st.rollNumber}` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Title */}
+                  <div>
+                    <label
+                      htmlFor="create-homework-title-input"
+                      style={{
+                        display: 'block',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        marginBottom: '0.375rem',
+                      }}
+                    >
+                      Homework Title *
+                    </label>
+                    <input
+                      id="create-homework-title-input"
+                      type="text"
+                      className="anesa-input"
+                      placeholder="e.g. Chapter 4 Problem Set: Linear Equations"
+                      value={createTitle}
+                      onChange={(e) => setCreateTitle(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '2.5rem',
+                        padding: '0 0.75rem',
+                        borderRadius: 'var(--radius, 6px)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                      required
+                    />
                   </div>
-                )}
-              </div>
 
-              {/* Modal Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <Button type="button" variant="ghost" onClick={() => setShowCreateModal(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => handleCreateSubmit(false)}
-                  disabled={actionLoading}
-                >
-                  Save as Draft
-                </Button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={() => handleCreateSubmit(true)}
-                  disabled={actionLoading}
-                >
-                  Publish Now
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                  {/* Instructions */}
+                  <div>
+                    <label
+                      htmlFor="create-homework-instructions-input"
+                      style={{
+                        display: 'block',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        marginBottom: '0.375rem',
+                      }}
+                    >
+                      Instructions & Guidelines
+                    </label>
+                    <textarea
+                      id="create-homework-instructions-input"
+                      className="anesa-textarea"
+                      rows={4}
+                      placeholder="Detailed instructions for students, reading references, submission requirements..."
+                      value={createInstructions}
+                      onChange={(e) => setCreateInstructions(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.625rem',
+                        borderRadius: 'var(--radius, 6px)',
+                        border: '1px solid var(--color-border)',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
 
-      {/* ─── MODAL: INSTITUTIONAL DOCUMENT LIBRARY ─────────────────────────────────── */}
-      {showDocLibraryModal && (
-        <div style={modalOverlayStyle} onClick={() => setShowDocLibraryModal(false)}>
-          <div style={{ ...modalCardStyle, maxWidth: '38rem' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>
-                Select Institutional Document
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowDocLibraryModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-            <p style={{ margin: '0 0 1rem', fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
-              Choose a verified document from your institution's central files to attach to this homework assignment.
-            </p>
-            {loadingDocs ? (
-              <Spinner label="Loading documents..." />
-            ) : availableDocs.length === 0 ? (
-              <p style={{ color: 'var(--color-fg-muted)', fontSize: '0.875rem' }}>No institutional documents available.</p>
-            ) : (
-              <div style={{ maxHeight: '20rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {availableDocs.map((doc) => (
+                  {/* Submission Type Toggle */}
+                  <div>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        marginBottom: '0.375rem',
+                      }}
+                    >
+                      Submission Mode
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <label
+                        style={{
+                          flex: 1,
+                          padding: '0.625rem 1rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: `1.5px solid ${createSubmissionType === 'ONLINE' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                          backgroundColor:
+                            createSubmissionType === 'ONLINE'
+                              ? 'var(--color-primary-soft)'
+                              : 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontWeight: 500,
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="submissionType"
+                          checked={createSubmissionType === 'ONLINE'}
+                          onChange={() => setCreateSubmissionType('ONLINE')}
+                        />
+                        Online Submission (Files / Text)
+                      </label>
+                      <label
+                        style={{
+                          flex: 1,
+                          padding: '0.625rem 1rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: `1.5px solid ${createSubmissionType === 'OFFLINE' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                          backgroundColor:
+                            createSubmissionType === 'OFFLINE'
+                              ? 'var(--color-primary-soft)'
+                              : 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontWeight: 500,
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="submissionType"
+                          checked={createSubmissionType === 'OFFLINE'}
+                          onChange={() => setCreateSubmissionType('OFFLINE')}
+                        />
+                        Offline / In-Class Submission
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Due Date & Time, Max Marks */}
                   <div
-                    key={doc.id}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.625rem 0.75rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                      backgroundColor: 'var(--color-surface, #ffffff)',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '0.75rem',
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>📄 {doc.fileName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
-                        {(doc.fileSizeBytes / 1024).toFixed(1)} KB • {doc.mimeType}
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => handleSelectExistingDoc(doc)}
-                    >
-                      Attach
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
-              <Button type="button" variant="ghost" onClick={() => setShowDocLibraryModal(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── MODAL: REVIEW SUBMISSIONS (TEACHER) ─────────────────────────────────── */}
-      {selectedHwForReview && (
-        <div style={modalOverlayStyle} onClick={() => setSelectedHwForReview(null)}>
-          <div style={{ ...modalCardStyle, maxWidth: '54rem' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>
-                  Submissions: {selectedHwForReview.title}
-                </h2>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', marginTop: '0.25rem' }}>
-                  {selectedHwForReview.courseTitle} {selectedHwForReview.sectionName ? `(${selectedHwForReview.sectionName})` : ''} • Due: {selectedHwForReview.dueDate || 'None'}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedHwForReview(null)}
-                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Submission Stats Pill */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-              <div style={{ padding: '0.5rem 0.875rem', borderRadius: '6px', backgroundColor: 'var(--color-primary-soft)', fontSize: '0.875rem' }}>
-                Total: <strong>{selectedHwForReview.totalRecipients}</strong>
-              </div>
-              <div style={{ padding: '0.5rem 0.875rem', borderRadius: '6px', backgroundColor: 'var(--color-emerald-soft)', fontSize: '0.875rem' }}>
-                Submitted: <strong>{selectedHwForReview.submittedCount}</strong>
-              </div>
-              <div style={{ padding: '0.5rem 0.875rem', borderRadius: '6px', backgroundColor: 'var(--color-amber-soft)', fontSize: '0.875rem' }}>
-                Pending: <strong>{selectedHwForReview.pendingCount}</strong>
-              </div>
-              <div style={{ padding: '0.5rem 0.875rem', borderRadius: '6px', backgroundColor: 'var(--color-coral-soft)', fontSize: '0.875rem' }}>
-                Graded: <strong>{selectedHwForReview.reviewedCount}</strong>
-              </div>
-            </div>
-
-            {/* If grading a specific student */}
-            {activeSubmission ? (
-              <div
-                style={{
-                  padding: '1.25rem',
-                  borderRadius: 'var(--radius, 8px)',
-                  border: '1.5px solid var(--color-primary)',
-                  backgroundColor: 'var(--color-primary-soft)',
-                  marginBottom: '1.25rem',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 600 }}>
-                    Grade Submission: {activeSubmission.studentName} ({activeSubmission.admissionNumber})
-                  </h3>
-                  <Button variant="ghost" onClick={() => setActiveSubmission(null)}>
-                    Back to List
-                  </Button>
-                </div>
-
-                {/* Submitted Content Display */}
-                <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '6px', marginBottom: '1rem', border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', marginBottom: '0.5rem' }}>
-                    Submitted: {activeSubmission.submittedAt ? new Date(activeSubmission.submittedAt).toLocaleString() : '—'}
-                  </div>
-                  {activeSubmission.submissionText && (
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <strong>Student Answers:</strong>
-                      <p style={{ marginTop: '0.25rem', whiteSpace: 'pre-wrap', fontSize: '0.875rem' }}>
-                        {activeSubmission.submissionText}
-                      </p>
-                    </div>
-                  )}
-                  {activeSubmission.files.length > 0 && (
-                    <div>
-                      <strong>Attached Documents:</strong>
-                      <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem', fontSize: '0.875rem' }}>
-                        {activeSubmission.files.map((f) => (
-                          <li key={f.id}>
-                            📄 {f.fileName} ({(f.fileSizeBytes / 1024).toFixed(1)} KB)
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* Grading Form */}
-                <form onSubmit={handleSaveReview} style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                        Marks Obtained (Max: {selectedHwForReview.maxMarks || 100})
+                      <label
+                        htmlFor="create-due-date-input"
+                        style={{
+                          display: 'block',
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          marginBottom: '0.375rem',
+                        }}
+                      >
+                        Due Date
                       </label>
                       <input
-                        type="number"
-                        min="0"
-                        max={selectedHwForReview.maxMarks || 100}
+                        id="create-due-date-input"
+                        type="date"
                         className="anesa-input"
-                        value={reviewMarks}
-                        onChange={(e) => setReviewMarks(e.target.value === '' ? '' : Number(e.target.value))}
+                        value={createDueDate}
+                        onChange={(e) => setCreateDueDate(e.target.value)}
                         style={{
                           width: '100%',
                           height: '2.5rem',
@@ -1849,19 +1734,57 @@ export function HomeworkPage() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                        Letter Grade (Optional)
+                      <label
+                        htmlFor="create-due-time-input"
+                        style={{
+                          display: 'block',
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          marginBottom: '0.375rem',
+                        }}
+                      >
+                        Due Time
                       </label>
                       <input
-                        type="text"
+                        id="create-due-time-input"
+                        type="time"
                         className="anesa-input"
-                        placeholder="e.g. A+, 95%, Excellent"
-                        value={reviewGrade}
-                        onChange={(e) => setReviewGrade(e.target.value)}
+                        value={createDueTime}
+                        onChange={(e) => setCreateDueTime(e.target.value)}
                         style={{
                           width: '100%',
                           height: '2.5rem',
-                          padding: '0 0.75rem',
+                          padding: '0 0.5rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="create-max-marks-input"
+                        style={{
+                          display: 'block',
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          marginBottom: '0.375rem',
+                        }}
+                      >
+                        Maximum Marks
+                      </label>
+                      <input
+                        id="create-max-marks-input"
+                        type="number"
+                        min="0"
+                        className="anesa-input"
+                        value={createMaxMarks}
+                        onChange={(e) =>
+                          setCreateMaxMarks(e.target.value === '' ? '' : Number(e.target.value))
+                        }
+                        style={{
+                          width: '100%',
+                          height: '2.5rem',
+                          padding: '0 0.5rem',
                           borderRadius: 'var(--radius, 6px)',
                           border: '1px solid var(--color-border)',
                         }}
@@ -1869,19 +1792,933 @@ export function HomeworkPage() {
                     </div>
                   </div>
 
+                  {/* Allow Resubmission */}
+                  {createSubmissionType === 'ONLINE' && (
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={createAllowResubmission}
+                        onChange={(e) => setCreateAllowResubmission(e.target.checked)}
+                      />
+                      <span>Allow students to resubmit if revisions are requested</span>
+                    </label>
+                  )}
+
+                  {/* Attachments Section */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem' }}>
+                      Teacher Attachments (Worksheets, Reference PDFs, Reading Materials)
+                    </span>
+                    <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
+                      Upload worksheets or materials directly from your computer (PDF, Word, Images,
+                      max 25MB) or attach from your institution library.
+                    </p>
+
+                    {/* Hidden native file input */}
+                    <input
+                      id="teacher-file-input"
+                      type="file"
+                      ref={teacherFileInputRef}
+                      onChange={handleTeacherFileSelected}
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                      style={{ display: 'none' }}
+                    />
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={() => teacherFileInputRef.current?.click()}
+                        disabled={uploadingAttachment}
+                      >
+                        {uploadingAttachment ? 'Uploading...' : '📁 Upload from Computer'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          void handleOpenDocLibrary();
+                        }}
+                        disabled={uploadingAttachment}
+                      >
+                        📚 Select from Library
+                      </Button>
+                    </div>
+
+                    {/* Manual Reference Entry */}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      <input
+                        type="text"
+                        className="anesa-input"
+                        aria-label="Or enter document name / file ID"
+                        placeholder="Or enter document name / file ID (e.g. worksheet_algebra.pdf)"
+                        value={createAttachmentName}
+                        onChange={(e) => setCreateAttachmentName(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '2.5rem',
+                          padding: '0 0.75rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          void handleAddAttachment();
+                        }}
+                        disabled={uploadingAttachment}
+                      >
+                        + Add File
+                      </Button>
+                    </div>
+
+                    {attachmentError && <Alert tone="error">{attachmentError}</Alert>}
+
+                    {/* Attached Files List */}
+                    {createAttachments.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          padding: '0.75rem',
+                          backgroundColor: 'var(--color-surface-sunken, #f8f9fa)',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      >
+                        <div
+                          style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.5rem' }}
+                        >
+                          Attached Files ({createAttachments.length}):
+                        </div>
+                        <ul
+                          style={{
+                            margin: 0,
+                            padding: 0,
+                            listStyle: 'none',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.375rem',
+                          }}
+                        >
+                          {createAttachments.map((att, idx) => (
+                            <li
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '0.375rem 0.5rem',
+                                backgroundColor: 'var(--color-surface, #ffffff)',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-border)',
+                                fontSize: '0.8125rem',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <span>📄</span>
+                                <span
+                                  style={{
+                                    fontWeight: 500,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {att.fileName}
+                                </span>
+                                <span
+                                  style={{ color: 'var(--color-fg-muted)', fontSize: '0.75rem' }}
+                                >
+                                  ({(att.fileSizeBytes / 1024).toFixed(1)} KB)
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCreateAttachments(
+                                    createAttachments.filter((_, i) => i !== idx),
+                                  )
+                                }
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--color-danger, #b42318)',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '0.75rem',
+                      marginTop: '1rem',
+                    }}
+                  >
+                    <Button type="button" variant="ghost" onClick={() => setShowCreateModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        void handleCreateSubmit(false);
+                      }}
+                      disabled={actionLoading}
+                    >
+                      Save as Draft
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => {
+                        void handleCreateSubmit(true);
+                      }}
+                      disabled={actionLoading}
+                    >
+                      Publish Now
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ─── MODAL: INSTITUTIONAL DOCUMENT LIBRARY ─────────────────────────────────── */}
+          {showDocLibraryModal && (
+            <div
+              style={modalOverlayStyle}
+              role="presentation"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowDocLibraryModal(false);
+              }}
+            >
+              <div
+                style={{ ...modalCardStyle, maxWidth: '38rem' }}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="select-doc-modal-title"
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <h2
+                    id="select-doc-modal-title"
+                    style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}
+                  >
+                    Select Institutional Document
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowDocLibraryModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '1.25rem',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Close modal"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p
+                  style={{
+                    margin: '0 0 1rem',
+                    fontSize: '0.875rem',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
+                  Choose a verified document from your institution's central files to attach to this
+                  homework assignment.
+                </p>
+                {loadingDocs ? (
+                  <Spinner label="Loading documents..." />
+                ) : availableDocs.length === 0 ? (
+                  <p style={{ color: 'var(--color-fg-muted)', fontSize: '0.875rem' }}>
+                    No institutional documents available.
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      maxHeight: '20rem',
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    {availableDocs.map((doc) => (
+                      <div
+                        key={doc.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.625rem 0.75rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-surface, #ffffff)',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                            📄 {doc.fileName}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                            {(doc.fileSizeBytes / 1024).toFixed(1)} KB • {doc.mimeType}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => handleSelectExistingDoc(doc)}
+                        >
+                          Attach
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setShowDocLibraryModal(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── MODAL: REVIEW SUBMISSIONS (TEACHER) ─────────────────────────────────── */}
+          {selectedHwForReview && (
+            <div
+              style={modalOverlayStyle}
+              role="presentation"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedHwForReview(null);
+              }}
+            >
+              <div
+                style={{ ...modalCardStyle, maxWidth: '54rem' }}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="review-submissions-modal-title"
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '1rem',
+                  }}
+                >
                   <div>
-                    <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                      Teacher Feedback & Remarks
+                    <h2
+                      id="review-submissions-modal-title"
+                      style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}
+                    >
+                      Submissions: {selectedHwForReview.title}
+                    </h2>
+                    <div
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: 'var(--color-fg-muted)',
+                        marginTop: '0.25rem',
+                      }}
+                    >
+                      {selectedHwForReview.courseTitle}{' '}
+                      {selectedHwForReview.sectionName
+                        ? `(${selectedHwForReview.sectionName})`
+                        : ''}{' '}
+                      • Due: {selectedHwForReview.dueDate || 'None'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedHwForReview(null)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Close modal"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Submission Stats Pill */}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    marginBottom: '1.25rem',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '0.5rem 0.875rem',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--color-primary-soft)',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Total: <strong>{selectedHwForReview.totalRecipients}</strong>
+                  </div>
+                  <div
+                    style={{
+                      padding: '0.5rem 0.875rem',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--color-emerald-soft)',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Submitted: <strong>{selectedHwForReview.submittedCount}</strong>
+                  </div>
+                  <div
+                    style={{
+                      padding: '0.5rem 0.875rem',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--color-amber-soft)',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Pending: <strong>{selectedHwForReview.pendingCount}</strong>
+                  </div>
+                  <div
+                    style={{
+                      padding: '0.5rem 0.875rem',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--color-coral-soft)',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Graded: <strong>{selectedHwForReview.reviewedCount}</strong>
+                  </div>
+                </div>
+
+                {/* If grading a specific student */}
+                {activeSubmission ? (
+                  <div
+                    style={{
+                      padding: '1.25rem',
+                      borderRadius: 'var(--radius, 8px)',
+                      border: '1.5px solid var(--color-primary)',
+                      backgroundColor: 'var(--color-primary-soft)',
+                      marginBottom: '1.25rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '1rem',
+                      }}
+                    >
+                      <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 600 }}>
+                        Grade Submission: {activeSubmission.studentName} (
+                        {activeSubmission.admissionNumber})
+                      </h3>
+                      <Button variant="ghost" onClick={() => setActiveSubmission(null)}>
+                        Back to List
+                      </Button>
+                    </div>
+
+                    {/* Submitted Content Display */}
+                    <div
+                      style={{
+                        backgroundColor: '#ffffff',
+                        padding: '1rem',
+                        borderRadius: '6px',
+                        marginBottom: '1rem',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '0.8125rem',
+                          color: 'var(--color-fg-muted)',
+                          marginBottom: '0.5rem',
+                        }}
+                      >
+                        Submitted:{' '}
+                        {activeSubmission.submittedAt
+                          ? new Date(activeSubmission.submittedAt).toLocaleString()
+                          : '—'}
+                      </div>
+                      {activeSubmission.submissionText && (
+                        <div style={{ marginBottom: '0.75rem' }}>
+                          <strong>Student Answers:</strong>
+                          <p
+                            style={{
+                              marginTop: '0.25rem',
+                              whiteSpace: 'pre-wrap',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            {activeSubmission.submissionText}
+                          </p>
+                        </div>
+                      )}
+                      {activeSubmission.files.length > 0 && (
+                        <div>
+                          <strong>Attached Documents:</strong>
+                          <ul
+                            style={{
+                              margin: '0.25rem 0 0',
+                              paddingLeft: '1.25rem',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            {activeSubmission.files.map((f) => (
+                              <li key={f.id}>
+                                📄 {f.fileName} ({(f.fileSizeBytes / 1024).toFixed(1)} KB)
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Grading Form */}
+                    <form
+                      onSubmit={(e) => {
+                        void handleSaveReview(e);
+                      }}
+                      style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}
+                    >
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: '1rem',
+                        }}
+                      >
+                        <div>
+                          <label
+                            htmlFor="review-marks-input"
+                            style={{
+                              display: 'block',
+                              fontWeight: 600,
+                              fontSize: '0.875rem',
+                              marginBottom: '0.25rem',
+                            }}
+                          >
+                            Marks Obtained (Max: {selectedHwForReview.maxMarks || 100})
+                          </label>
+                          <input
+                            id="review-marks-input"
+                            type="number"
+                            min="0"
+                            max={selectedHwForReview.maxMarks || 100}
+                            className="anesa-input"
+                            value={reviewMarks}
+                            onChange={(e) =>
+                              setReviewMarks(e.target.value === '' ? '' : Number(e.target.value))
+                            }
+                            style={{
+                              width: '100%',
+                              height: '2.5rem',
+                              padding: '0 0.5rem',
+                              borderRadius: 'var(--radius, 6px)',
+                              border: '1px solid var(--color-border)',
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="review-grade-input"
+                            style={{
+                              display: 'block',
+                              fontWeight: 600,
+                              fontSize: '0.875rem',
+                              marginBottom: '0.25rem',
+                            }}
+                          >
+                            Letter Grade (Optional)
+                          </label>
+                          <input
+                            id="review-grade-input"
+                            type="text"
+                            className="anesa-input"
+                            placeholder="e.g. A+, 95%, Excellent"
+                            value={reviewGrade}
+                            onChange={(e) => setReviewGrade(e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: '2.5rem',
+                              padding: '0 0.75rem',
+                              borderRadius: 'var(--radius, 6px)',
+                              border: '1px solid var(--color-border)',
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="review-feedback-input"
+                          style={{
+                            display: 'block',
+                            fontWeight: 600,
+                            fontSize: '0.875rem',
+                            marginBottom: '0.25rem',
+                          }}
+                        >
+                          Teacher Feedback & Remarks
+                        </label>
+                        <textarea
+                          id="review-feedback-input"
+                          className="anesa-textarea"
+                          rows={3}
+                          placeholder="Feedback for student..."
+                          value={reviewFeedback}
+                          onChange={(e) => setReviewFeedback(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            borderRadius: 'var(--radius, 6px)',
+                            border: '1px solid var(--color-border)',
+                            fontFamily: 'inherit',
+                          }}
+                        />
+                      </div>
+
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.875rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={reviewAllowResubmission}
+                          onChange={(e) => setReviewAllowResubmission(e.target.checked)}
+                        />
+                        <span>Allow student to resubmit updated work</span>
+                      </label>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setActiveSubmission(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" variant="primary" disabled={actionLoading}>
+                          Save Evaluation
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                ) : null}
+
+                {/* Submissions List */}
+                <div
+                  className="anesa-table-wrapper"
+                  style={{ maxHeight: '380px', overflowY: 'auto' }}
+                >
+                  <table className="anesa-table">
+                    <thead>
+                      <tr>
+                        <th>Student Name & Admission</th>
+                        <th>Roll No</th>
+                        <th>Status</th>
+                        <th>Submitted At</th>
+                        <th>Files & Text</th>
+                        <th>Marks / Grade</th>
+                        <th style={{ textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {submissions.map((sub) => (
+                        <tr key={sub.studentId}>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{sub.studentName}</div>
+                            <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>
+                              {sub.admissionNumber}
+                            </div>
+                          </td>
+                          <td>{sub.rollNumber || '—'}</td>
+                          <td>
+                            <Badge
+                              tone={
+                                sub.status === 'SUBMITTED'
+                                  ? 'info'
+                                  : sub.status === 'REVIEWED'
+                                    ? 'positive'
+                                    : 'neutral'
+                              }
+                            >
+                              {sub.status}
+                            </Badge>
+                          </td>
+                          <td style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
+                            {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString() : '—'}
+                          </td>
+                          <td style={{ fontSize: '0.8125rem' }}>
+                            {sub.files.length > 0 ? (
+                              <span>
+                                📎 {sub.files.length} file{sub.files.length > 1 ? 's' : ''}
+                              </span>
+                            ) : sub.submissionText ? (
+                              <span>📝 Text provided</span>
+                            ) : (
+                              <span style={{ color: 'var(--color-fg-muted)' }}>None</span>
+                            )}
+                          </td>
+                          <td>
+                            {sub.marksObtained !== null && sub.marksObtained !== undefined ? (
+                              <span style={{ fontWeight: 600, color: 'var(--color-emerald-ink)' }}>
+                                {sub.marksObtained} {sub.grade ? `(${sub.grade})` : ''}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--color-fg-muted)' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {sub.status !== 'PENDING' ? (
+                              <Button
+                                variant="secondary"
+                                onClick={() => handleSelectSubmissionToGrade(sub)}
+                              >
+                                Grade / Feedback
+                              </Button>
+                            ) : (
+                              <span
+                                style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}
+                              >
+                                Unsubmitted
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setSelectedHwForReview(null);
+                    }}
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── MODAL: SUBMIT HOMEWORK (STUDENT) ────────────────────────────────────── */}
+          {selectedHwForSubmit && (
+            <div
+              style={modalOverlayStyle}
+              role="presentation"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedHwForSubmit(null);
+              }}
+            >
+              <div
+                style={modalCardStyle}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="submit-homework-modal-title"
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1.25rem',
+                  }}
+                >
+                  <div>
+                    <h2
+                      id="submit-homework-modal-title"
+                      style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}
+                    >
+                      Submit Homework
+                    </h2>
+                    <div
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: 'var(--color-fg-muted)',
+                        marginTop: '0.25rem',
+                      }}
+                    >
+                      {selectedHwForSubmit.courseTitle} • Teacher: {selectedHwForSubmit.teacherName}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedHwForSubmit(null)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Close modal"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    void handleStudentSubmit(e);
+                  }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+                >
+                  {/* Assignment Overview */}
+                  <div
+                    style={{
+                      padding: '1rem',
+                      borderRadius: 'var(--radius, 6px)',
+                      backgroundColor: 'var(--color-primary-soft)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                      {selectedHwForSubmit.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.875rem',
+                        color: 'var(--color-text)',
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {selectedHwForSubmit.instructions}
+                    </div>
+                    {selectedHwForSubmit.attachments.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: '0.75rem',
+                          paddingTop: '0.5rem',
+                          borderTop: '1px solid var(--color-border)',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 600 }}>
+                          Teacher Documents:
+                        </span>
+                        <ul
+                          style={{
+                            margin: '0.25rem 0 0',
+                            padding: 0,
+                            listStyle: 'none',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.375rem',
+                          }}
+                        >
+                          {selectedHwForSubmit.attachments.map((att) => (
+                            <li
+                              key={att.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '0.375rem 0.5rem',
+                                backgroundColor: 'var(--color-surface, #ffffff)',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-border)',
+                              }}
+                            >
+                              <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>
+                                📎 {att.fileName}{' '}
+                                <span
+                                  style={{ color: 'var(--color-fg-muted)', fontSize: '0.75rem' }}
+                                >
+                                  ({(att.fileSizeBytes / 1024).toFixed(1)} KB)
+                                </span>
+                              </span>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => {
+                                  void handleDownloadAttachment(att.fileId, att.fileName);
+                                }}
+                              >
+                                ⬇️ Download
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text Submission */}
+                  <div>
+                    <label
+                      htmlFor="student-submit-text-input"
+                      style={{
+                        display: 'block',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        marginBottom: '0.375rem',
+                      }}
+                    >
+                      Your Answers / Solution Notes
                     </label>
                     <textarea
+                      id="student-submit-text-input"
                       className="anesa-textarea"
-                      rows={3}
-                      placeholder="Feedback for student..."
-                      value={reviewFeedback}
-                      onChange={(e) => setReviewFeedback(e.target.value)}
+                      rows={4}
+                      placeholder="Type your answers, solutions, or explanation..."
+                      value={submitText}
+                      onChange={(e) => setSubmitText(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '0.5rem',
+                        padding: '0.625rem',
                         borderRadius: 'var(--radius, 6px)',
                         border: '1px solid var(--color-border)',
                         fontFamily: 'inherit',
@@ -1889,421 +2726,335 @@ export function HomeworkPage() {
                     />
                   </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={reviewAllowResubmission}
-                      onChange={(e) => setReviewAllowResubmission(e.target.checked)}
-                    />
-                    <span>Allow student to resubmit updated work</span>
-                  </label>
+                  {/* File Upload Dropzone / Input */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem' }}>
+                      Upload Completed Files (PDF, DOCX, Images, ZIP)
+                    </span>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                    <Button type="button" variant="ghost" onClick={() => setActiveSubmission(null)}>
+                    {/* Hidden student file input */}
+                    <input
+                      id="student-file-input"
+                      type="file"
+                      ref={studentFileInputRef}
+                      onChange={handleStudentFileSelected}
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip"
+                      style={{ display: 'none' }}
+                    />
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={() => studentFileInputRef.current?.click()}
+                        disabled={actionLoading}
+                      >
+                        📁 Upload from Device
+                      </Button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        className="anesa-input"
+                        aria-label="Or enter file name / reference ID"
+                        placeholder="Or enter file name / reference ID (e.g. physics_ans.pdf)"
+                        value={submitFileName}
+                        onChange={(e) => setSubmitFileName(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '2.5rem',
+                          padding: '0 0.75rem',
+                          borderRadius: 'var(--radius, 6px)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          void handleAddSubmitFile();
+                        }}
+                        disabled={actionLoading}
+                      >
+                        + Attach File
+                      </Button>
+                    </div>
+                    {submitFiles.length > 0 && (
+                      <ul
+                        style={{
+                          margin: '0.5rem 0 0',
+                          paddingLeft: '1.25rem',
+                          fontSize: '0.8125rem',
+                        }}
+                      >
+                        {submitFiles.map((file, idx) => (
+                          <li
+                            key={idx}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                          >
+                            <span>📄 {file.fileName}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSubmitFiles(submitFiles.filter((_, i) => i !== idx))
+                              }
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--color-danger, #b42318)',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Academic Integrity Check */}
+                  <div
+                    style={{
+                      padding: '0.75rem 1rem',
+                      borderRadius: '6px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '0.8125rem',
+                      color: 'var(--color-fg-muted)',
+                    }}
+                  >
+                    🔒 <strong>Academic Honesty:</strong> By submitting, you confirm that this
+                    homework submission represents your own academic work in accordance with
+                    institutional policy.
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '0.75rem',
+                      marginTop: '0.5rem',
+                    }}
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setSelectedHwForSubmit(null)}
+                    >
                       Cancel
                     </Button>
                     <Button type="submit" variant="primary" disabled={actionLoading}>
-                      Save Evaluation
+                      Submit Assignment
                     </Button>
                   </div>
                 </form>
               </div>
-            ) : null}
-
-            {/* Submissions List */}
-            <div className="anesa-table-wrapper" style={{ maxHeight: '380px', overflowY: 'auto' }}>
-              <table className="anesa-table">
-                <thead>
-                  <tr>
-                    <th>Student Name & Admission</th>
-                    <th>Roll No</th>
-                    <th>Status</th>
-                    <th>Submitted At</th>
-                    <th>Files & Text</th>
-                    <th>Marks / Grade</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {submissions.map((sub) => (
-                    <tr key={sub.studentId}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{sub.studentName}</div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)' }}>{sub.admissionNumber}</div>
-                      </td>
-                      <td>{sub.rollNumber || '—'}</td>
-                      <td>
-                        <Badge
-                          tone={
-                            sub.status === 'SUBMITTED'
-                              ? 'info'
-                              : sub.status === 'REVIEWED'
-                                ? 'positive'
-                                : 'neutral'
-                          }
-                        >
-                          {sub.status}
-                        </Badge>
-                      </td>
-                      <td style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
-                        {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString() : '—'}
-                      </td>
-                      <td style={{ fontSize: '0.8125rem' }}>
-                        {sub.files.length > 0 ? (
-                          <span>📎 {sub.files.length} file{sub.files.length > 1 ? 's' : ''}</span>
-                        ) : sub.submissionText ? (
-                          <span>📝 Text provided</span>
-                        ) : (
-                          <span style={{ color: 'var(--color-fg-muted)' }}>None</span>
-                        )}
-                      </td>
-                      <td>
-                        {sub.marksObtained !== null && sub.marksObtained !== undefined ? (
-                          <span style={{ fontWeight: 600, color: 'var(--color-emerald-ink)' }}>
-                            {sub.marksObtained} {sub.grade ? `(${sub.grade})` : ''}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--color-fg-muted)' }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {sub.status !== 'PENDING' ? (
-                          <Button
-                            variant="secondary"
-                            onClick={() => handleSelectSubmissionToGrade(sub)}
-                          >
-                            Grade / Feedback
-                          </Button>
-                        ) : (
-                          <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.8125rem' }}>Unsubmitted</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
+          )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
-              <Button variant="primary" onClick={() => setSelectedHwForReview(null)}>
-                Done
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── MODAL: SUBMIT HOMEWORK (STUDENT) ────────────────────────────────────── */}
-      {selectedHwForSubmit && (
-        <div style={modalOverlayStyle} onClick={() => setSelectedHwForSubmit(null)}>
-          <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>Submit Homework</h2>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', marginTop: '0.25rem' }}>
-                  {selectedHwForSubmit.courseTitle} • Teacher: {selectedHwForSubmit.teacherName}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedHwForSubmit(null)}
-                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleStudentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Assignment Overview */}
+          {/* ─── MODAL: VIEW DETAILS & FEEDBACK (STUDENT) ────────────────────────────── */}
+          {selectedHwForView && (
+            <div
+              style={modalOverlayStyle}
+              role="presentation"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedHwForView(null);
+              }}
+            >
               <div
-                style={{
-                  padding: '1rem',
-                  borderRadius: 'var(--radius, 6px)',
-                  backgroundColor: 'var(--color-primary-soft)',
-                  border: '1px solid var(--color-border)',
-                }}
+                style={modalCardStyle}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="view-homework-modal-title"
               >
-                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{selectedHwForSubmit.title}</div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--color-text)', whiteSpace: 'pre-wrap' }}>
-                  {selectedHwForSubmit.instructions}
-                </div>
-                {selectedHwForSubmit.attachments.length > 0 && (
-                  <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)' }}>
-                    <span style={{ fontSize: '0.8125rem', fontWeight: 600 }}>Teacher Documents:</span>
-                    <ul style={{ margin: '0.25rem 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                      {selectedHwForSubmit.attachments.map((att) => (
-                        <li
-                          key={att.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.375rem 0.5rem',
-                            backgroundColor: 'var(--color-surface, #ffffff)',
-                            borderRadius: '4px',
-                            border: '1px solid var(--color-border)',
-                          }}
-                        >
-                          <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>
-                            📎 {att.fileName} <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.75rem' }}>({(att.fileSizeBytes / 1024).toFixed(1)} KB)</span>
-                          </span>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => handleDownloadAttachment(att.fileId, att.fileName)}
-                          >
-                            ⬇️ Download
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Text Submission */}
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
-                  Your Answers / Solution Notes
-                </label>
-                <textarea
-                  className="anesa-textarea"
-                  rows={4}
-                  placeholder="Type your answers, solutions, or explanation..."
-                  value={submitText}
-                  onChange={(e) => setSubmitText(e.target.value)}
+                <div
                   style={{
-                    width: '100%',
-                    padding: '0.625rem',
-                    borderRadius: 'var(--radius, 6px)',
-                    border: '1px solid var(--color-border)',
-                    fontFamily: 'inherit',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1.25rem',
                   }}
-                />
-              </div>
-
-              {/* File Upload Dropzone / Input */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem' }}>
-                  Upload Completed Files (PDF, DOCX, Images, ZIP)
-                </label>
-
-                {/* Hidden student file input */}
-                <input
-                  type="file"
-                  ref={studentFileInputRef}
-                  onChange={handleStudentFileSelected}
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip"
-                  style={{ display: 'none' }}
-                />
-
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <Button
+                >
+                  <div>
+                    <h2
+                      id="view-homework-modal-title"
+                      style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}
+                    >
+                      {selectedHwForView.title}
+                    </h2>
+                    <div
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: 'var(--color-fg-muted)',
+                        marginTop: '0.25rem',
+                      }}
+                    >
+                      {selectedHwForView.courseTitle} • Instructor: {selectedHwForView.teacherName}
+                    </div>
+                  </div>
+                  <button
                     type="button"
-                    variant="primary"
-                    onClick={() => studentFileInputRef.current?.click()}
-                    disabled={actionLoading}
+                    onClick={() => setSelectedHwForView(null)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Close modal"
                   >
-                    📁 Upload from Device
-                  </Button>
+                    ×
+                  </button>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    className="anesa-input"
-                    placeholder="Or enter file name / reference ID (e.g. physics_ans.pdf)"
-                    value={submitFileName}
-                    onChange={(e) => setSubmitFileName(e.target.value)}
-                    style={{
-                      flex: 1,
-                      height: '2.5rem',
-                      padding: '0 0.75rem',
-                      borderRadius: 'var(--radius, 6px)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                  <Button type="button" variant="secondary" onClick={handleAddSubmitFile} disabled={actionLoading}>
-                    + Attach File
-                  </Button>
-                </div>
-                {submitFiles.length > 0 && (
-                  <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', fontSize: '0.8125rem' }}>
-                    {submitFiles.map((file, idx) => (
-                      <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span>📄 {file.fileName}</span>
-                        <button
-                          type="button"
-                          onClick={() => setSubmitFiles(submitFiles.filter((_, i) => i !== idx))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Instructions */}
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9375rem', fontWeight: 600 }}>
+                      Instructions
+                    </h4>
+                    <div
+                      style={{
+                        padding: '0.875rem',
+                        borderRadius: '6px',
+                        backgroundColor: '#fafafa',
+                        border: '1px solid var(--color-border)',
+                        fontSize: '0.875rem',
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {selectedHwForView.instructions || 'No special instructions.'}
+                    </div>
+                  </div>
+
+                  {/* Evaluation / Feedback Box */}
+                  {(selectedHwForView.evaluatedAt ||
+                    selectedHwForView.marksObtained !== null ||
+                    selectedHwForView.feedback) && (
+                    <div
+                      style={{
+                        padding: '1rem',
+                        borderRadius: 'var(--radius, 6px)',
+                        backgroundColor: 'var(--color-emerald-soft)',
+                        border: '1px solid var(--color-emerald-hover)',
+                      }}
+                    >
+                      <h4
+                        style={{
+                          margin: '0 0 0.5rem',
+                          color: 'var(--color-emerald-ink)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Teacher Evaluation & Feedback
+                      </h4>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '1rem',
+                          marginBottom: '0.5rem',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {selectedHwForView.marksObtained !== null && (
+                          <span
+                            style={{
+                              fontSize: '1.125rem',
+                              fontWeight: 700,
+                              color: 'var(--color-emerald-ink)',
+                            }}
+                          >
+                            Score: {selectedHwForView.marksObtained}{' '}
+                            {selectedHwForView.maxMarks ? `/ ${selectedHwForView.maxMarks}` : ''}
+                          </span>
+                        )}
+                        {selectedHwForView.grade && (
+                          <Badge tone="positive">{selectedHwForView.grade}</Badge>
+                        )}
+                      </div>
+                      {selectedHwForView.feedback && (
+                        <p
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--color-danger, #b42318)',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
+                            margin: '0.25rem 0 0',
+                            fontSize: '0.875rem',
+                            color: 'var(--color-emerald-ink)',
                           }}
                         >
-                          Remove
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                          <strong>Remarks:</strong> {selectedHwForView.feedback}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-              {/* Academic Integrity Check */}
-              <div
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '6px',
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.8125rem',
-                  color: 'var(--color-fg-muted)',
-                }}
-              >
-                🔒 <strong>Academic Honesty:</strong> By submitting, you confirm that this homework submission represents your own academic work in accordance with institutional policy.
-              </div>
-
-              {/* Modal Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <Button type="button" variant="ghost" onClick={() => setSelectedHwForSubmit(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" variant="primary" disabled={actionLoading}>
-                  Submit Assignment
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ─── MODAL: VIEW DETAILS & FEEDBACK (STUDENT) ────────────────────────────── */}
-      {selectedHwForView && (
-        <div style={modalOverlayStyle} onClick={() => setSelectedHwForView(null)}>
-          <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>{selectedHwForView.title}</h2>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', marginTop: '0.25rem' }}>
-                  {selectedHwForView.courseTitle} • Instructor: {selectedHwForView.teacherName}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedHwForView(null)}
-                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {/* Instructions */}
-              <div>
-                <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9375rem', fontWeight: 600 }}>Instructions</h4>
-                <div
-                  style={{
-                    padding: '0.875rem',
-                    borderRadius: '6px',
-                    backgroundColor: '#fafafa',
-                    border: '1px solid var(--color-border)',
-                    fontSize: '0.875rem',
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {selectedHwForView.instructions || 'No special instructions.'}
-                </div>
-              </div>
-
-              {/* Evaluation / Feedback Box */}
-              {(selectedHwForView.evaluatedAt || selectedHwForView.marksObtained !== null || selectedHwForView.feedback) && (
-                <div
-                  style={{
-                    padding: '1rem',
-                    borderRadius: 'var(--radius, 6px)',
-                    backgroundColor: 'var(--color-emerald-soft)',
-                    border: '1px solid var(--color-emerald-hover)',
-                  }}
-                >
-                  <h4 style={{ margin: '0 0 0.5rem', color: 'var(--color-emerald-ink)', fontWeight: 600 }}>
-                    Teacher Evaluation & Feedback
-                  </h4>
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                    {selectedHwForView.marksObtained !== null && (
-                      <span style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-emerald-ink)' }}>
-                        Score: {selectedHwForView.marksObtained} {selectedHwForView.maxMarks ? `/ ${selectedHwForView.maxMarks}` : ''}
-                      </span>
-                    )}
-                    {selectedHwForView.grade && (
-                      <Badge tone="positive">{selectedHwForView.grade}</Badge>
-                    )}
+                  {/* Your Submission */}
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9375rem', fontWeight: 600 }}>
+                      Your Submitted Work
+                    </h4>
+                    <div
+                      style={{
+                        padding: '0.875rem',
+                        borderRadius: '6px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid var(--color-border)',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '0.8125rem',
+                          color: 'var(--color-fg-muted)',
+                          marginBottom: '0.5rem',
+                        }}
+                      >
+                        Status: <Badge tone="info">{selectedHwForView.submissionStatus}</Badge>{' '}
+                        {selectedHwForView.submittedAt &&
+                          `• Submitted on ${new Date(selectedHwForView.submittedAt).toLocaleString()}`}
+                      </div>
+                      {selectedHwForView.mySubmissionText && (
+                        <p style={{ margin: '0.5rem 0', whiteSpace: 'pre-wrap' }}>
+                          {selectedHwForView.mySubmissionText}
+                        </p>
+                      )}
+                      {selectedHwForView.mySubmissionFiles.length > 0 && (
+                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
+                          {selectedHwForView.mySubmissionFiles.map((f) => (
+                            <li key={f.id}>
+                              📄 {f.fileName} ({(f.fileSizeBytes / 1024).toFixed(1)} KB)
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
-                  {selectedHwForView.feedback && (
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: 'var(--color-emerald-ink)' }}>
-                      <strong>Remarks:</strong> {selectedHwForView.feedback}
-                    </p>
-                  )}
-                </div>
-              )}
 
-              {/* Your Submission */}
-              <div>
-                <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9375rem', fontWeight: 600 }}>Your Submitted Work</h4>
-                <div
-                  style={{
-                    padding: '0.875rem',
-                    borderRadius: '6px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid var(--color-border)',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--color-fg-muted)', marginBottom: '0.5rem' }}>
-                    Status: <Badge tone="info">{selectedHwForView.submissionStatus}</Badge>{' '}
-                    {selectedHwForView.submittedAt && `• Submitted on ${new Date(selectedHwForView.submittedAt).toLocaleString()}`}
+                  {/* Actions */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                    {selectedHwForView.resubmissionAllowed && (
+                      <Button
+                        variant="primary"
+                        onClick={() => {
+                          setSelectedHwForSubmit(selectedHwForView);
+                          setSubmitText(selectedHwForView.mySubmissionText || '');
+                          setSubmitFiles([]);
+                          setSelectedHwForView(null);
+                        }}
+                      >
+                        Resubmit Work
+                      </Button>
+                    )}
+                    <Button variant="secondary" onClick={() => setSelectedHwForView(null)}>
+                      Close
+                    </Button>
                   </div>
-                  {selectedHwForView.mySubmissionText && (
-                    <p style={{ margin: '0.5rem 0', whiteSpace: 'pre-wrap' }}>
-                      {selectedHwForView.mySubmissionText}
-                    </p>
-                  )}
-                  {selectedHwForView.mySubmissionFiles.length > 0 && (
-                    <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
-                      {selectedHwForView.mySubmissionFiles.map((f) => (
-                        <li key={f.id}>
-                          📄 {f.fileName} ({(f.fileSizeBytes / 1024).toFixed(1)} KB)
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                {selectedHwForView.resubmissionAllowed && (
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      setSelectedHwForSubmit(selectedHwForView);
-                      setSubmitText(selectedHwForView.mySubmissionText || '');
-                      setSubmitFiles([]);
-                      setSelectedHwForView(null);
-                    }}
-                  >
-                    Resubmit Work
-                  </Button>
-                )}
-                <Button variant="secondary" onClick={() => setSelectedHwForView(null)}>
-                  Close
-                </Button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
         </>
       )}
     </div>

@@ -29,9 +29,9 @@ export class EligibilityService {
     tx: TenantTx,
     ctx: TrustedContext,
     policyId: string,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Partial<EligibilityPolicyDto>> {
     const key = `exam_policy_ext:${lower(policyId)}`;
-    const res = await tx.query<{ value: Record<string, unknown> }>(
+    const res = await tx.query<{ value: Partial<EligibilityPolicyDto> }>(
       `SELECT value FROM app.organization_settings WHERE organization_id = $1 AND key = $2`,
       [ctx.tenantId, key],
     );
@@ -169,17 +169,17 @@ export class EligibilityService {
     const scope = policy.exam_schedule_id
       ? 'SCHEDULE'
       : policy.examination_id
-      ? 'EXAMINATION'
-      : policy.campus_id
-      ? 'CAMPUS'
-      : 'INSTITUTION';
+        ? 'EXAMINATION'
+        : policy.campus_id
+          ? 'CAMPUS'
+          : 'INSTITUTION';
 
     return {
       ...policy,
-      scope: (ext.scope as any) ?? scope,
-      status: (ext.status as any) ?? 'ACTIVE',
-      description: (ext.description as any) ?? null,
-      attendance_rules: (ext.attendance_rules as any) ?? {
+      scope: ext.scope ?? scope,
+      status: ext.status ?? 'ACTIVE',
+      description: ext.description ?? null,
+      attendance_rules: ext.attendance_rules ?? {
         calculation_period: 'FULL_TERM',
         excused_treatment: 'EXEMPT',
         late_treatment: 'PRESENT',
@@ -189,24 +189,24 @@ export class EligibilityService {
         allow_exemption: true,
         exemption_approver_role: 'PRINCIPAL',
       },
-      fee_rules: (ext.fee_rules as any) ?? {
+      fee_rules: ext.fee_rules ?? {
         max_balance_tolerance: 0,
         allow_concession_exemption: true,
         deadline_days_prior: 0,
         require_payment_verification: true,
       },
-      academic_rules: (ext.academic_rules as any) ?? {
+      academic_rules: ext.academic_rules ?? {
         required_enrolment_status: 'REGISTERED',
         min_enrolment_days: 0,
         allow_academic_exception: true,
         supplementary_eligible: true,
       },
-      assessment_rules: (ext.assessment_rules as any) ?? {
+      assessment_rules: ext.assessment_rules ?? {
         components: [],
         allow_grace_marks: false,
         max_grace_marks: 0,
       },
-      grading_rules: (ext.grading_rules as any) ?? {
+      grading_rules: ext.grading_rules ?? {
         grading_system: 'PERCENTAGE',
         grade_scale: [
           {
@@ -270,17 +270,17 @@ export class EligibilityService {
       approval_rules: ext.approval_rules
         ? {
             governance_mode:
-              (ext.approval_rules as any).governance_mode ??
-              ((ext.approval_rules as any).results_workflow === 'DIRECT_PUBLISH'
+              ext.approval_rules.governance_mode ??
+              (ext.approval_rules.results_workflow === 'DIRECT_PUBLISH'
                 ? 'PRINCIPAL_FINAL_AUTHORITY'
                 : 'INDEPENDENT_REVIEW'),
-            require_coordinator_review: (ext.approval_rules as any).require_coordinator_review ?? true,
-            require_principal_approval: (ext.approval_rules as any).require_principal_approval ?? true,
-            allow_individual_override: (ext.approval_rules as any).allow_individual_override ?? true,
-            results_workflow: (ext.approval_rules as any).results_workflow ?? 'DRAFT_REVIEW_PUBLISH',
-            delegated_roles: (ext.approval_rules as any).delegated_roles ?? [],
-            effective_date: (ext.approval_rules as any).effective_date,
-            notes: (ext.approval_rules as any).notes,
+            require_coordinator_review: ext.approval_rules.require_coordinator_review ?? true,
+            require_principal_approval: ext.approval_rules.require_principal_approval ?? true,
+            allow_individual_override: ext.approval_rules.allow_individual_override ?? true,
+            results_workflow: ext.approval_rules.results_workflow ?? 'DRAFT_REVIEW_PUBLISH',
+            delegated_roles: ext.approval_rules.delegated_roles ?? [],
+            effective_date: ext.approval_rules.effective_date,
+            notes: ext.approval_rules.notes,
           }
         : {
             governance_mode: 'PRINCIPAL_FINAL_AUTHORITY',
@@ -462,18 +462,18 @@ export class EligibilityService {
     const scheduleId = target.scheduleId
       ? lower(target.scheduleId)
       : input.exam_schedule_id
-      ? lower(input.exam_schedule_id)
-      : null;
+        ? lower(input.exam_schedule_id)
+        : null;
     let examinationId = target.examinationId
       ? lower(target.examinationId)
       : input.examination_id
-      ? lower(input.examination_id)
-      : null;
+        ? lower(input.examination_id)
+        : null;
     let campusId: string | null = target.campusId
       ? lower(target.campusId)
       : input.campus_id
-      ? lower(input.campus_id)
-      : null;
+        ? lower(input.campus_id)
+        : null;
 
     if (scheduleId) {
       const schedule = await ExamService.getSchedule(tx, ctx, scheduleId);

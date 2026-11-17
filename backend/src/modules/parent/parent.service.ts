@@ -2,9 +2,7 @@ import { AppError } from '../../shared/errors/http-errors.js';
 import type { TenantTx } from '../../shared/database/index.js';
 import type { TrustedContext } from '../../shared/tenancy/trusted-context.js';
 import { assertGuardianAccessAuthorized } from '../../shared/institution/institution-config.js';
-import type {
-  ParentChildDto,
-} from './parent.schemas.js';
+import type { ParentChildDto } from './parent.schemas.js';
 
 export class ParentService {
   /**

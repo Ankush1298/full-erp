@@ -87,7 +87,10 @@ function createMockTx(options: {
       }
 
       // Candidate list query
-      if (q.includes('FROM app.exam_candidate_lists') && q.includes('ORDER BY created_at DESC LIMIT 1')) {
+      if (
+        q.includes('FROM app.exam_candidate_lists') &&
+        q.includes('ORDER BY created_at DESC LIMIT 1')
+      ) {
         if (options.candidateListStatus) {
           return Promise.resolve({
             rows: [
@@ -164,7 +167,10 @@ function createMockTx(options: {
       }
 
       // Audit insert
-      if (q.includes('INSERT INTO app.audit_events') || q.includes('INSERT INTO platform.audit_log')) {
+      if (
+        q.includes('INSERT INTO app.audit_events') ||
+        q.includes('INSERT INTO platform.audit_log')
+      ) {
         auditLogs.push(params);
         return Promise.resolve({ rows: [], rowCount: 1 });
       }
@@ -445,7 +451,7 @@ describe('Examination Workflow Security & Lifecycle Controls', () => {
       expect(res.is_amendment).toBe(true);
 
       const amendLog = auditLogs.find(
-        (p: any) => Array.isArray(p) && p.includes('exam.marks.amend_published'),
+        (p: unknown) => Array.isArray(p) && p.includes('exam.marks.amend_published'),
       );
       expect(amendLog).toBeDefined();
     });
@@ -493,12 +499,7 @@ describe('Examination Workflow Security & Lifecycle Controls', () => {
         evidence_exception: true,
       });
 
-      const res = await ExamService.correctMark(
-        tx,
-        principalCtx,
-        baseSchedule.id,
-        parsedPayload,
-      );
+      const res = await ExamService.correctMark(tx, principalCtx, baseSchedule.id, parsedPayload);
 
       expect(res.success).toBe(true);
       expect(res.student_id).toBe(STUDENT_USER_ID);
@@ -506,7 +507,7 @@ describe('Examination Workflow Security & Lifecycle Controls', () => {
       expect(res.status).toBe('SUBMITTED');
 
       const correctLog = auditLogs.find(
-        (p: any) => Array.isArray(p) && p.includes('exam.marks.correct'),
+        (p: unknown) => Array.isArray(p) && p.includes('exam.marks.correct'),
       );
       expect(correctLog).toBeDefined();
     });

@@ -10,7 +10,14 @@ function getModuleIcon(key: string): React.ReactNode {
   switch (key) {
     case 'students':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
           <circle cx="9" cy="7" r="4" />
           <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -19,14 +26,28 @@ function getModuleIcon(key: string): React.ReactNode {
       );
     case 'academics':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
           <path d="M6 12v5c3 3 9 3 12 0v-5" />
         </svg>
       );
     case 'attendance':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
           <line x1="16" x2="16" y1="2" y2="6" />
           <line x1="8" x2="8" y1="2" y2="6" />
@@ -36,7 +57,14 @@ function getModuleIcon(key: string): React.ReactNode {
       );
     case 'homework':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
           <path d="M6 6h10" />
           <path d="M6 10h10" />
@@ -45,7 +73,14 @@ function getModuleIcon(key: string): React.ReactNode {
       );
     case 'examinations':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
           <path d="m9 15 2 2 4-4" />
@@ -53,34 +88,69 @@ function getModuleIcon(key: string): React.ReactNode {
       );
     case 'finance':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect width="20" height="14" x="2" y="5" rx="2" />
           <line x1="2" x2="22" y1="10" y2="10" />
         </svg>
       );
     case 'parent_portal':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
       );
     case 'school_vault':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       );
     case 'documents':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
         </svg>
       );
     case 'reports':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <line x1="12" x2="12" y1="20" y2="10" />
           <line x1="18" x2="18" y1="20" y2="4" />
           <line x1="6" x2="6" y1="20" y2="16" />
@@ -88,7 +158,14 @@ function getModuleIcon(key: string): React.ReactNode {
       );
     case 'imports':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
           <polyline points="17 8 12 3 7 8" />
           <line x1="12" x2="12" y1="3" y2="15" />
@@ -96,27 +173,55 @@ function getModuleIcon(key: string): React.ReactNode {
       );
     case 'consents':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           <path d="m9 12 2 2 4-4" />
         </svg>
       );
     case 'notifications':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
           <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         </svg>
       );
     case 'ai_assistant':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
         </svg>
       );
     default:
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect width="7" height="7" x="3" y="3" rx="1" />
           <rect width="7" height="7" x="14" y="3" rx="1" />
           <rect width="7" height="7" x="14" y="14" rx="1" />
@@ -189,8 +294,8 @@ export const PlatformEntitlementsPage: React.FC = () => {
         }
         setLoading(false);
       })
-      .catch((err) => {
-        setError(err.message);
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Unknown error');
         setLoading(false);
       });
   }, []);
@@ -232,8 +337,10 @@ export const PlatformEntitlementsPage: React.FC = () => {
         setInitialModuleState(initialMap);
         setInstLoading(false);
       })
-      .catch((err) => {
-        setActionError(`Failed to load institution entitlements: ${err.message}`);
+      .catch((err: unknown) => {
+        setActionError(
+          `Failed to load institution entitlements: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        );
         setInstLoading(false);
       });
   }, [selectedInstId, catalogModules]);
@@ -243,7 +350,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
       prev.map((m) => {
         if (m.key !== key) return m;
         return { ...m, enabled: !m.enabled };
-      })
+      }),
     );
   };
 
@@ -256,10 +363,11 @@ export const PlatformEntitlementsPage: React.FC = () => {
           ...m,
           isTrial: nextTrial,
           expiresAt: nextTrial
-            ? m.expiresAt || new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0]
+            ? m.expiresAt ||
+              new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0]
             : undefined,
         };
-      })
+      }),
     );
   };
 
@@ -268,7 +376,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
       prev.map((m) => {
         if (m.key !== key) return m;
         return { ...m, expiresAt: date };
-      })
+      }),
     );
   };
 
@@ -297,7 +405,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
           shouldEnable = true;
         }
         return { ...m, enabled: shouldEnable };
-      })
+      }),
     );
   };
 
@@ -324,7 +432,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
 
   const handleConfirmSave = () => {
     setShowConfirmModal(false);
-    executeSave();
+    void executeSave();
   };
 
   const executeSave = async () => {
@@ -346,7 +454,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
 
       await platformApi.setEntitlements(selectedInstId, payload);
       setActionSuccess(
-        `Entitlements saved and enforced for ${selectedInstDetail?.name}. Server-side fail-closed authorization is active (403 MODULE_NOT_ENTITLED for disabled modules).`
+        `Entitlements saved and enforced for ${selectedInstDetail?.name}. Server-side fail-closed authorization is active (403 MODULE_NOT_ENTITLED for disabled modules).`,
       );
 
       // Update initial state baseline
@@ -365,7 +473,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
 
   // Compute diff against initially loaded state
   const pendingChanges = modulesState.filter(
-    (m) => (initialModuleState[m.key] ?? true) !== m.enabled
+    (m) => (initialModuleState[m.key] ?? true) !== m.enabled,
   );
 
   // Compute broken dependencies among enabled modules
@@ -382,7 +490,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
           moduleName: m.name,
           missingKey: depKey,
           missingName: catalogModules.find((c) => c.key === depKey)?.name || depKey,
-        }))
+        })),
     );
 
   const categories = ['ALL', 'CORE', 'ACADEMIC', 'OPERATIONS', 'FINANCE', 'SECURITY_AI'];
@@ -393,8 +501,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
       : catalogModules.filter((m) => m.category === categoryFilter);
 
   const visibleModules = modulesState.filter((m) => {
-    const matchesCategory =
-      tenantCategoryFilter === 'ALL' || m.category === tenantCategoryFilter;
+    const matchesCategory = tenantCategoryFilter === 'ALL' || m.category === tenantCategoryFilter;
     const matchesSearch =
       !tenantSearch.trim() ||
       m.name.toLowerCase().includes(tenantSearch.toLowerCase()) ||
@@ -404,7 +511,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
   });
 
   const isDisablingCoreModules = pendingChanges.some(
-    (m) => !m.enabled && (m.key === 'students' || m.key === 'academics')
+    (m) => !m.enabled && (m.key === 'students' || m.key === 'academics'),
   );
 
   const totalCount = modulesState.length;
@@ -437,7 +544,8 @@ export const PlatformEntitlementsPage: React.FC = () => {
         <div>
           <h2 className="platform-page-title">ERP Module Marketplace & Capability Catalog</h2>
           <p className="platform-page-desc">
-            Manage purchased, enabled, and trialed ERP modules per tenant. Server-side fail-closed gates enforce <code>403 MODULE_NOT_ENTITLED</code> on unpurchased routes.
+            Manage purchased, enabled, and trialed ERP modules per tenant. Server-side fail-closed
+            gates enforce <code>403 MODULE_NOT_ENTITLED</code> on unpurchased routes.
           </p>
         </div>
 
@@ -484,9 +592,7 @@ export const PlatformEntitlementsPage: React.FC = () => {
               </div>
 
               <div className="selector-field">
-                <label className="text-sm font-semibold">
-                  Quick Preset Bundle:
-                </label>
+                <span className="text-sm font-semibold">Quick Preset Bundle:</span>
                 <div className="bundle-quick-actions">
                   <button
                     type="button"
@@ -595,23 +701,36 @@ export const PlatformEntitlementsPage: React.FC = () => {
           {brokenDependencies.length > 0 && (
             <div className="dependency-alert-banner mt-4" role="alert">
               <div className="alert-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
                   <line x1="12" x2="12" y1="9" y2="13" />
                   <line x1="12" x2="12.01" y1="17" y2="17" />
                 </svg>
               </div>
               <div className="alert-content">
-                <strong>Module Dependency Inconsistencies Detected ({brokenDependencies.length}):</strong>
+                <strong>
+                  Module Dependency Inconsistencies Detected ({brokenDependencies.length}):
+                </strong>
                 <ul className="dep-warnings-list mt-1">
                   {brokenDependencies.map((dep, idx) => (
                     <li key={`${dep.moduleKey}-${dep.missingKey}-${idx}`}>
-                      <strong>{dep.moduleName}</strong> requires <code>{dep.missingName}</code>, which is currently disabled.
+                      <strong>{dep.moduleName}</strong> requires <code>{dep.missingName}</code>,
+                      which is currently disabled.
                     </li>
                   ))}
                 </ul>
                 <p className="dep-advice text-xs mt-1">
-                  Users accessing routes dependent on disabled modules will receive <code>403 MODULE_NOT_ENTITLED</code>.
+                  Users accessing routes dependent on disabled modules will receive{' '}
+                  <code>403 MODULE_NOT_ENTITLED</code>.
                 </p>
               </div>
             </div>
@@ -625,7 +744,9 @@ export const PlatformEntitlementsPage: React.FC = () => {
                 {pendingChanges.map((m) => (
                   <li key={m.key}>
                     <strong>{m.name}</strong> ({m.key}):{' '}
-                    <span className={m.enabled ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}>
+                    <span
+                      className={m.enabled ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}
+                    >
                       {m.enabled ? 'ENABLED' : 'DISABLED (FAIL-CLOSED)'}
                     </span>
                   </li>
@@ -638,7 +759,16 @@ export const PlatformEntitlementsPage: React.FC = () => {
           <div className="tenant-modules-toolbar mt-4">
             <div className="tenant-search-wrap">
               <span className="search-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" x2="16.65" y1="21" y2="16.65" />
                 </svg>
@@ -716,16 +846,25 @@ export const PlatformEntitlementsPage: React.FC = () => {
                       <div className="module-status-row">
                         {mod.enabled ? (
                           mod.isTrial ? (
-                            <span className="module-status-badge badge-trial">Trial Evaluation</span>
+                            <span className="module-status-badge badge-trial">
+                              Trial Evaluation
+                            </span>
                           ) : (
-                            <span className="module-status-badge badge-active">Active / Enforced</span>
+                            <span className="module-status-badge badge-active">
+                              Active / Enforced
+                            </span>
                           )
                         ) : (
-                          <span className="module-status-badge badge-disabled">Disabled (Fail-Closed)</span>
+                          <span className="module-status-badge badge-disabled">
+                            Disabled (Fail-Closed)
+                          </span>
                         )}
 
                         {hasMissingDep && (
-                          <span className="module-status-badge badge-warning" title="Prerequisites disabled">
+                          <span
+                            className="module-status-badge badge-warning"
+                            title="Prerequisites disabled"
+                          >
                             Dep Warning
                           </span>
                         )}
@@ -781,7 +920,10 @@ export const PlatformEntitlementsPage: React.FC = () => {
 
               {visibleModules.length === 0 && (
                 <div className="empty-catalog-box mt-6">
-                  <p>No modules match &quot;{tenantSearch}&quot; in category &quot;{tenantCategoryFilter}&quot;.</p>
+                  <p>
+                    No modules match &quot;{tenantSearch}&quot; in category &quot;
+                    {tenantCategoryFilter}&quot;.
+                  </p>
                   <button
                     type="button"
                     className="platform-btn platform-btn-secondary mt-2"
@@ -799,7 +941,8 @@ export const PlatformEntitlementsPage: React.FC = () => {
               <div className="entitlements-footer-bar mt-6">
                 <div className="footer-info">
                   <span>
-                    <strong>{modulesState.filter((m) => m.enabled).length}</strong> of {modulesState.length} modules active.
+                    <strong>{modulesState.filter((m) => m.enabled).length}</strong> of{' '}
+                    {modulesState.length} modules active.
                   </span>
                   <span className="footer-subinfo">
                     Unsaved changes:{' '}
@@ -834,7 +977,12 @@ export const PlatformEntitlementsPage: React.FC = () => {
 
           {/* High-Impact Confirmation Modal */}
           {showConfirmModal && (
-            <div className="guarded-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+            <div
+              className="guarded-modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="confirm-modal-title"
+            >
               <div className="guarded-modal-card">
                 <div className="guarded-modal-header">
                   <h3 id="confirm-modal-title">Confirm Entitlement Policy Updates</h3>
@@ -846,7 +994,16 @@ export const PlatformEntitlementsPage: React.FC = () => {
                   {isDisablingCoreModules && (
                     <div className="dependency-alert-banner mb-3" role="alert">
                       <div className="alert-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="20"
+                          height="20"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
                           <line x1="12" x2="12" y1="9" y2="13" />
                           <line x1="12" x2="12.01" y1="17" y2="17" />
@@ -855,7 +1012,9 @@ export const PlatformEntitlementsPage: React.FC = () => {
                       <div className="alert-content">
                         <strong>Critical Core Module Deactivation:</strong>
                         <p className="text-xs mt-1">
-                          You are disabling core modules (such as Students or Academics). This will immediately lock out faculty and administrative users from primary workflows.
+                          You are disabling core modules (such as Students or Academics). This will
+                          immediately lock out faculty and administrative users from primary
+                          workflows.
                         </p>
                       </div>
                     </div>
@@ -868,7 +1027,11 @@ export const PlatformEntitlementsPage: React.FC = () => {
                     {pendingChanges.map((m) => (
                       <li key={m.key} className="flex justify-between py-1 border-b last:border-0">
                         <span className="font-medium">{m.name}</span>
-                        <span className={m.enabled ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}>
+                        <span
+                          className={
+                            m.enabled ? 'text-green-700 font-bold' : 'text-red-700 font-bold'
+                          }
+                        >
                           {m.enabled ? '→ ENABLING' : '→ DISABLING (403 Fail-Closed)'}
                         </span>
                       </li>
@@ -878,9 +1041,9 @@ export const PlatformEntitlementsPage: React.FC = () => {
                   <div className="guarded-guarantee-list mt-3">
                     <strong>Zero-Downtime Multi-Tenant Guarantee:</strong>
                     <br />
-                    • Changes apply immediately at the API middleware layer without restarting services.
-                    <br />
-                    • Existing persistent databases and records remain intact.
+                    • Changes apply immediately at the API middleware layer without restarting
+                    services.
+                    <br />• Existing persistent databases and records remain intact.
                   </div>
                 </div>
                 <div className="guarded-modal-footer">
@@ -923,7 +1086,9 @@ export const PlatformEntitlementsPage: React.FC = () => {
             {filteredCatalog.map((mod) => (
               <div key={mod.key} className="catalog-module-card">
                 <div className="card-top">
-                  <span className={`cat-pill cat-${mod.category.toLowerCase()}`}>{mod.category}</span>
+                  <span className={`cat-pill cat-${mod.category.toLowerCase()}`}>
+                    {mod.category}
+                  </span>
                   <code className="module-key-code">{mod.key}</code>
                 </div>
                 <div className="flex items-center gap-3">

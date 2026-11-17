@@ -1,9 +1,6 @@
 import { Type, type Static } from '@sinclair/typebox';
 
-export const SubmissionTypeSchema = Type.Union([
-  Type.Literal('OFFLINE'),
-  Type.Literal('ONLINE'),
-]);
+export const SubmissionTypeSchema = Type.Union([Type.Literal('OFFLINE'), Type.Literal('ONLINE')]);
 export type SubmissionType = Static<typeof SubmissionTypeSchema>;
 
 export const HomeworkStatusSchema = Type.Union([
@@ -149,11 +146,13 @@ export const SubmissionListItemDtoSchema = Type.Object({
 export type SubmissionListItemDto = Static<typeof SubmissionListItemDtoSchema>;
 
 export const ReviewSubmissionBodySchema = Type.Object({
-  status: Type.Optional(Type.Union([
-    Type.Literal('REVIEWED'),
-    Type.Literal('RESUBMISSION_REQUESTED'),
-    Type.Literal('COMPLETED'),
-  ])),
+  status: Type.Optional(
+    Type.Union([
+      Type.Literal('REVIEWED'),
+      Type.Literal('RESUBMISSION_REQUESTED'),
+      Type.Literal('COMPLETED'),
+    ]),
+  ),
   marksObtained: Type.Optional(Type.Number({ minimum: 0, maximum: 1000 })),
   grade: Type.Optional(Type.String({ minLength: 1, maxLength: 20 })),
   feedback: Type.Optional(Type.String()),

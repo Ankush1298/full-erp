@@ -2,12 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
-import {
-  STUDENT,
-  PARENT,
-  ACADEMIC_ADMIN,
-  createFakeBackend,
-} from './helpers/fakeBackend';
+import { STUDENT, PARENT, ACADEMIC_ADMIN, createFakeBackend } from './helpers/fakeBackend';
 import { renderApp } from './helpers/render';
 
 describe('Document Center: navigation and access', () => {
@@ -25,8 +20,12 @@ describe('Document Center: navigation and access', () => {
     const b = createFakeBackend({ session: true, me: studentWithDocs });
     renderApp(b, '/documents');
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Document Center' })).toBeInTheDocument();
-    expect(screen.getByText('Institutional Document Governance & Verification')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Document Center' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Institutional Document Governance & Verification'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Tenant Isolation')).toBeInTheDocument();
     expect(screen.getByText('Antimalware Verification')).toBeInTheDocument();
     expect(screen.getByText('Signed Downloads')).toBeInTheDocument();
@@ -52,7 +51,9 @@ describe('Document Center: navigation and access', () => {
     await userEvent.click(detailsBtn);
 
     expect(await screen.findByText('Document Verification & Security Details')).toBeInTheDocument();
-    expect(screen.getByText('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08')).toBeInTheDocument();
+    expect(
+      screen.getByText('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'),
+    ).toBeInTheDocument();
     expect(screen.getByText('CLEAN (Inspected)')).toBeInTheDocument();
   });
 
@@ -71,7 +72,9 @@ describe('Document Center: navigation and access', () => {
     const b = createFakeBackend({ session: true, me: parentWithDocs });
     renderApp(b, '/documents');
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Document Center' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Document Center' }),
+    ).toBeInTheDocument();
     expect(await screen.findByLabelText(/Viewing Records For Linked Child/i)).toBeInTheDocument();
     expect(screen.getByText(/Verified Legal Guardianship Linkage/i)).toBeInTheDocument();
   });

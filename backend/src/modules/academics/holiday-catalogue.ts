@@ -49,11 +49,15 @@ interface RawHolidaySeed {
 }
 
 const STATUTORY_NATIONAL = 'Section 25, Negotiable Instruments Act, 1881 / Gazette of India';
-const DOPT_STATUTORY = 'Ministry of Personnel (DoPT) / Section 25, Negotiable Instruments Act, 1881';
+const DOPT_STATUTORY =
+  'Ministry of Personnel (DoPT) / Section 25, Negotiable Instruments Act, 1881';
 const BIHAR_GAD_STATUTORY = 'Government of Bihar GAD Notification No. 11/N-1-03/2010-GAD';
-const DOPT_PROVISIONAL = 'Government of India (DoPT) Gazetted List (Pending Year-Specific Circular)';
-const BIHAR_GAD_PROVISIONAL = 'Government of Bihar, General Administration Department (Pending Year-Specific Circular)';
-const BIHAR_EDU_PROVISIONAL = 'Bihar School Holiday Calendar, Department of Education (Pending Year-Specific Circular)';
+const DOPT_PROVISIONAL =
+  'Government of India (DoPT) Gazetted List (Pending Year-Specific Circular)';
+const BIHAR_GAD_PROVISIONAL =
+  'Government of Bihar, General Administration Department (Pending Year-Specific Circular)';
+const BIHAR_EDU_PROVISIONAL =
+  'Bihar School Holiday Calendar, Department of Education (Pending Year-Specific Circular)';
 const RECOMMENDED_INSTITUTIONAL = 'Recommended Academic Break (Requires Institution Confirmation)';
 
 const CATALOGUE_SEEDS: RawHolidaySeed[] = [
@@ -67,9 +71,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: STATUTORY_NATIONAL,
     dates: {
-      2025: { date: '2025-01-26', status: 'VERIFIED', verifiedDate: '1950-01-26', notes: 'National Holiday' },
-      2026: { date: '2026-01-26', status: 'VERIFIED', verifiedDate: '1950-01-26', notes: 'National Holiday' },
-      2027: { date: '2027-01-26', status: 'VERIFIED', verifiedDate: '1950-01-26', notes: 'National Holiday' },
+      2025: {
+        date: '2025-01-26',
+        status: 'VERIFIED',
+        verifiedDate: '1950-01-26',
+        notes: 'National Holiday',
+      },
+      2026: {
+        date: '2026-01-26',
+        status: 'VERIFIED',
+        verifiedDate: '1950-01-26',
+        notes: 'National Holiday',
+      },
+      2027: {
+        date: '2027-01-26',
+        status: 'VERIFIED',
+        verifiedDate: '1950-01-26',
+        notes: 'National Holiday',
+      },
     },
   },
   {
@@ -81,9 +100,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: STATUTORY_NATIONAL,
     dates: {
-      2025: { date: '2025-08-15', status: 'VERIFIED', verifiedDate: '1947-08-15', notes: 'National Holiday' },
-      2026: { date: '2026-08-15', status: 'VERIFIED', verifiedDate: '1947-08-15', notes: 'National Holiday' },
-      2027: { date: '2027-08-15', status: 'VERIFIED', verifiedDate: '1947-08-15', notes: 'National Holiday' },
+      2025: {
+        date: '2025-08-15',
+        status: 'VERIFIED',
+        verifiedDate: '1947-08-15',
+        notes: 'National Holiday',
+      },
+      2026: {
+        date: '2026-08-15',
+        status: 'VERIFIED',
+        verifiedDate: '1947-08-15',
+        notes: 'National Holiday',
+      },
+      2027: {
+        date: '2027-08-15',
+        status: 'VERIFIED',
+        verifiedDate: '1947-08-15',
+        notes: 'National Holiday',
+      },
     },
   },
   {
@@ -95,9 +129,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: STATUTORY_NATIONAL,
     dates: {
-      2025: { date: '2025-10-02', status: 'VERIFIED', verifiedDate: '1948-10-02', notes: 'National Holiday' },
-      2026: { date: '2026-10-02', status: 'VERIFIED', verifiedDate: '1948-10-02', notes: 'National Holiday' },
-      2027: { date: '2027-10-02', status: 'VERIFIED', verifiedDate: '1948-10-02', notes: 'National Holiday' },
+      2025: {
+        date: '2025-10-02',
+        status: 'VERIFIED',
+        verifiedDate: '1948-10-02',
+        notes: 'National Holiday',
+      },
+      2026: {
+        date: '2026-10-02',
+        status: 'VERIFIED',
+        verifiedDate: '1948-10-02',
+        notes: 'National Holiday',
+      },
+      2027: {
+        date: '2027-10-02',
+        status: 'VERIFIED',
+        verifiedDate: '1948-10-02',
+        notes: 'National Holiday',
+      },
     },
   },
   {
@@ -109,9 +158,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: DOPT_STATUTORY,
     dates: {
-      2025: { date: '2025-04-14', status: 'VERIFIED', verifiedDate: '2020-04-14', notes: 'Annual Gazetted Holiday' },
-      2026: { date: '2026-04-14', status: 'VERIFIED', verifiedDate: '2020-04-14', notes: 'Annual Gazetted Holiday' },
-      2027: { date: '2027-04-14', status: 'VERIFIED', verifiedDate: '2020-04-14', notes: 'Annual Gazetted Holiday' },
+      2025: {
+        date: '2025-04-14',
+        status: 'VERIFIED',
+        verifiedDate: '2020-04-14',
+        notes: 'Annual Gazetted Holiday',
+      },
+      2026: {
+        date: '2026-04-14',
+        status: 'VERIFIED',
+        verifiedDate: '2020-04-14',
+        notes: 'Annual Gazetted Holiday',
+      },
+      2027: {
+        date: '2027-04-14',
+        status: 'VERIFIED',
+        verifiedDate: '2020-04-14',
+        notes: 'Annual Gazetted Holiday',
+      },
     },
   },
   {
@@ -123,9 +187,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: DOPT_PROVISIONAL,
     dates: {
-      2025: { date: '2025-04-10', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2026: { date: '2026-03-31', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2027: { date: '2027-04-19', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
+      2025: {
+        date: '2025-04-10',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2026: {
+        date: '2026-03-31',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2027: {
+        date: '2027-04-19',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
     },
   },
   {
@@ -137,9 +216,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: DOPT_PROVISIONAL,
     dates: {
-      2025: { date: '2025-04-18', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable Christian holiday; subject to official year-specific gazette notification' },
-      2026: { date: '2026-04-03', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable Christian holiday; subject to official year-specific gazette notification' },
-      2027: { date: '2027-03-26', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable Christian holiday; subject to official year-specific gazette notification' },
+      2025: {
+        date: '2025-04-18',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable Christian holiday; subject to official year-specific gazette notification',
+      },
+      2026: {
+        date: '2026-04-03',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable Christian holiday; subject to official year-specific gazette notification',
+      },
+      2027: {
+        date: '2027-03-26',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable Christian holiday; subject to official year-specific gazette notification',
+      },
     },
   },
   {
@@ -151,9 +245,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: DOPT_PROVISIONAL,
     dates: {
-      2025: { date: '2025-05-12', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2026: { date: '2026-05-31', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2027: { date: '2027-05-20', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
+      2025: {
+        date: '2025-05-12',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2026: {
+        date: '2026-05-31',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2027: {
+        date: '2027-05-20',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
     },
   },
   {
@@ -165,9 +274,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: STATUTORY_NATIONAL,
     dates: {
-      2025: { date: '2025-12-25', status: 'VERIFIED', verifiedDate: '1881-12-25', notes: 'Fixed statutory holiday' },
-      2026: { date: '2026-12-25', status: 'VERIFIED', verifiedDate: '1881-12-25', notes: 'Fixed statutory holiday' },
-      2027: { date: '2027-12-25', status: 'VERIFIED', verifiedDate: '1881-12-25', notes: 'Fixed statutory holiday' },
+      2025: {
+        date: '2025-12-25',
+        status: 'VERIFIED',
+        verifiedDate: '1881-12-25',
+        notes: 'Fixed statutory holiday',
+      },
+      2026: {
+        date: '2026-12-25',
+        status: 'VERIFIED',
+        verifiedDate: '1881-12-25',
+        notes: 'Fixed statutory holiday',
+      },
+      2027: {
+        date: '2027-12-25',
+        status: 'VERIFIED',
+        verifiedDate: '1881-12-25',
+        notes: 'Fixed statutory holiday',
+      },
     },
   },
   {
@@ -179,9 +303,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: DOPT_PROVISIONAL,
     dates: {
-      2025: { date: '2025-11-05', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2026: { date: '2026-11-24', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2027: { date: '2027-11-14', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
+      2025: {
+        date: '2025-11-05',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2026: {
+        date: '2026-11-24',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2027: {
+        date: '2027-11-14',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
     },
   },
 
@@ -313,9 +452,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: DOPT_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-02', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2026: { date: '2026-10-20', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2027: { date: '2027-10-10', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
+      2025: {
+        date: '2025-10-02',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2026: {
+        date: '2026-10-20',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2027: {
+        date: '2027-10-10',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
     },
   },
   {
@@ -327,9 +481,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: DOPT_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-20', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2026: { date: '2026-11-08', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
-      2027: { date: '2027-10-29', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to official year-specific gazette notification' },
+      2025: {
+        date: '2025-10-20',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2026: {
+        date: '2026-11-08',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
+      2027: {
+        date: '2027-10-29',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to official year-specific gazette notification',
+      },
     },
   },
 
@@ -343,9 +512,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_GAD_STATUTORY,
     dates: {
-      2025: { date: '2025-03-22', status: 'VERIFIED', verifiedDate: '2010-03-22', notes: 'Bihar State Foundation Day' },
-      2026: { date: '2026-03-22', status: 'VERIFIED', verifiedDate: '2010-03-22', notes: 'Bihar State Foundation Day' },
-      2027: { date: '2027-03-22', status: 'VERIFIED', verifiedDate: '2010-03-22', notes: 'Bihar State Foundation Day' },
+      2025: {
+        date: '2025-03-22',
+        status: 'VERIFIED',
+        verifiedDate: '2010-03-22',
+        notes: 'Bihar State Foundation Day',
+      },
+      2026: {
+        date: '2026-03-22',
+        status: 'VERIFIED',
+        verifiedDate: '2010-03-22',
+        notes: 'Bihar State Foundation Day',
+      },
+      2027: {
+        date: '2027-03-22',
+        status: 'VERIFIED',
+        verifiedDate: '2010-03-22',
+        notes: 'Bihar State Foundation Day',
+      },
     },
   },
   {
@@ -357,9 +541,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_GAD_PROVISIONAL,
     dates: {
-      2025: { date: '2025-01-06', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2026: { date: '2026-01-16', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2027: { date: '2027-01-14', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
+      2025: {
+        date: '2025-01-06',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2026: {
+        date: '2026-01-16',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2027: {
+        date: '2027-01-14',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
     },
   },
   {
@@ -371,9 +570,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_GAD_PROVISIONAL,
     dates: {
-      2025: { date: '2025-02-26', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2026: { date: '2026-02-15', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2027: { date: '2027-03-06', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
+      2025: {
+        date: '2025-02-26',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2026: {
+        date: '2026-02-15',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2027: {
+        date: '2027-03-06',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
     },
   },
   {
@@ -385,9 +599,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-03-14', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-03-03', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-03-22', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-03-14',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-03-03',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-03-22',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -399,9 +628,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-03-15', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-03-04', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-03-23', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-03-15',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-03-04',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-03-23',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -413,9 +657,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_GAD_PROVISIONAL,
     dates: {
-      2025: { date: '2025-04-06', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2026: { date: '2026-03-27', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2027: { date: '2027-04-15', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
+      2025: {
+        date: '2025-04-06',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2026: {
+        date: '2026-03-27',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2027: {
+        date: '2027-04-15',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
     },
   },
   {
@@ -427,9 +686,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-08-16', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-09-03', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-08-25', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-08-16',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-09-03',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-08-25',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -441,9 +715,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: false,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-08-09', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-08-28', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-08-17', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-08-09',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-08-28',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-08-17',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -455,9 +744,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-09-30', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-10-18', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-10-08', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-09-30',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-10-18',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-10-08',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -469,9 +773,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-01', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-10-19', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-10-09', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-10-01',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-10-19',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-10-09',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -483,9 +802,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_GAD_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-22', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2026: { date: '2026-11-09', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2027: { date: '2027-10-30', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
+      2025: {
+        date: '2025-10-22',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2026: {
+        date: '2026-11-09',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2027: {
+        date: '2027-10-30',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
     },
   },
   {
@@ -497,9 +831,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_GAD_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-23', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2026: { date: '2026-11-10', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
-      2027: { date: '2027-10-31', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar GAD year-specific notification' },
+      2025: {
+        date: '2025-10-23',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2026: {
+        date: '2026-11-10',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
+      2027: {
+        date: '2027-10-31',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar GAD year-specific notification',
+      },
     },
   },
   {
@@ -511,9 +860,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-26', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-11-13', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-11-03', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-10-26',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-11-13',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-11-03',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -525,9 +889,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-27', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-11-14', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-11-04', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-10-27',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-11-14',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-11-04',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {
@@ -539,9 +918,24 @@ const CATALOGUE_SEEDS: RawHolidaySeed[] = [
     isGovernmentMandated: true,
     source: BIHAR_EDU_PROVISIONAL,
     dates: {
-      2025: { date: '2025-10-28', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2026: { date: '2026-11-15', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
-      2027: { date: '2027-11-05', status: 'PROVISIONAL', verifiedDate: null, notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification' },
+      2025: {
+        date: '2025-10-28',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2026: {
+        date: '2026-11-15',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
+      2027: {
+        date: '2027-11-05',
+        status: 'PROVISIONAL',
+        verifiedDate: null,
+        notes: 'Movable festival date; subject to Bihar School Holiday Calendar notification',
+      },
     },
   },
   {

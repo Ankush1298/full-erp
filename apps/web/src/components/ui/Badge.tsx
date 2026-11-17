@@ -2,7 +2,21 @@ import type { ReactNode } from 'react';
 
 export interface BadgeProps {
   children: ReactNode;
-  tone?: 'positive' | 'warning' | 'danger' | 'neutral' | 'brand' | 'purple' | 'emerald' | 'amber' | 'coral' | string;
+  tone?:
+    | 'positive'
+    | 'warning'
+    | 'danger'
+    | 'neutral'
+    | 'brand'
+    | 'purple'
+    | 'emerald'
+    | 'amber'
+    | 'coral'
+    | 'info'
+    | 'success'
+    | 'sky'
+    | 'rose'
+    | 'gray';
   className?: string;
 }
 

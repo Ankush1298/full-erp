@@ -394,7 +394,9 @@ describe('Platform CLI (Unit)', () => {
       await expect(
         grantAuthority(mockDb, {
           tenant: 'apex-school',
-          authority: 'SUPER_ADMIN_AUTHORITY' as any,
+          authority: 'SUPER_ADMIN_AUTHORITY' as unknown as Parameters<
+            typeof grantAuthority
+          >[1]['authority'],
           approvedBy: 'super-admin@campusos.test',
           justification: 'Audited setup',
         }),
@@ -403,14 +405,16 @@ describe('Platform CLI (Unit)', () => {
 
     it('grants SECURITY_AUTHORITY permissions transactionally', async () => {
       const mockDb = {
-        query: vi.fn().mockImplementation(async (sql: string, _params?: any[]) => {
+        query: vi.fn().mockImplementation((sql: string, _params?: unknown[]) => {
           if (sql.includes('SELECT id, name, slug FROM app.organizations')) {
-            return { rows: [{ id: 'org-123', name: 'Apex School', slug: 'apex-school' }] };
+            return Promise.resolve({
+              rows: [{ id: 'org-123', name: 'Apex School', slug: 'apex-school' }],
+            });
           }
           if (sql.includes('SELECT id FROM app.roles')) {
-            return { rows: [{ id: 'role-col-admin' }] };
+            return Promise.resolve({ rows: [{ id: 'role-col-admin' }] });
           }
-          return { rows: [] };
+          return Promise.resolve({ rows: [] });
         }),
       };
 
@@ -437,14 +441,16 @@ describe('Platform CLI (Unit)', () => {
 
     it('grants FINANCIAL_GATEWAY_AUTHORITY permissions transactionally', async () => {
       const mockDb = {
-        query: vi.fn().mockImplementation(async (sql: string, _params?: any[]) => {
+        query: vi.fn().mockImplementation((sql: string, _params?: unknown[]) => {
           if (sql.includes('SELECT id, name, slug FROM app.organizations')) {
-            return { rows: [{ id: 'org-456', name: 'Apex College', slug: 'apex-college' }] };
+            return Promise.resolve({
+              rows: [{ id: 'org-456', name: 'Apex College', slug: 'apex-college' }],
+            });
           }
           if (sql.includes('SELECT id FROM app.roles')) {
-            return { rows: [{ id: 'role-fin-admin' }] };
+            return Promise.resolve({ rows: [{ id: 'role-fin-admin' }] });
           }
-          return { rows: [] };
+          return Promise.resolve({ rows: [] });
         }),
       };
 
@@ -459,10 +465,7 @@ describe('Platform CLI (Unit)', () => {
       expect(res.organizationId).toBe('org-456');
       expect(res.authority).toBe('FINANCIAL_GATEWAY_AUTHORITY');
       expect(res.roleCode).toBe('FINANCE_ADMIN');
-      expect(res.grantedPermissions).toEqual([
-        'fee.gateway.manage',
-        'fee.refund.initiate',
-      ]);
+      expect(res.grantedPermissions).toEqual(['fee.gateway.manage', 'fee.refund.initiate']);
     });
   });
 });

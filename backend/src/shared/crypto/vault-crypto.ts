@@ -109,7 +109,7 @@ export function decryptWithDek(
     decipher.setAuthTag(tag);
 
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  } catch (err) {
+  } catch {
     throw new AppError(
       400,
       'VAULT_DECRYPTION_FAILED',
@@ -266,9 +266,7 @@ export function splitSecret(
  * Lagrange polynomial interpolation in GF(2^8) to reconstruct secret at x = 0
  * using any 2 distinct presented shares.
  */
-export function reconstructSecret(
-  shares: Array<{ index: number; data: string }>,
-): Buffer {
+export function reconstructSecret(shares: Array<{ index: number; data: string }>): Buffer {
   if (shares.length < 2) {
     throw new AppError(
       400,
@@ -287,7 +285,11 @@ export function reconstructSecret(
   }
 
   if (unique.size < 2) {
-    throw new AppError(400, 'DUPLICATE_SHARES', 'Presented shares must be from distinct custodians.');
+    throw new AppError(
+      400,
+      'DUPLICATE_SHARES',
+      'Presented shares must be from distinct custodians.',
+    );
   }
 
   const entries = Array.from(unique.entries()).slice(0, 2);

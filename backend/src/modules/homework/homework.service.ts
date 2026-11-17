@@ -34,10 +34,7 @@ export class HomeworkService {
   /**
    * List classes, sections, and subjects the calling teacher or administrator is authorized to view.
    */
-  static async listTeacherClasses(
-    tx: TenantTx,
-    ctx: TrustedContext,
-  ): Promise<TeacherClassItem[]> {
+  static async listTeacherClasses(tx: TenantTx, ctx: TrustedContext): Promise<TeacherClassItem[]> {
     ensureTrusted(ctx);
     await AuthorizationEngine.assert(tx, ctx, 'homework.manage');
 
@@ -223,12 +220,20 @@ export class HomeworkService {
       [ctx.tenantId, ctx.userId],
     );
     if (!empRes.rows[0]) {
-      throw new AppError(403, 'Active employee record required to create homework', 'EMPLOYEE_RECORD_REQUIRED');
+      throw new AppError(
+        403,
+        'Active employee record required to create homework',
+        'EMPLOYEE_RECORD_REQUIRED',
+      );
     }
     const creatorEmployeeId = empRes.rows[0].id;
     const creatorName = empRes.rows[0].display_name;
 
-    const offRes = await tx.query<{ code_snapshot: string; title_snapshot: string; section_id: string | null }>(
+    const offRes = await tx.query<{
+      code_snapshot: string;
+      title_snapshot: string;
+      section_id: string | null;
+    }>(
       `SELECT code_snapshot, title_snapshot, section_id
          FROM app.course_offerings
         WHERE organization_id = $1 AND id = $2 AND status IN ('PUBLISHED', 'CLOSED')`,
@@ -286,7 +291,15 @@ export class HomeworkService {
           `INSERT INTO app.homework_attachments (
             id, organization_id, homework_id, file_id, file_name, file_size_bytes, mime_type
           ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [attId, ctx.tenantId, homeworkId, att.fileId, att.fileName, att.fileSizeBytes, att.mimeType],
+          [
+            attId,
+            ctx.tenantId,
+            homeworkId,
+            att.fileId,
+            att.fileName,
+            att.fileSizeBytes,
+            att.mimeType,
+          ],
         );
         attachmentItems.push({
           id: attId,
@@ -300,10 +313,22 @@ export class HomeworkService {
 
     // If published now, send notifications to students
     if (isPublish) {
-      await this.notifyHomeworkPublished(tx, ctx, homeworkId, body.title, body.courseOfferingId, sectionId);
+      await this.notifyHomeworkPublished(
+        tx,
+        ctx,
+        homeworkId,
+        body.title,
+        body.courseOfferingId,
+        sectionId,
+      );
     }
 
-    const recipients = await this.previewRecipients(tx, ctx, body.courseOfferingId, sectionId ?? undefined);
+    const recipients = await this.previewRecipients(
+      tx,
+      ctx,
+      body.courseOfferingId,
+      sectionId ?? undefined,
+    );
 
     return {
       id: homeworkId,
@@ -390,7 +415,7 @@ export class HomeworkService {
       params.push(body.maxMarks);
     }
     if (body.allowResubmission !== undefined) {
-      sets.push(`allow_resubmission = $${idx++}`);
+      sets.push(`allow_resubmission = $${idx}`);
       params.push(body.allowResubmission);
     }
 
@@ -410,7 +435,12 @@ export class HomeworkService {
   ): Promise<void> {
     ensureTrusted(ctx);
 
-    const hw = await tx.query<{ course_offering_id: string; section_id: string | null; title: string; status: string }>(
+    const hw = await tx.query<{
+      course_offering_id: string;
+      section_id: string | null;
+      title: string;
+      status: string;
+    }>(
       `SELECT course_offering_id, section_id, title, status FROM app.homework_assignments WHERE organization_id = $1 AND id = $2`,
       [ctx.tenantId, homeworkId],
     );
@@ -446,11 +476,7 @@ export class HomeworkService {
   /**
    * Close a homework assignment.
    */
-  static async closeHomework(
-    tx: TenantTx,
-    ctx: TrustedContext,
-    homeworkId: string,
-  ): Promise<void> {
+  static async closeHomework(tx: TenantTx, ctx: TrustedContext, homeworkId: string): Promise<void> {
     ensureTrusted(ctx);
 
     const hw = await tx.query<{ course_offering_id: string; status: string }>(
@@ -844,7 +870,9 @@ export class HomeworkService {
           ctx.tenantId,
           sub.rows[0].user_id,
           'ACADEMIC',
-          newStatus === 'RESUBMISSION_REQUESTED' ? 'Homework Resubmission Requested' : 'Homework Feedback Available',
+          newStatus === 'RESUBMISSION_REQUESTED'
+            ? 'Homework Resubmission Requested'
+            : 'Homework Feedback Available',
           `Your teacher has reviewed "${sub.rows[0].title}". ${body.feedback ? 'Feedback: ' + body.feedback : ''}`.trim(),
           `/student/homework/${sub.rows[0].homework_id}`,
           'homework',
@@ -994,7 +1022,10 @@ export class HomeworkService {
     tx: TenantTx,
     ctx: TrustedContext,
     homeworkId: string,
-    body: { submissionText?: string; files?: { fileId: string; fileName: string; fileSizeBytes: number; mimeType: string }[] },
+    body: {
+      submissionText?: string;
+      files?: { fileId: string; fileName: string; fileSizeBytes: number; mimeType: string }[];
+    },
   ): Promise<void> {
     ensureTrusted(ctx);
     AuthorizationEngine.assertStudentActor(ctx);
@@ -1029,7 +1060,11 @@ export class HomeworkService {
       [ctx.tenantId, homeworkId, studentId],
     );
     if (!hwRes.rows[0]) {
-      throw new AppError(404, 'Homework not found or student not enrolled in this section', 'HOMEWORK_NOT_FOUND');
+      throw new AppError(
+        404,
+        'Homework not found or student not enrolled in this section',
+        'HOMEWORK_NOT_FOUND',
+      );
     }
     const hw = hwRes.rows[0];
 
@@ -1037,7 +1072,11 @@ export class HomeworkService {
       throw new AppError(400, 'Submissions are closed for this homework', 'HOMEWORK_NOT_PUBLISHED');
     }
     if (hw.submission_type !== 'ONLINE') {
-      throw new AppError(400, 'This is an offline homework assignment; online uploads are disabled', 'ONLINE_SUBMISSION_DISABLED');
+      throw new AppError(
+        400,
+        'This is an offline homework assignment; online uploads are disabled',
+        'ONLINE_SUBMISSION_DISABLED',
+      );
     }
 
     // Determine if late
@@ -1069,7 +1108,11 @@ export class HomeworkService {
     if (existing.rows[0]) {
       const ex = existing.rows[0];
       if (!hw.allow_resubmission && !ex.resubmission_allowed && ex.status !== 'PENDING') {
-        throw new AppError(409, 'Resubmission is not permitted for this assignment', 'RESUBMISSION_DENIED');
+        throw new AppError(
+          409,
+          'Resubmission is not permitted for this assignment',
+          'RESUBMISSION_DENIED',
+        );
       }
 
       submissionId = ex.id;
@@ -1089,7 +1132,14 @@ export class HomeworkService {
         `INSERT INTO app.homework_submissions (
           id, organization_id, homework_id, student_id, status, submission_text, submitted_at
         ) VALUES ($1, $2, $3, $4, $5, $6, now())`,
-        [submissionId, ctx.tenantId, homeworkId, studentId, submissionStatus, body.submissionText || null],
+        [
+          submissionId,
+          ctx.tenantId,
+          homeworkId,
+          studentId,
+          submissionStatus,
+          body.submissionText || null,
+        ],
       );
     }
 
@@ -1322,7 +1372,11 @@ export class HomeworkService {
     // Size limit 25MB
     const MAX_SIZE = 25 * 1024 * 1024;
     if (body.fileSizeBytes > MAX_SIZE || body.fileSizeBytes <= 0) {
-      throw new AppError(400, 'File size must be between 1 byte and 25 MB', 'FILE_SIZE_OUT_OF_BOUNDS');
+      throw new AppError(
+        400,
+        'File size must be between 1 byte and 25 MB',
+        'FILE_SIZE_OUT_OF_BOUNDS',
+      );
     }
 
     // Validate MIME type
@@ -1437,7 +1491,11 @@ export class HomeworkService {
           [ctx.tenantId, homeworkId, studentId],
         );
         if (!hwEnrolled.rows[0]) {
-          throw new AppError(403, 'FORBIDDEN_SECTION', 'Access denied: student is not enrolled in this section');
+          throw new AppError(
+            403,
+            'FORBIDDEN_SECTION',
+            'Access denied: student is not enrolled in this section',
+          );
         }
       }
       fileName = attRes.rows[0].fileName;

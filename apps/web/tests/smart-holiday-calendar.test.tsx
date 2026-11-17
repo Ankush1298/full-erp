@@ -207,9 +207,7 @@ describe('Smart Annual Holiday Calendar (Indian Schools & Bihar State)', () => {
     const approveBtn = screen.getByRole('button', { name: /Approve and Save/i });
     await userEvent.click(approveBtn);
 
-    expect(
-      await screen.findByText(/Successfully approved and saved/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Successfully approved and saved/i)).toBeInTheDocument();
   });
 
   it('requires explicit confirmation for mixed selection including provisional holidays', async () => {
@@ -229,7 +227,9 @@ describe('Smart Annual Holiday Calendar (Indian Schools & Bihar State)', () => {
     await userEvent.click(selectAllBtn);
 
     // Provisional confirmation checkbox should be visible
-    const confirmCheckbox = screen.getByLabelText(/Confirm inclusion of provisional or unverified holidays/i);
+    const confirmCheckbox = screen.getByLabelText(
+      /Confirm inclusion of provisional or unverified holidays/i,
+    );
     expect(confirmCheckbox).toBeInTheDocument();
     expect(confirmCheckbox).not.toBeChecked();
 
@@ -246,9 +246,7 @@ describe('Smart Annual Holiday Calendar (Indian Schools & Bihar State)', () => {
     expect(confirmCheckbox).toBeChecked();
 
     await userEvent.click(approveBtn);
-    expect(
-      await screen.findByText(/Successfully approved and saved/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Successfully approved and saved/i)).toBeInTheDocument();
   });
 
   it('displays actionable validation error message instead of generic API validation (400)', async () => {

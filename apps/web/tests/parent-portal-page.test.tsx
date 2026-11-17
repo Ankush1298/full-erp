@@ -238,7 +238,9 @@ describe('Parent Portal Component, Navigation & Security Isolation', () => {
     expect(await screen.findByText('Enrolled Subjects & Faculty')).toBeInTheDocument();
     expect(screen.getByText('Advanced Mathematics')).toBeInTheDocument();
     expect(screen.getByText('Dr. Rao')).toBeInTheDocument();
-    expect(screen.getByText(/The digital homework and assignment module is pending/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/The digital homework and assignment module is pending/),
+    ).toBeInTheDocument();
   });
 
   it('navigates to Examinations tab and displays strictly published results', async () => {

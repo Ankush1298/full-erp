@@ -328,7 +328,10 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.teacher.cookie}` },
     });
     expect(resAll.statusCode).toBe(200);
-    const bodyAll = resAll.json<{ success: boolean; data: { totalCount: number; students: any[] } }>();
+    const bodyAll = resAll.json<{
+      success: boolean;
+      data: { totalCount: number; students: { studentId: string }[] };
+    }>();
     expect(bodyAll.data.totalCount).toBe(2);
 
     // Section A preview (only Student 1)
@@ -338,9 +341,12 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.teacher.cookie}` },
     });
     expect(resSecA.statusCode).toBe(200);
-    const bodySecA = resSecA.json<{ success: boolean; data: { totalCount: number; students: any[] } }>();
+    const bodySecA = resSecA.json<{
+      success: boolean;
+      data: { totalCount: number; students: { studentId: string }[] };
+    }>();
     expect(bodySecA.data.totalCount).toBe(1);
-    expect(bodySecA.data.students[0].studentId).toBe(student1Id);
+    expect(bodySecA.data.students[0]!.studentId).toBe(student1Id);
   });
 
   it('3. Teacher creates a homework assignment for Section A (draft)', async () => {
@@ -379,7 +385,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.studentOne.cookie}` },
     });
     expect(res1.statusCode).toBe(200);
-    const body1 = res1.json<{ success: boolean; data: any[] }>();
+    const body1 = res1.json<{ success: boolean; data: Array<{ id: string }> }>();
     const found = body1.data.find((h) => h.id === homeworkId);
     expect(found).toBeUndefined();
   });
@@ -406,11 +412,14 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.studentOne.cookie}` },
     });
     expect(res1.statusCode).toBe(200);
-    const body1 = res1.json<{ success: boolean; data: any[] }>();
+    const body1 = res1.json<{
+      success: boolean;
+      data: Array<{ id: string; title: string; submissionStatus: string }>;
+    }>();
     const found1 = body1.data.find((h) => h.id === homeworkId);
     expect(found1).toBeDefined();
-    expect(found1.title).toBe('Math Homework: Algebra Chapter 3');
-    expect(found1.submissionStatus).toBe('PENDING');
+    expect(found1?.title).toBe('Math Homework: Algebra Chapter 3');
+    expect(found1?.submissionStatus).toBe('PENDING');
 
     // Student 2 in Section B MUST NOT see Section A homework
     const res2 = await app.inject({
@@ -419,7 +428,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.studentTwo.cookie}` },
     });
     expect(res2.statusCode).toBe(200);
-    const body2 = res2.json<{ success: boolean; data: any[] }>();
+    const body2 = res2.json<{ success: boolean; data: Array<{ id: string }> }>();
     const found2 = body2.data.find((h) => h.id === homeworkId);
     expect(found2).toBeUndefined();
   });
@@ -486,12 +495,15 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.teacher.cookie}` },
     });
     expect(listRes.statusCode).toBe(200);
-    const listBody = listRes.json<{ success: boolean; data: any[] }>();
+    const listBody = listRes.json<{
+      success: boolean;
+      data: Array<{ id: string; studentId: string; status: string; files: unknown[] }>;
+    }>();
     expect(listBody.data.length).toBe(1);
-    expect(listBody.data[0].studentId).toBe(student1Id);
-    expect(listBody.data[0].status).toBe('SUBMITTED');
-    expect(listBody.data[0].files.length).toBe(1);
-    submissionId = listBody.data[0].id;
+    expect(listBody.data[0]!.studentId).toBe(student1Id);
+    expect(listBody.data[0]!.status).toBe('SUBMITTED');
+    expect(listBody.data[0]!.files.length).toBe(1);
+    submissionId = listBody.data[0]!.id;
 
     // Review submission
     const reviewRes = await app.inject({
@@ -521,13 +533,22 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.studentOne.cookie}` },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: any[] }>();
+    const body = res.json<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        submissionStatus: string;
+        marksObtained: number;
+        grade: string;
+        feedback: string;
+      }>;
+    }>();
     const hw = body.data.find((h) => h.id === homeworkId);
     expect(hw).toBeDefined();
-    expect(hw.submissionStatus).toBe('REVIEWED');
-    expect(hw.marksObtained).toBe(95);
-    expect(hw.grade).toBe('A');
-    expect(hw.feedback).toContain('Excellent work!');
+    expect(hw?.submissionStatus).toBe('REVIEWED');
+    expect(hw?.marksObtained).toBe(95);
+    expect(hw?.grade).toBe('A');
+    expect(hw?.feedback).toContain('Excellent work!');
   });
 
   it('11. Parent Portal: Parent A views verified child homework & feedback', async () => {
@@ -537,12 +558,15 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.parentA.cookie}` },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: any[] }>();
+    const body = res.json<{
+      success: boolean;
+      data: Array<{ id: string; marksObtained: number; feedback: string }>;
+    }>();
     expect(body.success).toBe(true);
     expect(body.data.length).toBe(1);
-    expect(body.data[0].id).toBe(homeworkId);
-    expect(body.data[0].marksObtained).toBe(95);
-    expect(body.data[0].feedback).toContain('Excellent work!');
+    expect(body.data[0]!.id).toBe(homeworkId);
+    expect(body.data[0]!.marksObtained).toBe(95);
+    expect(body.data[0]!.feedback).toContain('Excellent work!');
   });
 
   it('12. Parent B cannot access Student 1 assignments (forbidden/not linked)', async () => {

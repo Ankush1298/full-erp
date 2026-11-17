@@ -87,16 +87,17 @@ beforeAll(async () => {
   studentId = T.students.one;
 
   // Set student date of birth to 20 years ago (adult student)
-  await adminQuery(
-    `UPDATE app.users SET date_of_birth = '2004-01-15' WHERE id = $1`,
-    [studentUserId],
-  );
+  await adminQuery(`UPDATE app.users SET date_of_birth = '2004-01-15' WHERE id = $1`, [
+    studentUserId,
+  ]);
 
   // Reset passwords
-  await adminQuery(
-    `UPDATE platform.identities SET password_hash = $1 WHERE id IN ($2, $3, $4)`,
-    [HASH, adminUserId, staffUserId, studentUserId],
-  );
+  await adminQuery(`UPDATE platform.identities SET password_hash = $1 WHERE id IN ($2, $3, $4)`, [
+    HASH,
+    adminUserId,
+    staffUserId,
+    studentUserId,
+  ]);
 
   // Create guardian
   guardianUserId = uuidv7();
@@ -182,7 +183,8 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
       });
 
       expect(r.statusCode).toBe(200);
-      const isa = r.json<{ data: { title: string; institution_type: string; status: string } }>().data;
+      const isa = r.json<{ data: { title: string; institution_type: string; status: string } }>()
+        .data;
       expect(isa.title).toBe('COLLEGE_PRINCIPAL');
       expect(isa.institution_type).toBe('COLLEGE');
       expect(isa.status).toBe('ACTIVE');
@@ -404,7 +406,9 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
         aad,
       ).toString('utf8');
       expect(decrypted).toBe(rawPlaintext);
-      expect(JSON.parse(decrypted).medicalCondition).toBe('Severe peanut allergy requiring EpiPen');
+      expect((JSON.parse(decrypted) as { medicalCondition: string }).medicalCondition).toBe(
+        'Severe peanut allergy requiring EpiPen',
+      );
     });
 
     it('detects tampering: corrupted ciphertext fails local decryption with authentication tag mismatch', () => {
@@ -438,9 +442,21 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
         payload: {
           vaultEpochId,
           custodians: [
-            { custodianName: 'Board of Trustees Chair', custodianRole: 'Institutional Oversight', shareIndex: 1 },
-            { custodianName: 'Senior Legal Counsel', custodianRole: 'Legal Custodian', shareIndex: 2 },
-            { custodianName: 'Institutional Registrar', custodianRole: 'Academic Operations', shareIndex: 3 },
+            {
+              custodianName: 'Board of Trustees Chair',
+              custodianRole: 'Institutional Oversight',
+              shareIndex: 1,
+            },
+            {
+              custodianName: 'Senior Legal Counsel',
+              custodianRole: 'Legal Custodian',
+              shareIndex: 2,
+            },
+            {
+              custodianName: 'Institutional Registrar',
+              custodianRole: 'Academic Operations',
+              shareIndex: 3,
+            },
           ],
         },
       });
@@ -465,7 +481,9 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
       });
 
       expect(r.statusCode).toBe(201);
-      const data = r.json<{ data: { ceremonyId: string; status: string; requiredShares: number } }>().data;
+      const data = r.json<{
+        data: { ceremonyId: string; status: string; requiredShares: number };
+      }>().data;
       expect(data.status).toBe('IN_PROGRESS');
       expect(data.requiredShares).toBe(2);
       ceremonyId = data.ceremonyId;
@@ -487,7 +505,9 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
       });
 
       expect(r.statusCode).toBe(200);
-      const data = r.json<{ data: { sharesPresented: number; isComplete: boolean; status: string } }>().data;
+      const data = r.json<{
+        data: { sharesPresented: number; isComplete: boolean; status: string };
+      }>().data;
       expect(data.sharesPresented).toBe(1);
       expect(data.isComplete).toBe(false);
       expect(data.status).toBe('IN_PROGRESS');
@@ -528,7 +548,9 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
       });
 
       expect(r.statusCode).toBe(200);
-      const data = r.json<{ data: { sharesPresented: number; isComplete: boolean; status: string } }>().data;
+      const data = r.json<{
+        data: { sharesPresented: number; isComplete: boolean; status: string };
+      }>().data;
       expect(data.sharesPresented).toBe(2);
       expect(data.isComplete).toBe(true);
       expect(data.status).toBe('COMPLETED');
@@ -556,7 +578,9 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
       });
 
       expect(r.statusCode).toBe(403);
-      expect(r.json<{ error: { code: string } }>().error.code).toBe('ADULT_STUDENT_PRIVACY_RESTRICTION');
+      expect(r.json<{ error: { code: string } }>().error.code).toBe(
+        'ADULT_STUDENT_PRIVACY_RESTRICTION',
+      );
     });
 
     it('allows adult student to grant explicit access consent to guardian', async () => {
@@ -614,7 +638,9 @@ describe('Anesa School Vault — Zero-Access Cryptographic Architecture & Univer
       });
 
       expect(r.statusCode).toBe(403);
-      expect(r.json<{ error: { code: string } }>().error.code).toBe('ADULT_STUDENT_PRIVACY_RESTRICTION');
+      expect(r.json<{ error: { code: string } }>().error.code).toBe(
+        'ADULT_STUDENT_PRIVACY_RESTRICTION',
+      );
     });
   });
 });

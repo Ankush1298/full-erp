@@ -26,11 +26,13 @@ export interface SystemMonitoringTelemetry {
     roundTripLatencyMs: number;
     latencyMs: number;
     serverVersion: string;
-    connections?: {
-      active: number;
-      idle: number;
-      total: number;
-    } | undefined;
+    connections?:
+      | {
+          active: number;
+          idle: number;
+          total: number;
+        }
+      | undefined;
   };
   backups: {
     status: 'FRESH' | 'WARNING' | 'STALE' | 'NONE';
@@ -71,10 +73,7 @@ export class MonitoringService {
 
   async collectTelemetry(): Promise<SystemMonitoringTelemetry> {
     const now = new Date();
-    const storageDir =
-      this.backupDir ||
-      process.env['BACKUP_STORAGE_DIR'] ||
-      path.resolve(process.cwd(), '.data/backups');
+    const storageDir = this.backupDir || path.resolve(process.cwd(), '.data/backups');
 
     // 1. API process metrics
     const mem = process.memoryUsage();
@@ -96,7 +95,6 @@ export class MonitoringService {
     let dbStatus: 'CONNECTED' | 'DISCONNECTED' = 'DISCONNECTED';
     let latencyMs = -1;
     let serverVersion = 'unknown';
-    let connections: { active: number; idle: number; total: number } | undefined;
     const recentHighRiskAlerts = 0;
 
     const dbStart = Date.now();
@@ -130,7 +128,7 @@ export class MonitoringService {
       for (const file of files) {
         try {
           const metaPath = path.join(storageDir, file);
-          const meta: BackupMetadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+          const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as BackupMetadata;
           metas.push(meta);
           totalSizeBytes += meta.integrity?.cipherSizeBytes || 0;
           if (meta.status === 'FAILED') failedBackupsCount++;
@@ -160,7 +158,7 @@ export class MonitoringService {
     }
 
     // 4. Real disk / storage capacity telemetry
-    let diskStatus: 'HEALTHY' | 'WARNING' | 'CRITICAL' = 'HEALTHY';
+    let diskStatus: 'HEALTHY' | 'WARNING' | 'CRITICAL';
     let totalBytes = 0;
     let availableBytes = 0;
     let usedBytes = 0;
@@ -210,7 +208,7 @@ export class MonitoringService {
         roundTripLatencyMs: latencyMs,
         latencyMs,
         serverVersion,
-        connections,
+        connections: undefined,
       },
       backups: {
         status: backupStatus,

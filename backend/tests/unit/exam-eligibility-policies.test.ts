@@ -43,8 +43,20 @@ describe('Examination Eligibility & Governance Schemas', () => {
       },
       assessment_rules: {
         components: [
-          { name: 'Theory Paper', component_type: 'THEORY', max_marks: 70, pass_marks: 28, weight_percentage: 70 },
-          { name: 'Practical Assessment', component_type: 'PRACTICAL', max_marks: 30, pass_marks: 12, weight_percentage: 30 },
+          {
+            name: 'Theory Paper',
+            component_type: 'THEORY',
+            max_marks: 70,
+            pass_marks: 28,
+            weight_percentage: 70,
+          },
+          {
+            name: 'Practical Assessment',
+            component_type: 'PRACTICAL',
+            max_marks: 30,
+            pass_marks: 12,
+            weight_percentage: 30,
+          },
         ],
         allow_grace_marks: true,
         max_grace_marks: 5,
@@ -52,10 +64,38 @@ describe('Examination Eligibility & Governance Schemas', () => {
       grading_rules: {
         grading_system: 'LETTER_GRADE',
         grade_scale: [
-          { grade: 'A+', min_percentage: 90, max_percentage: 100, grade_point: 10, description: 'Outstanding', is_passing: true },
-          { grade: 'A', min_percentage: 80, max_percentage: 89.99, grade_point: 9, description: 'Excellent', is_passing: true },
-          { grade: 'B', min_percentage: 60, max_percentage: 79.99, grade_point: 7, description: 'Good', is_passing: true },
-          { grade: 'F', min_percentage: 0, max_percentage: 59.99, grade_point: 0, description: 'Fail', is_passing: false },
+          {
+            grade: 'A+',
+            min_percentage: 90,
+            max_percentage: 100,
+            grade_point: 10,
+            description: 'Outstanding',
+            is_passing: true,
+          },
+          {
+            grade: 'A',
+            min_percentage: 80,
+            max_percentage: 89.99,
+            grade_point: 9,
+            description: 'Excellent',
+            is_passing: true,
+          },
+          {
+            grade: 'B',
+            min_percentage: 60,
+            max_percentage: 79.99,
+            grade_point: 7,
+            description: 'Good',
+            is_passing: true,
+          },
+          {
+            grade: 'F',
+            min_percentage: 0,
+            max_percentage: 59.99,
+            grade_point: 0,
+            description: 'Fail',
+            is_passing: false,
+          },
         ],
       },
       approval_rules: {

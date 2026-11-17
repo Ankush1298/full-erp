@@ -214,7 +214,8 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
       });
 
       expect(r.statusCode).toBe(201);
-      const data = r.json<{ data: { id: string; deviceNumber: number; deviceType: string } }>().data;
+      const data = r.json<{ data: { id: string; deviceNumber: number; deviceType: string } }>()
+        .data;
       expect(data.deviceNumber).toBe(1);
       expect(data.deviceType).toBe('SECURITY_KEY');
       teacherDeviceId = data.id;
@@ -254,13 +255,18 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
       });
 
       expect(verRes.statusCode).toBe(200);
-      const verData = verRes.json<{ data: { verified: boolean; deviceType: string; userPresenceVerified: boolean } }>().data;
+      const verData = verRes.json<{
+        data: { verified: boolean; deviceType: string; userPresenceVerified: boolean };
+      }>().data;
       expect(verData.verified).toBe(true);
       expect(verData.userPresenceVerified).toBe(true);
     });
 
     it('strictly rejects forged or tampered challenge signature', async () => {
-      const forgedSignature = signChallenge(teacherDeviceSigning.privateKeyPkcs8, 'forged-challenge-string');
+      const forgedSignature = signChallenge(
+        teacherDeviceSigning.privateKeyPkcs8,
+        'forged-challenge-string',
+      );
 
       const verRes = await app.inject({
         method: 'POST',
@@ -276,7 +282,9 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
       });
 
       expect(verRes.statusCode).toBe(401);
-      expect(verRes.json<{ error: { code: string } }>().error.code).toBe('DEVICE_SIGNATURE_INVALID');
+      expect(verRes.json<{ error: { code: string } }>().error.code).toBe(
+        'DEVICE_SIGNATURE_INVALID',
+      );
     });
 
     it('enrolls Principal platform authenticator (Touch ID / Windows Hello)', async () => {
@@ -413,7 +421,10 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
       expect(tgRes.statusCode).toBe(201);
 
       // 3. Wrap CWK for Principal device via ECDH
-      const principalWrapped = wrapKeyForDevice(cwkAcademicsMarks, principalDeviceEcdh.publicKeyBase64);
+      const principalWrapped = wrapKeyForDevice(
+        cwkAcademicsMarks,
+        principalDeviceEcdh.publicKeyBase64,
+      );
       const pgRes = await app.inject({
         method: 'POST',
         url: '/api/v1/vault/grants/issue',
@@ -446,7 +457,15 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         },
       });
       expect(grantsRes.statusCode).toBe(200);
-      const grant = grantsRes.json<{ data: Array<{ capabilityKeyName: string; wrappedCapabilityKey: string; ephemeralPublicKey: string; iv: string; tag: string }> }>().data[0]!;
+      const grant = grantsRes.json<{
+        data: Array<{
+          capabilityKeyName: string;
+          wrappedCapabilityKey: string;
+          ephemeralPublicKey: string;
+          iv: string;
+          tag: string;
+        }>;
+      }>().data[0]!;
       expect(grant.capabilityKeyName).toBe('CWK_ACADEMICS_MARKS');
 
       // 2. Unwraps CWK locally using Teacher device private key
@@ -536,7 +555,15 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
           cookie: `session_token=${s.principal.cookie}`,
         },
       });
-      const grant = grantsRes.json<{ data: Array<{ capabilityKeyName: string; wrappedCapabilityKey: string; ephemeralPublicKey: string; iv: string; tag: string }> }>().data[0]!;
+      const grant = grantsRes.json<{
+        data: Array<{
+          capabilityKeyName: string;
+          wrappedCapabilityKey: string;
+          ephemeralPublicKey: string;
+          iv: string;
+          tag: string;
+        }>;
+      }>().data[0]!;
 
       // 2. Unwraps CWK locally using Principal device private key
       const principalCwk = unwrapKeyWithDevice(
@@ -559,7 +586,8 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         },
       });
       expect(getRes.statusCode).toBe(200);
-      const envelope = getRes.json<{ data: { ciphertext: string; iv: string; authTag: string } }>().data;
+      const envelope = getRes.json<{ data: { ciphertext: string; iv: string; authTag: string } }>()
+        .data;
 
       // 4. Principal decrypts locally
       const aadV1 = buildAad({
@@ -574,12 +602,16 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         principalCwk,
         aadV1,
       );
-      const decryptedMarks = JSON.parse(decryptedPlaintext.toString('utf8'));
+      const decryptedMarks = JSON.parse(decryptedPlaintext.toString('utf8')) as {
+        theoryObtained: number;
+        totalObtained: number;
+        [key: string]: unknown;
+      };
       expect(decryptedMarks.theoryObtained).toBe(45);
       expect(decryptedMarks.totalObtained).toBe(80);
 
       // 5. Principal performs authorized correction (paper re-evaluation: Theory 45 -> 50)
-      const correctedMarks = {
+      const correctedMarks: Record<string, unknown> = {
         ...decryptedMarks,
         theoryObtained: 50,
         totalObtained: 85,
@@ -655,7 +687,11 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
           custodians: [
             { shareIndex: 1, custodianName: 'Dr. Ramesh Gupta', custodianRole: 'College Chairman' },
             { shareIndex: 2, custodianName: 'Adv. Priya Nair', custodianRole: 'Legal Trustee' },
-            { shareIndex: 3, custodianName: 'External Auditor Ernst', custodianRole: 'Statutory Auditor' },
+            {
+              shareIndex: 3,
+              custodianName: 'External Auditor Ernst',
+              custodianRole: 'Statutory Auditor',
+            },
           ],
         },
       });
@@ -730,7 +766,9 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         },
       });
       expect(s1Res.statusCode).toBe(200);
-      expect(s1Res.json<{ data: { isComplete: boolean; status: string } }>().data.status).toBe('IN_PROGRESS');
+      expect(s1Res.json<{ data: { isComplete: boolean; status: string } }>().data.status).toBe(
+        'IN_PROGRESS',
+      );
 
       // 3. Custodian 2 (Legal Trustee) presents Share 2
       const share2 = smekShares[1]!;
@@ -748,7 +786,9 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         },
       });
       expect(s2Res.statusCode).toBe(200);
-      expect(s2Res.json<{ data: { isComplete: boolean; status: string } }>().data.status).toBe('COMPLETED');
+      expect(s2Res.json<{ data: { isComplete: boolean; status: string } }>().data.status).toBe(
+        'COMPLETED',
+      );
 
       // 4. Client-side reconstruction of SMEK from Share 1 + Share 2
       const reconstructedSmek = reconstructSecret([share1, share2]);
@@ -792,7 +832,9 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         },
       });
       expect(adultCheck.statusCode).toBe(403);
-      expect(adultCheck.json<{ error: { code: string } }>().error.code).toBe('ADULT_STUDENT_PRIVACY_RESTRICTION');
+      expect(adultCheck.json<{ error: { code: string } }>().error.code).toBe(
+        'ADULT_STUDENT_PRIVACY_RESTRICTION',
+      );
     });
 
     it('allows adult student to grant explicit access consent to guardian', async () => {
@@ -822,7 +864,9 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         },
       });
       expect(permittedCheck.statusCode).toBe(200);
-      expect(permittedCheck.json<{ data: { child: { studentId: string } } }>().data.child.studentId).toBe(adultStudentId);
+      expect(
+        permittedCheck.json<{ data: { child: { studentId: string } } }>().data.child.studentId,
+      ).toBe(adultStudentId);
     });
 
     it('immediately re-blocks Guardian access when adult student revokes consent', async () => {
@@ -845,7 +889,9 @@ describe('Anesa School Vault — End-to-End Operational Workflow & Recovery Veri
         },
       });
       expect(blockedCheck.statusCode).toBe(403);
-      expect(blockedCheck.json<{ error: { code: string } }>().error.code).toBe('ADULT_STUDENT_PRIVACY_RESTRICTION');
+      expect(blockedCheck.json<{ error: { code: string } }>().error.code).toBe(
+        'ADULT_STUDENT_PRIVACY_RESTRICTION',
+      );
     });
   });
 });

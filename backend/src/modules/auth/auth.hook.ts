@@ -60,7 +60,11 @@ interface RouteModuleMapping {
 const ROUTE_TO_MODULE_MAP: readonly RouteModuleMapping[] = [
   { prefix: '/api/v1/academics', moduleKey: 'academics', name: 'Academics & Cohort Management' },
   { prefix: '/api/v1/attendance', moduleKey: 'attendance', name: 'Attendance & Class Tracking' },
-  { prefix: '/api/v1/examinations', moduleKey: 'examinations', name: 'Examinations, Marks & Report Cards' },
+  {
+    prefix: '/api/v1/examinations',
+    moduleKey: 'examinations',
+    name: 'Examinations, Marks & Report Cards',
+  },
   { prefix: '/api/v1/homework', moduleKey: 'homework', name: 'Homework & Assignment Workflow' },
   { prefix: '/api/v1/finance', moduleKey: 'finance', name: 'Fees & Finance Ledger' },
   { prefix: '/api/v1/parent', moduleKey: 'parent_portal', name: 'Parent / Guardian Portal' },
@@ -69,8 +73,16 @@ const ROUTE_TO_MODULE_MAP: readonly RouteModuleMapping[] = [
   { prefix: '/api/v1/reporting', moduleKey: 'reports', name: 'Institutional Analytics & Reports' },
   { prefix: '/api/v1/students/imports', moduleKey: 'imports', name: 'Bulk Data Imports' },
   { prefix: '/api/v1/faculty/imports', moduleKey: 'imports', name: 'Bulk Data Imports' },
-  { prefix: '/api/v1/consent', moduleKey: 'consents', name: 'Institutional Consent & Policy Management' },
-  { prefix: '/api/v1/notifications', moduleKey: 'notifications', name: 'Omnichannel Notifications & Dispatch' },
+  {
+    prefix: '/api/v1/consent',
+    moduleKey: 'consents',
+    name: 'Institutional Consent & Policy Management',
+  },
+  {
+    prefix: '/api/v1/notifications',
+    moduleKey: 'notifications',
+    name: 'Omnichannel Notifications & Dispatch',
+  },
 ];
 
 /**
@@ -208,16 +220,26 @@ const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, opts) => {
           [ctx.tenantId],
         );
         if (entRes.rows[0]?.value) {
-          const val = entRes.rows[0].value as any;
+          const val = entRes.rows[0].value as {
+            modules?:
+              | Array<{ key: string; enabled?: boolean }>
+              | Record<string, { enabled?: boolean } | boolean>;
+          };
           let enabled = true;
           if (Array.isArray(val.modules)) {
-            const found = val.modules.find((m: any) => m.key === matchedModule.moduleKey);
+            const found = val.modules.find((m) => m.key === matchedModule.moduleKey);
             if (found && found.enabled === false) {
               enabled = false;
             }
           } else if (val.modules && typeof val.modules === 'object') {
-            const found = val.modules[matchedModule.moduleKey];
-            if (found && (found.enabled === false || found === false)) {
+            const modulesRecord = val.modules as Record<string, unknown>;
+            const found = modulesRecord[matchedModule.moduleKey];
+            if (
+              found === false ||
+              (typeof found === 'object' &&
+                found !== null &&
+                (found as { enabled?: boolean }).enabled === false)
+            ) {
               enabled = false;
             }
           }

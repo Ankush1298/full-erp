@@ -1,12 +1,7 @@
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import { AppError, resourceNotFound } from '../../src/shared/errors/http-errors.js';
 import { assertDisposableTestDatabase } from '../../src/shared/database/test-guard.js';
-import {
-  createTenant,
-  grantAuthority,
-  seedTenant,
-  suspendTenant,
-} from './platform-cli.js';
+import { createTenant, grantAuthority, seedTenant, suspendTenant } from './platform-cli.js';
 import { ERP_MODULE_CATALOG } from './module-registry.js';
 import type {
   CreateInstitutionInput,
@@ -14,6 +9,7 @@ import type {
   InstitutionListItem,
   ListInstitutionsQuery,
   ModuleEntitlementItem,
+  ModuleKey,
   PlanBundle,
   ReconcileRolesInput,
   SetEntitlementsInput,
@@ -23,12 +19,18 @@ import type {
 } from './platform.schemas.js';
 
 export interface PlatformDbExecutor {
-  query: <T = any>(sql: string, params?: unknown[]) => Promise<{ rows: T[]; rowCount: number | null }>;
+  query: <T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ) => Promise<{ rows: T[]; rowCount: number | null }>;
 }
 
 export interface PlatformDb {
   withSystem: <T>(work: (tx: PlatformDbExecutor) => Promise<T>) => Promise<T>;
-  query?: <T = any>(sql: string, params?: unknown[]) => Promise<{ rows: T[]; rowCount: number | null }>;
+  query?: <T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ) => Promise<{ rows: T[]; rowCount: number | null }>;
 }
 
 export class PlatformService {
@@ -158,7 +160,7 @@ export class PlatformService {
         actorType: string;
         organizationName?: string;
         reasonText?: string;
-      }> = [];
+      }>;
 
       try {
         const auditRes = await tx.query<{
@@ -195,8 +197,8 @@ export class PlatformService {
       }
 
       // 5. Real fleet counts across students and users
-      let totalStudents = 0;
-      let totalUsers = 0;
+      let totalStudents: number;
+      let totalUsers: number;
       try {
         const countsRes = await tx.query<{ students: string; users: string }>(`
           SELECT
@@ -211,7 +213,7 @@ export class PlatformService {
       }
 
       // 6. Top real audit activities
-      let topActivities: Array<{ action: string; count: number }> = [];
+      let topActivities: Array<{ action: string; count: number }>;
       try {
         const activityRes = await tx.query<{ action: string; count: string }>(`
           SELECT action, COUNT(*)::text as count
@@ -384,7 +386,9 @@ export class PlatformService {
         code: string;
         status: string;
         timezone: string;
-      }>('SELECT id, name, code, status, timezone FROM app.campuses WHERE organization_id = $1', [org.id]);
+      }>('SELECT id, name, code, status, timezone FROM app.campuses WHERE organization_id = $1', [
+        org.id,
+      ]);
 
       // Subscription
       const subRes = await tx.query<{ value: unknown }>(
@@ -395,7 +399,7 @@ export class PlatformService {
         planId: 'plan_standard_school',
         planName: `${org.institution_type} Complete Plan`,
         billingCycle: 'ANNUAL',
-        status: (org.status as any) === 'ACTIVE' ? 'ACTIVE' : 'TRIAL',
+        status: org.status === 'ACTIVE' ? 'ACTIVE' : 'TRIAL',
         priceInr: 150000,
         startsAt: org.created_at.toISOString(),
         expiresAt: new Date(new Date(org.created_at).getTime() + 365 * 86400000).toISOString(),
@@ -410,7 +414,10 @@ export class PlatformService {
       );
       const entitlementsRecord = (entRes.rows[0]?.value as {
         planBundle?: PlanBundle;
-        modules?: Record<string, { enabled?: boolean; isTrial?: boolean; startsAt?: string; expiresAt?: string }>;
+        modules?: Record<
+          string,
+          { enabled?: boolean; isTrial?: boolean; startsAt?: string; expiresAt?: string }
+        >;
       }) ?? {
         planBundle: 'COMPLETE_ERP',
         modules: {},
@@ -420,7 +427,7 @@ export class PlatformService {
       const modules: ModuleEntitlementItem[] = ERP_MODULE_CATALOG.map((mod) => {
         const stored = entitlementsRecord.modules?.[mod.key];
         return {
-          key: mod.key as any,
+          key: mod.key as ModuleKey,
           name: mod.name,
           category: mod.category,
           description: mod.description,
@@ -451,7 +458,8 @@ export class PlatformService {
         name: string;
         is_system: boolean;
         permission_count: string;
-      }>(`
+      }>(
+        `
         SELECT r.id, r.code, r.name, true as is_system,
                COUNT(rp.permission_code)::text as permission_count
           FROM app.roles r
@@ -459,19 +467,24 @@ export class PlatformService {
          WHERE r.organization_id = $1
          GROUP BY r.id, r.code, r.name
          ORDER BY r.code ASC
-      `, [org.id]);
+      `,
+        [org.id],
+      );
 
       // Real student, user, and employee counts for this institution
-      let studentsCount = 0;
-      let usersCount = 0;
-      let facultyCount = 0;
+      let studentsCount: number;
+      let usersCount: number;
+      let facultyCount: number;
       try {
-        const countsRes = await tx.query<{ students: string; users: string; faculty: string }>(`
+        const countsRes = await tx.query<{ students: string; users: string; faculty: string }>(
+          `
           SELECT
             (SELECT COUNT(*)::text FROM app.students WHERE organization_id = $1) as students,
             (SELECT COUNT(*)::text FROM app.users WHERE organization_id = $1) as users,
             (SELECT COUNT(*)::text FROM app.employees WHERE organization_id = $1) as faculty
-        `, [org.id]);
+        `,
+          [org.id],
+        );
         studentsCount = parseInt(countsRes.rows[0]?.students ?? '0', 10);
         usersCount = parseInt(countsRes.rows[0]?.users ?? '0', 10);
         facultyCount = parseInt(countsRes.rows[0]?.faculty ?? '0', 10);
@@ -517,7 +530,10 @@ export class PlatformService {
    * Creates and provisions a new tenant organization with canonical multi-tier role matrix,
    * subscription plan, and default module entitlements.
    */
-  async createInstitution(input: CreateInstitutionInput, operatorEmail: string = 'operator@anesa.internal') {
+  async createInstitution(
+    input: CreateInstitutionInput,
+    operatorEmail: string = 'operator@anesa.internal',
+  ) {
     return this.db.withSystem(async (tx) => {
       await this.assertMutationAllowed(tx, 'createInstitution');
 
@@ -546,7 +562,12 @@ export class PlatformService {
         planName: `${input.institutionType} Standard Annual Plan`,
         billingCycle: 'ANNUAL',
         status: 'ACTIVE',
-        priceInr: input.institutionType === 'SCHOOL' ? 120000 : input.institutionType === 'COLLEGE' ? 250000 : 500000,
+        priceInr:
+          input.institutionType === 'SCHOOL'
+            ? 120000
+            : input.institutionType === 'COLLEGE'
+              ? 250000
+              : 500000,
         startsAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
         maxStudents: 5000,
@@ -555,7 +576,10 @@ export class PlatformService {
       };
 
       // 3. Set default feature entitlements
-      const initialModules: Record<string, { enabled: boolean; isTrial: boolean; startsAt: string }> = {};
+      const initialModules: Record<
+        string,
+        { enabled: boolean; isTrial: boolean; startsAt: string }
+      > = {};
       for (const mod of ERP_MODULE_CATALOG) {
         initialModules[mod.key] = {
           enabled: true,
@@ -603,17 +627,24 @@ export class PlatformService {
 
       // 4. Audit platform tenant creation
       try {
-        await tx.query(`
+        await tx.query(
+          `
           INSERT INTO app.audit_events (
             id, organization_id, occurred_at, actor_type, action,
             resource_type, resource_id, risk_tier, reason_text, metadata
           ) VALUES ($1, $2, now(), 'SYSTEM', 'platform.tenant.create', 'organization', $2, 2, $3, $4)
-        `, [
-          uuidv7(),
-          tenant.id,
-          `Provisioned by Platform Operator (${operatorEmail})`,
-          JSON.stringify({ slug: input.slug, type: input.institutionType, adminEmail: input.adminEmail }),
-        ]);
+        `,
+          [
+            uuidv7(),
+            tenant.id,
+            `Provisioned by Platform Operator (${operatorEmail})`,
+            JSON.stringify({
+              slug: input.slug,
+              type: input.institutionType,
+              adminEmail: input.adminEmail,
+            }),
+          ],
+        );
       } catch {
         // Audit insert error shouldn't crash tenant provisioning
       }
@@ -625,7 +656,11 @@ export class PlatformService {
   /**
    * Updates organization details, branding, or status.
    */
-  async updateInstitution(orgId: string, input: UpdateInstitutionInput, operatorEmail: string = 'operator@anesa.internal') {
+  async updateInstitution(
+    orgId: string,
+    input: UpdateInstitutionInput,
+    operatorEmail: string = 'operator@anesa.internal',
+  ) {
     return this.db.withSystem(async (tx) => {
       await this.assertMutationAllowed(tx, 'updateInstitution');
 
@@ -647,26 +682,29 @@ export class PlatformService {
         if (input.status === 'SUSPENDED') {
           await suspendTenant(tx, org.id, input.reason);
         } else {
-          await tx.query('UPDATE app.organizations SET status = $1, updated_at = now() WHERE id = $2', [
-            input.status,
-            org.id,
-          ]);
+          await tx.query(
+            'UPDATE app.organizations SET status = $1, updated_at = now() WHERE id = $2',
+            [input.status, org.id],
+          );
         }
       }
 
       // Audit organization update / status transition
       try {
-        await tx.query(`
+        await tx.query(
+          `
           INSERT INTO app.audit_events (
             id, organization_id, occurred_at, actor_type, action,
             resource_type, resource_id, risk_tier, reason_text, metadata
           ) VALUES ($1, $2, now(), 'SYSTEM', 'platform.institution.update', 'organizations', $2, 2, $3, $4)
-        `, [
-          uuidv7(),
-          org.id,
-          input.reason || `Organization updated by ${operatorEmail}`,
-          JSON.stringify({ status: input.status, name: input.name }),
-        ]);
+        `,
+          [
+            uuidv7(),
+            org.id,
+            input.reason || `Organization updated by ${operatorEmail}`,
+            JSON.stringify({ status: input.status, name: input.name }),
+          ],
+        );
       } catch {
         // Quiet
       }
@@ -693,11 +731,14 @@ export class PlatformService {
           updatedBy: operatorEmail,
         };
 
-        await tx.query(`
+        await tx.query(
+          `
           INSERT INTO app.organization_settings (organization_id, key, value, updated_by, version)
           VALUES ($1, 'institution.configuration', $2, $3, 1)
           ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
-        `, [org.id, JSON.stringify(updated), updaterId]);
+        `,
+          [org.id, JSON.stringify(updated), updaterId],
+        );
       }
 
       return { success: true, id: org.id };
@@ -707,7 +748,11 @@ export class PlatformService {
   /**
    * Updates feature entitlements for an institution with dependency validation.
    */
-  async setEntitlements(orgId: string, input: SetEntitlementsInput, operatorEmail: string = 'operator@anesa.internal') {
+  async setEntitlements(
+    orgId: string,
+    input: SetEntitlementsInput,
+    operatorEmail: string = 'operator@anesa.internal',
+  ) {
     return this.db.withSystem(async (tx) => {
       await this.assertMutationAllowed(tx, 'setEntitlements');
 
@@ -718,10 +763,22 @@ export class PlatformService {
       const org = orgRes.rows[0];
       if (!org) throw resourceNotFound();
 
-      const modulesMap: Record<string, { enabled?: boolean; isTrial?: boolean; startsAt?: string; expiresAt?: string }> =
-        Array.isArray(input.modules)
-          ? Object.fromEntries((input.modules as any[]).map((m) => [m.key, m]))
-          : input.modules;
+      const modulesMap: Record<
+        string,
+        { enabled?: boolean; isTrial?: boolean; startsAt?: string; expiresAt?: string }
+      > = Array.isArray(input.modules)
+        ? Object.fromEntries(
+            (
+              input.modules as Array<{
+                key: string;
+                enabled?: boolean;
+                isTrial?: boolean;
+                startsAt?: string;
+                expiresAt?: string;
+              }>
+            ).map((m) => [m.key, m]),
+          )
+        : input.modules;
 
       // Validate dependencies: if a module is enabled, all its dependencies must also be enabled
       for (const [modKey, modConfig] of Object.entries(modulesMap)) {
@@ -756,25 +813,34 @@ export class PlatformService {
         updatedBy: operatorEmail,
       };
 
-      await tx.query(`
+      await tx.query(
+        `
         INSERT INTO app.organization_settings (organization_id, key, value, updated_by, version)
         VALUES ($1, 'feature.entitlements', $2, $3, 1)
         ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
-      `, [org.id, JSON.stringify(payload), updaterId]);
+      `,
+        [org.id, JSON.stringify(payload), updaterId],
+      );
 
       // Audit entitlement modification
       try {
-        await tx.query(`
+        await tx.query(
+          `
           INSERT INTO app.audit_events (
             id, organization_id, occurred_at, actor_type, action,
             resource_type, resource_id, risk_tier, reason_text, metadata
           ) VALUES ($1, $2, now(), 'SYSTEM', 'platform.entitlements.update', 'organization_settings', $2, 2, $3, $4)
-        `, [
-          uuidv7(),
-          org.id,
-          input.reason || `Entitlements modified by ${operatorEmail}`,
-          JSON.stringify({ planBundle: input.planBundle, updatedModules: Object.keys(input.modules) }),
-        ]);
+        `,
+          [
+            uuidv7(),
+            org.id,
+            input.reason || `Entitlements modified by ${operatorEmail}`,
+            JSON.stringify({
+              planBundle: input.planBundle,
+              updatedModules: Object.keys(input.modules),
+            }),
+          ],
+        );
       } catch {
         // Log quietly
       }
@@ -786,7 +852,11 @@ export class PlatformService {
   /**
    * Updates subscription configuration and billing plan for an institution.
    */
-  async setSubscription(orgId: string, input: SetSubscriptionInput, operatorEmail: string = 'operator@anesa.internal') {
+  async setSubscription(
+    orgId: string,
+    input: SetSubscriptionInput,
+    operatorEmail: string = 'operator@anesa.internal',
+  ) {
     return this.db.withSystem(async (tx) => {
       await this.assertMutationAllowed(tx, 'setSubscription');
 
@@ -816,25 +886,31 @@ export class PlatformService {
         ...(input.notes ? { notes: input.notes } : {}),
       };
 
-      await tx.query(`
+      await tx.query(
+        `
         INSERT INTO app.organization_settings (organization_id, key, value, updated_by, version)
         VALUES ($1, 'subscription.plan', $2, $3, 1)
         ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
-      `, [org.id, JSON.stringify(payload), updaterId]);
+      `,
+        [org.id, JSON.stringify(payload), updaterId],
+      );
 
       // Audit subscription change
       try {
-        await tx.query(`
+        await tx.query(
+          `
           INSERT INTO app.audit_events (
             id, organization_id, occurred_at, actor_type, action,
             resource_type, resource_id, risk_tier, reason_text, metadata
           ) VALUES ($1, $2, now(), 'SYSTEM', 'platform.subscription.update', 'organization_settings', $2, 2, $3, $4)
-        `, [
-          uuidv7(),
-          org.id,
-          input.reason || `Subscription updated by ${operatorEmail}`,
-          JSON.stringify(payload),
-        ]);
+        `,
+          [
+            uuidv7(),
+            org.id,
+            input.reason || `Subscription updated by ${operatorEmail}`,
+            JSON.stringify(payload),
+          ],
+        );
       } catch {
         // Quiet
       }
@@ -846,7 +922,11 @@ export class PlatformService {
   /**
    * Reconciles institution roles and permissions without deleting custom grants.
    */
-  async reconcileRoles(orgId: string, input: ReconcileRolesInput, operatorEmail: string = 'operator@anesa.internal') {
+  async reconcileRoles(
+    orgId: string,
+    input: ReconcileRolesInput,
+    operatorEmail: string = 'operator@anesa.internal',
+  ) {
     return this.db.withSystem(async (tx) => {
       await this.assertMutationAllowed(tx, 'reconcileRoles');
 
@@ -866,17 +946,20 @@ export class PlatformService {
 
       if (!isDryRun) {
         try {
-          await tx.query(`
+          await tx.query(
+            `
             INSERT INTO app.audit_events (
               id, organization_id, occurred_at, actor_type, action,
               resource_type, resource_id, risk_tier, reason_text, metadata
             ) VALUES ($1, $2, now(), 'SYSTEM', 'platform.roles.reconcile', 'roles', $2, 2, $3, $4)
-          `, [
-            uuidv7(),
-            org.id,
-            `Roles reconciled by ${operatorEmail}`,
-            JSON.stringify({ allowCritical: input.allowCritical }),
-          ]);
+          `,
+            [
+              uuidv7(),
+              org.id,
+              `Roles reconciled by ${operatorEmail}`,
+              JSON.stringify({ allowCritical: input.allowCritical }),
+            ],
+          );
         } catch {
           // Quiet
         }
@@ -899,7 +982,11 @@ export class PlatformService {
   /**
    * Grants critical authority (SECURITY_AUTHORITY or FINANCIAL_GATEWAY_AUTHORITY) with mandatory audit proof.
    */
-  async grantCriticalAuthority(orgId: string, input: GrantAuthorityInput, operatorEmail: string = 'operator@anesa.internal') {
+  async grantCriticalAuthority(
+    orgId: string,
+    input: GrantAuthorityInput,
+    operatorEmail: string = 'operator@anesa.internal',
+  ) {
     return this.db.withSystem(async (tx) => {
       await this.assertMutationAllowed(tx, 'grantCriticalAuthority');
 
@@ -919,17 +1006,24 @@ export class PlatformService {
       });
 
       try {
-        await tx.query(`
+        await tx.query(
+          `
           INSERT INTO app.audit_events (
             id, organization_id, occurred_at, actor_type, action,
             resource_type, resource_id, risk_tier, reason_text, metadata
           ) VALUES ($1, $2, now(), 'SYSTEM', 'platform.authority.grant', 'roles', $2, 3, $3, $4)
-        `, [
-          uuidv7(),
-          org.id,
-          input.justification,
-          JSON.stringify({ authority: input.authority, approvedBy: input.approvedBy, operator: operatorEmail }),
-        ]);
+        `,
+          [
+            uuidv7(),
+            org.id,
+            input.justification,
+            JSON.stringify({
+              authority: input.authority,
+              approvedBy: input.approvedBy,
+              operator: operatorEmail,
+            }),
+          ],
+        );
       } catch {
         // Quiet
       }
@@ -959,14 +1053,17 @@ export class PlatformService {
         reason_text: string | null;
         org_name: string | null;
         metadata: unknown;
-      }>(`
+      }>(
+        `
         SELECT a.id, a.occurred_at, a.action, a.resource_type, a.risk_tier, a.actor_type,
                a.reason_text, o.name as org_name, a.metadata
           FROM app.audit_events a
           LEFT JOIN app.organizations o ON o.id = a.organization_id
          ORDER BY a.occurred_at DESC
          LIMIT $1
-      `, [limit]);
+      `,
+        [limit],
+      );
 
       return res.rows.map((r) => ({
         id: r.id,

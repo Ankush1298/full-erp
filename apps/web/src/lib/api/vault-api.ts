@@ -62,7 +62,9 @@ export const RecoveryCeremonyDtoSchema = z.object({
 });
 export type RecoveryCeremonyDto = z.infer<typeof RecoveryCeremonyDtoSchema>;
 
-export async function fetchSecurityAuthority(client: ApiClient): Promise<SecurityAuthorityDto | null> {
+export async function fetchSecurityAuthority(
+  client: ApiClient,
+): Promise<SecurityAuthorityDto | null> {
   const res = await client.get('/v1/vault/authority', {
     schema: z.object({
       success: z.boolean(),

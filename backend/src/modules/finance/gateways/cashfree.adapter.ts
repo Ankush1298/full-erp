@@ -152,7 +152,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
         amount: amountPaise,
         currency: successPayment.payment_currency || 'INR',
         paymentMethod: 'ONLINE_CASHFREE',
-        rawResponse: successPayment as Record<string, unknown>,
+        rawResponse: successPayment,
       };
     }
 
@@ -164,7 +164,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
       amount: Math.round(Number(latest.order_amount) * 100),
       currency: latest.payment_currency || 'INR',
       failureReason: latest.payment_message || `Payment status: ${latest.payment_status}`,
-      rawResponse: latest as Record<string, unknown>,
+      rawResponse: latest,
     };
   }
 
@@ -172,10 +172,12 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
     config: GatewayConfig,
     params: WebhookVerificationParams,
   ): Promise<WebhookProcessResult> {
+    await Promise.resolve();
     const signature =
       params.headers['x-webhook-signature'] || params.headers['X-Webhook-Signature'];
-    const timestamp =
+    const rawTimestamp =
       params.headers['x-webhook-timestamp'] || params.headers['X-Webhook-Timestamp'];
+    const timestamp = Array.isArray(rawTimestamp) ? rawTimestamp[0] : rawTimestamp;
 
     if (!signature || typeof signature !== 'string') {
       return {
@@ -225,7 +227,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
     };
 
     try {
-      payload = JSON.parse(rawString);
+      payload = JSON.parse(rawString) as typeof payload;
     } catch {
       return {
         isValid: false,
@@ -255,7 +257,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
         gatewayPaymentRef,
         status: 'SUCCESS',
         amount,
-        rawEvent: payload as Record<string, unknown>,
+        rawEvent: payload,
       };
     }
 
@@ -269,7 +271,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
         status: 'FAILED',
         amount,
         failureReason: payment?.payment_message || 'Payment failed',
-        rawEvent: payload as Record<string, unknown>,
+        rawEvent: payload,
       };
     }
 
@@ -282,7 +284,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
         gatewayPaymentRef,
         status: 'FAILED',
         failureReason: 'User dropped checkout session',
-        rawEvent: payload as Record<string, unknown>,
+        rawEvent: payload,
       };
     }
 
@@ -295,7 +297,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
         gatewayPaymentRef: refund?.cf_refund_id ? String(refund.cf_refund_id) : undefined,
         status: 'REFUNDED',
         amount: refund?.refund_amount ? Math.round(Number(refund.refund_amount) * 100) : undefined,
-        rawEvent: payload as Record<string, unknown>,
+        rawEvent: payload,
       };
     }
 
@@ -303,7 +305,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
       isValid: true,
       eventType: type,
       status: 'IGNORED',
-      rawEvent: payload as Record<string, unknown>,
+      rawEvent: payload,
     };
   }
 
@@ -345,7 +347,7 @@ export class CashfreeAdapter implements IPaymentGatewayAdapter {
       success: true,
       gatewayRefundRef: String(data.cf_refund_id || refundId),
       status: data.refund_status === 'SUCCESS' ? 'SUCCESS' : 'PENDING',
-      rawResponse: data as Record<string, unknown>,
+      rawResponse: data,
     };
   }
 

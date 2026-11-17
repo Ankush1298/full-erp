@@ -144,7 +144,11 @@ describe('Vault Cryptographic Primitives', () => {
       const challenge = generateChallenge();
 
       const signature = signChallenge(privateKeyPkcs8, challenge);
-      const isForgedValid = verifyDeviceSignature(publicKeySpki, 'different-challenge-12345', signature);
+      const isForgedValid = verifyDeviceSignature(
+        publicKeySpki,
+        'different-challenge-12345',
+        signature,
+      );
       expect(isForgedValid).toBe(false);
     });
 

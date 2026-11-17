@@ -17,7 +17,8 @@ export const FORBIDDEN_PERSISTENT_DB_NAMES = Object.freeze([
   'template1',
 ]);
 
-export const DISPOSABLE_TEST_DB_PATTERN = /^campusos_(?:test_[0-9a-f]{12}|mig_[0-9a-f]{10}|dr_[0-9a-f]{10})$/;
+export const DISPOSABLE_TEST_DB_PATTERN =
+  /^campusos_(?:test_[0-9a-f]{12}|mig_[0-9a-f]{10}|dr_[0-9a-f]{10})$/;
 
 export class PersistentDatabaseMutationBlockedError extends Error {
   constructor(message: string) {
@@ -80,10 +81,7 @@ export function assertDisposableTestDatabase(
   }
 }
 
-export function validatePersistentWriteAuthorized(
-  urlOrName: string,
-  justification: string,
-): void {
+export function validatePersistentWriteAuthorized(urlOrName: string, justification: string): void {
   // Fail closed if running under a test runner
   if (process.env['VITEST'] || process.env['NODE_ENV'] === 'test') {
     throw new PersistentDatabaseMutationBlockedError(

@@ -179,6 +179,8 @@ export const GetChildFeesResponseSchema = Type.Object({
 
 export const InitiateChildPaymentBodySchema = Type.Object({
   dueId: Type.String({ format: 'uuid' }),
-  provider: Type.Optional(Type.Union([Type.Literal('RAZORPAY'), Type.Literal('CASHFREE'), Type.Literal('PHONEPE')])),
+  provider: Type.Optional(
+    Type.Union([Type.Literal('RAZORPAY'), Type.Literal('CASHFREE'), Type.Literal('PHONEPE')]),
+  ),
 });
 export type InitiateChildPaymentBody = Static<typeof InitiateChildPaymentBodySchema>;

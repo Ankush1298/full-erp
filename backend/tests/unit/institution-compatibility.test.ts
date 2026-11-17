@@ -46,9 +46,21 @@ describe('Universal Institution Compatibility (Unit)', () => {
   describe('Academic Performance & Standing Calculations', () => {
     const scores = [
       { courseId: 'c1', courseName: 'Mathematics', credits: 4, maxMarks: 100, obtainedMarks: 92 },
-      { courseId: 'c2', courseName: 'Computer Science', credits: 4, maxMarks: 100, obtainedMarks: 85 },
+      {
+        courseId: 'c2',
+        courseName: 'Computer Science',
+        credits: 4,
+        maxMarks: 100,
+        obtainedMarks: 85,
+      },
       { courseId: 'c3', courseName: 'Physics', credits: 3, maxMarks: 100, obtainedMarks: 78 },
-      { courseId: 'c4', courseName: 'English Literature', credits: 2, maxMarks: 100, obtainedMarks: 88 },
+      {
+        courseId: 'c4',
+        courseName: 'English Literature',
+        credits: 2,
+        maxMarks: 100,
+        obtainedMarks: 88,
+      },
     ];
 
     it('computes standard percentage and letter grade for School', () => {

@@ -25,10 +25,7 @@ export function SegmentedNav<T extends string = string>({
 }: SegmentedNavProps<T>) {
   return (
     <div className={`anesa-nav-bar ${className}`.trim()}>
-      <nav
-        className="flex items-center gap-2 overflow-x-auto w-full"
-        aria-label={ariaLabel}
-      >
+      <nav className="flex items-center gap-2 overflow-x-auto w-full" aria-label={ariaLabel}>
         {items.map((item) => {
           const isActive = item.id === activeId;
           return (

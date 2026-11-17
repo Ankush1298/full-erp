@@ -11,6 +11,7 @@ import { registerHolidayRoutes } from './holiday.routes.js';
 import { registerSetupRoutes } from './setup.routes.js';
 import { registerFacultyStudentResolver } from './assigned-resolver.js';
 import { registerPromotionToolRoute } from '../students/term-enrollment.routes.js';
+import { registerPromotionRoutes } from './promotion.routes.js';
 import {
   CreatePeriodTypeBodySchema,
   type CreatePeriodTypeBody,
@@ -204,5 +205,6 @@ export const registerAcademicsRoutes: FastifyPluginAsync<{ db: Database }> = asy
   registerHolidayRoutes(app, opts.db);
   registerSetupRoutes(app, opts.db);
   registerPromotionToolRoute(app, opts.db);
+  registerPromotionRoutes(app, opts.db);
   registerFacultyStudentResolver();
 };

@@ -19,11 +19,13 @@ import {
   UploadAttachmentResponseSchema,
   type CreateHomeworkBody,
   type ReviewSubmissionBody,
+  type SubmitHomeworkBody,
   type UpdateHomeworkBody,
   type UploadAttachmentBody,
 } from './homework.schemas.js';
 
 export const registerHomeworkRoutes: FastifyPluginAsync<{ db: Database }> = async (app, opts) => {
+  await Promise.resolve();
   if (!opts.db) {
     throw new Error('Database dependency is required for homework routes.');
   }
@@ -48,7 +50,9 @@ export const registerHomeworkRoutes: FastifyPluginAsync<{ db: Database }> = asyn
     async (req, reply) => {
       const ctx = req.tenantContext;
       if (!ctx) throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
-      const data = await opts.db.withTenant(ctx, (tx) => HomeworkService.listTeacherClasses(tx, ctx));
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        HomeworkService.listTeacherClasses(tx, ctx),
+      );
       return reply.status(200).send({ success: true, data });
     },
   );
@@ -221,9 +225,7 @@ export const registerHomeworkRoutes: FastifyPluginAsync<{ db: Database }> = asyn
     async (req, reply) => {
       const ctx = req.tenantContext;
       if (!ctx) throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
-      await opts.db.withTenant(ctx, (tx) =>
-        HomeworkService.closeHomework(tx, ctx, req.params.id),
-      );
+      await opts.db.withTenant(ctx, (tx) => HomeworkService.closeHomework(tx, ctx, req.params.id));
       return reply.status(200).send({ success: true });
     },
   );
@@ -301,7 +303,7 @@ export const registerHomeworkRoutes: FastifyPluginAsync<{ db: Database }> = asyn
   );
 
   // 12. Student submits homework (online)
-  app.post<{ Params: { id: string }; Body: { submissionText?: string; files?: any[] } }>(
+  app.post<{ Params: { id: string }; Body: SubmitHomeworkBody }>(
     '/student/assignments/:id/submit',
     {
       config: { permission: 'homework.submit' },

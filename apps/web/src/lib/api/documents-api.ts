@@ -84,7 +84,10 @@ export const InitiateUploadResponseSchema = z.preprocess(
             upload: {
               url: upload?.url ?? data.upload_url ?? '',
               method: (upload?.method as string) ?? 'PUT',
-              headers: (upload?.headers as Record<string, string>) ?? (data.headers as Record<string, string>) ?? {},
+              headers:
+                (upload?.headers as Record<string, string>) ??
+                (data.headers as Record<string, string>) ??
+                {},
               expiresAt: (upload?.expiresAt as string) ?? (data.expires_at as string) ?? '',
             },
           },

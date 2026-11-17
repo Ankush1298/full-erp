@@ -38,9 +38,7 @@ describe('Database Isolation & Persistent Database Protection Guard (P0)', () =>
       expect(isPersistentDatabase('campusos_demo')).toBe(true);
       expect(isPersistentDatabase('campusos_dev')).toBe(true);
       expect(
-        isPersistentDatabase(
-          'postgresql://campusos_admin:pass@127.0.0.1:54329/campusos_demo',
-        ),
+        isPersistentDatabase('postgresql://campusos_admin:pass@127.0.0.1:54329/campusos_demo'),
       ).toBe(true);
     });
 
@@ -69,16 +67,14 @@ describe('Database Isolation & Persistent Database Protection Guard (P0)', () =>
         ),
       ).toThrow(PersistentDatabaseMutationBlockedError);
 
-      expect(() =>
-        assertDisposableTestDatabase('campusos_demo', 'IntegrationTest'),
-      ).toThrow(/Refusing to execute against protected persistent database 'campusos_demo'/);
+      expect(() => assertDisposableTestDatabase('campusos_demo', 'IntegrationTest')).toThrow(
+        /Refusing to execute against protected persistent database 'campusos_demo'/,
+      );
     });
 
     it('refuses campusos_dev with PersistentDatabaseMutationBlockedError', () => {
       expect(() =>
-        assertDisposableTestDatabase(
-          'postgresql://app_runtime:pass@127.0.0.1:54329/campusos_dev',
-        ),
+        assertDisposableTestDatabase('postgresql://app_runtime:pass@127.0.0.1:54329/campusos_dev'),
       ).toThrow(/Refusing to execute against protected persistent database 'campusos_dev'/);
     });
 
@@ -100,17 +96,13 @@ describe('Database Isolation & Persistent Database Protection Guard (P0)', () =>
     });
 
     it('accepts valid disposable test databases created by Vitest global setup', () => {
-      expect(() =>
-        assertDisposableTestDatabase('campusos_test_0123456789ab'),
-      ).not.toThrow();
+      expect(() => assertDisposableTestDatabase('campusos_test_0123456789ab')).not.toThrow();
       expect(() =>
         assertDisposableTestDatabase(
           'postgresql://app_migrator:pass@127.0.0.1:5432/campusos_test_fedcba987654',
         ),
       ).not.toThrow();
-      expect(() =>
-        assertDisposableTestDatabase('campusos_mig_0123456789'),
-      ).not.toThrow();
+      expect(() => assertDisposableTestDatabase('campusos_mig_0123456789')).not.toThrow();
     });
   });
 

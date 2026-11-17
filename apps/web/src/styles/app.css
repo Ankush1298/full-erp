@@ -97,24 +97,29 @@
   font-weight: 600;
   margin-bottom: var(--space-2);
 }
-.badge--positive, .badge--success, .badge--emerald {
-  background: #EAFBF1;
-  color: #12723A;
+.badge--positive,
+.badge--success,
+.badge--emerald {
+  background: #eafbf1;
+  color: #12723a;
 }
-.badge--warning, .badge--amber {
-  background: #FEF9EB;
-  color: #8C5E06;
+.badge--warning,
+.badge--amber {
+  background: #fef9eb;
+  color: #8c5e06;
 }
-.badge--danger, .badge--coral {
-  background: #FDF2F2;
-  color: #B42318;
+.badge--danger,
+.badge--coral {
+  background: #fdf2f2;
+  color: #b42318;
 }
-.badge--brand, .badge--purple {
-  background: #F3EEFB;
+.badge--brand,
+.badge--purple {
+  background: #f3eefb;
   color: #504175;
 }
 .badge--neutral {
-  background: #F3F4F6;
+  background: #f3f4f6;
   color: #374151;
 }
 .spinner {
@@ -2311,7 +2316,7 @@ progress#setup-progress::-moz-progress-bar {
 }
 
 .anesa-nav-btn--active,
-.anesa-nav-btn[aria-current="page"] {
+.anesa-nav-btn[aria-current='page'] {
   background: var(--color-primary, #504175) !important;
   color: #ffffff !important;
   box-shadow: 0 1px 4px rgba(80, 65, 117, 0.25) !important;
@@ -2712,7 +2717,7 @@ progress#setup-progress::-moz-progress-bar {
   box-shadow: 0 0 0 1px var(--color-primary);
 }
 
-.import-kind-option input[type="radio"] {
+.import-kind-option input[type='radio'] {
   margin-top: 0.25rem;
   accent-color: var(--color-primary);
 }
@@ -3060,7 +3065,9 @@ progress#setup-progress::-moz-progress-bar {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .doc-card:hover {
@@ -3304,7 +3311,9 @@ progress#setup-progress::-moz-progress-bar {
   background: #faf9fd;
   border: 1px solid rgba(80, 65, 117, 0.08);
   border-radius: var(--radius);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .feature-capability-card:hover {

@@ -1,10 +1,4 @@
 import { localDateOf } from '../../lib/campus-time';
-import type {
-  EvaluationStatus,
-  ExamType,
-  OverrideStatus,
-  ScheduleStatus,
-} from '../../lib/api/examinations-api';
 
 const MONTH_NAMES = [
   'Jan',
@@ -22,7 +16,10 @@ const MONTH_NAMES = [
 ];
 
 /** Parse YYYY-MM-DD or ISO timestamp safely into friendly day month year text */
-export function formatFriendlyDate(dateStr?: string | null, timeZone: string = 'Asia/Kolkata'): string {
+export function formatFriendlyDate(
+  dateStr?: string | null,
+  timeZone: string = 'Asia/Kolkata',
+): string {
   if (!dateStr) return '—';
   let clean = dateStr;
   if (dateStr.includes('T')) {
@@ -77,7 +74,7 @@ export function formatTimeRange(start?: string | null, end?: string | null): str
 }
 
 /** Converts raw enum exam types to school-friendly titles */
-export function formatExamType(type?: ExamType | string | null): string {
+export function formatExamType(type?: string | null): string {
   switch (type) {
     case 'MID_TERM':
       return 'Mid-Term Examination';
@@ -97,7 +94,7 @@ export function formatExamType(type?: ExamType | string | null): string {
 }
 
 /** Converts raw enum schedule statuses to clear school labels */
-export function formatScheduleStatus(status?: ScheduleStatus | string | null): string {
+export function formatScheduleStatus(status?: string | null): string {
   switch (status) {
     case 'SCHEDULED':
       return 'Scheduled';
@@ -116,7 +113,7 @@ export function formatScheduleStatus(status?: ScheduleStatus | string | null): s
 
 /** Returns status tone / color indicator */
 export function getScheduleStatusTone(
-  status?: ScheduleStatus | string | null,
+  status?: string | null,
 ): 'emerald' | 'amber' | 'purple' | 'coral' | 'neutral' {
   switch (status) {
     case 'PUBLISHED':
@@ -133,7 +130,7 @@ export function getScheduleStatusTone(
 }
 
 /** Friendly labels for evaluation status */
-export function formatEvaluationStatus(status?: EvaluationStatus | string | null): string {
+export function formatEvaluationStatus(status?: string | null): string {
   switch (status) {
     case 'ELIGIBLE':
       return 'Eligible (Cleared)';
@@ -147,7 +144,7 @@ export function formatEvaluationStatus(status?: EvaluationStatus | string | null
 }
 
 /** Friendly labels for override status */
-export function formatOverrideStatus(status?: OverrideStatus | string | null): string {
+export function formatOverrideStatus(status?: string | null): string {
   switch (status) {
     case 'NONE':
       return 'No Override';

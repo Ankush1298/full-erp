@@ -104,10 +104,9 @@ export async function planTenantReconciliation(
   const validCodes = new Set(registeredRes.rows.map((r) => r['code'] as string));
 
   // 2. Fetch tenant roles
-  const rolesRes = await db.query(
-    'SELECT id, code FROM app.roles WHERE organization_id = $1',
-    [organizationId],
-  );
+  const rolesRes = await db.query('SELECT id, code FROM app.roles WHERE organization_id = $1', [
+    organizationId,
+  ]);
   const rolesByCode = new Map<string, string>(
     rolesRes.rows.map((r) => [r['code'] as string, r['id'] as string]),
   );
@@ -125,10 +124,10 @@ export async function planTenantReconciliation(
         [organizationId],
       );
       if (settingsRes.rows.length > 0 && settingsRes.rows[0]?.['value']) {
-        let val = settingsRes.rows[0]['value'];
+        let val: unknown = settingsRes.rows[0]['value'];
         if (typeof val === 'string') {
           try {
-            val = JSON.parse(val);
+            val = JSON.parse(val) as unknown;
           } catch {
             val = {};
           }
@@ -222,7 +221,8 @@ export async function planTenantReconciliation(
         skippedCritical.push({
           roleCode,
           permissionCode: permCode,
-          reason: 'Classified as CRITICAL. Requires explicit authorization (allowCriticalGrants: true).',
+          reason:
+            'Classified as CRITICAL. Requires explicit authorization (allowCriticalGrants: true).',
         });
       } else {
         proposedAdditions.push({
@@ -274,10 +274,9 @@ export async function executeTenantReconciliation(
   }
 
   // Fetch role IDs
-  const rolesRes = await db.query(
-    'SELECT id, code FROM app.roles WHERE organization_id = $1',
-    [plan.organizationId],
-  );
+  const rolesRes = await db.query('SELECT id, code FROM app.roles WHERE organization_id = $1', [
+    plan.organizationId,
+  ]);
   const rolesByCode = new Map<string, string>(
     rolesRes.rows.map((r) => [r['code'] as string, r['id'] as string]),
   );

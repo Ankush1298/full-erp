@@ -186,7 +186,10 @@ export async function fetchChildSummary(c: ApiClient, childId: string): Promise<
   return res.data;
 }
 
-export async function fetchChildAttendance(c: ApiClient, childId: string): Promise<ChildAttendance> {
+export async function fetchChildAttendance(
+  c: ApiClient,
+  childId: string,
+): Promise<ChildAttendance> {
   const res = await c.get(`/v1/parent/children/${encodeURIComponent(childId)}/attendance`, {
     schema: z.object({
       success: z.boolean(),
@@ -206,7 +209,10 @@ export async function fetchChildAcademics(c: ApiClient, childId: string): Promis
   return res.data;
 }
 
-export async function fetchChildExaminations(c: ApiClient, childId: string): Promise<ChildExaminations> {
+export async function fetchChildExaminations(
+  c: ApiClient,
+  childId: string,
+): Promise<ChildExaminations> {
   const res = await c.get(`/v1/parent/children/${encodeURIComponent(childId)}/examinations`, {
     schema: z.object({
       success: z.boolean(),

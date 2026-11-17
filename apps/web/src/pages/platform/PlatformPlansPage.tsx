@@ -24,7 +24,7 @@ export const PlatformPlansPage: React.FC = () => {
   const [status, setStatus] = useState<'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'SUSPENDED'>('ACTIVE');
   const [priceInr, setPriceInr] = useState<number>(149999);
   const [renewalDate, setRenewalDate] = useState<string>(
-    new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().split('T')[0]!
+    () => new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().split('T')[0]!,
   );
   const [maxStudents, setMaxStudents] = useState<number>(5000);
   const [maxFaculty, setMaxFaculty] = useState<number>(250);
@@ -54,8 +54,8 @@ export const PlatformPlansPage: React.FC = () => {
         }
         setLoading(false);
       })
-      .catch((err) => {
-        setError(err.message || 'Failed to load SaaS plans or institutions');
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load SaaS plans or institutions');
         setLoading(false);
       });
   };
@@ -90,8 +90,10 @@ export const PlatformPlansPage: React.FC = () => {
         }
         setInstLoading(false);
       })
-      .catch((err) => {
-        setErrorBanner(`Failed to load institution details: ${err.message}`);
+      .catch((err: unknown) => {
+        setErrorBanner(
+          `Failed to load institution details: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        );
         setInstLoading(false);
       });
   }, [selectedOrgId]);
@@ -166,7 +168,7 @@ export const PlatformPlansPage: React.FC = () => {
 
       await platformApi.setSubscription(selectedOrgId, payload);
       setSuccessBanner(
-        `Subscription plan successfully updated and enforced for ${instDetail?.name}. Status: ${status}, Annual Rate: ₹${priceInr.toLocaleString('en-IN')}.`
+        `Subscription plan successfully updated and enforced for ${instDetail?.name}. Status: ${status}, Annual Rate: ₹${priceInr.toLocaleString('en-IN')}.`,
       );
 
       // Refresh institution detail
@@ -212,7 +214,8 @@ export const PlatformPlansPage: React.FC = () => {
         <div>
           <h2 className="platform-page-title">SaaS Subscription Plans & Billing Tiers</h2>
           <p className="platform-page-desc">
-            Define institutional packaging, configure annual contract tiers (INR), and assign subscription plans with enforced capacity limits.
+            Define institutional packaging, configure annual contract tiers (INR), and assign
+            subscription plans with enforced capacity limits.
           </p>
         </div>
       </div>
@@ -223,7 +226,8 @@ export const PlatformPlansPage: React.FC = () => {
           <div>
             <h3 className="card-title">Assign & Manage Tenant Subscription</h3>
             <p className="card-subtitle">
-              Allocate official SaaS tiers, customize annual INR pricing, set renewal schedules, and configure maximum student/faculty capacity limits.
+              Allocate official SaaS tiers, customize annual INR pricing, set renewal schedules, and
+              configure maximum student/faculty capacity limits.
             </p>
           </div>
         </div>
@@ -250,10 +254,17 @@ export const PlatformPlansPage: React.FC = () => {
 
           {instDetail && (
             <div className="tenant-current-badge">
-              <span className="text-xs uppercase text-slate-500 font-bold block">Current Active Tier</span>
+              <span className="text-xs uppercase text-slate-500 font-bold block">
+                Current Active Tier
+              </span>
               <span className="font-semibold text-slate-800">
-                {instDetail.subscription?.planName ? `${instDetail.subscription.planName} Plan` : 'Unassigned'} •{' '}
-                <span className={`status-pill status-${(instDetail.subscription?.status || 'ACTIVE').toLowerCase()}`}>
+                {instDetail.subscription?.planName
+                  ? `${instDetail.subscription.planName} Plan`
+                  : 'Unassigned'}{' '}
+                •{' '}
+                <span
+                  className={`status-pill status-${(instDetail.subscription?.status || 'ACTIVE').toLowerCase()}`}
+                >
                   {instDetail.subscription?.status || 'ACTIVE'}
                 </span>
               </span>
@@ -284,9 +295,7 @@ export const PlatformPlansPage: React.FC = () => {
             <div className="subscription-form-grid">
               {/* Plan Preset Selector */}
               <div className="form-field">
-                <label htmlFor="plan-preset-select">
-                  Plan Tier Preset:
-                </label>
+                <label htmlFor="plan-preset-select">Plan Tier Preset:</label>
                 <select
                   id="plan-preset-select"
                   value={selectedPlanId}
@@ -308,9 +317,7 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Plan Name */}
               <div className="form-field">
-                <label htmlFor="plan-name-input">
-                  Contract Plan Display Name:
-                </label>
+                <label htmlFor="plan-name-input">Contract Plan Display Name:</label>
                 <input
                   id="plan-name-input"
                   type="text"
@@ -323,13 +330,13 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Subscription Status */}
               <div className="form-field">
-                <label htmlFor="status-select">
-                  Subscription Status:
-                </label>
+                <label htmlFor="status-select">Subscription Status:</label>
                 <select
                   id="status-select"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'SUSPENDED')}
+                  onChange={(e) =>
+                    setStatus(e.target.value as 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'SUSPENDED')
+                  }
                   className="platform-select"
                 >
                   <option value="ACTIVE">ACTIVE — Enforced & In Good Standing</option>
@@ -341,13 +348,13 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Billing Cycle */}
               <div className="form-field">
-                <label htmlFor="billing-cycle-select">
-                  Billing Cycle:
-                </label>
+                <label htmlFor="billing-cycle-select">Billing Cycle:</label>
                 <select
                   id="billing-cycle-select"
                   value={billingCycle}
-                  onChange={(e) => setBillingCycle(e.target.value as 'ANNUAL' | 'MONTHLY' | 'CUSTOM')}
+                  onChange={(e) =>
+                    setBillingCycle(e.target.value as 'ANNUAL' | 'MONTHLY' | 'CUSTOM')
+                  }
                   className="platform-select"
                 >
                   <option value="ANNUAL">ANNUAL — Invoiced Yearly</option>
@@ -358,9 +365,7 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Price in INR */}
               <div className="form-field">
-                <label htmlFor="price-inr-input">
-                  Annual Contract Rate (INR ₹):
-                </label>
+                <label htmlFor="price-inr-input">Annual Contract Rate (INR ₹):</label>
                 <input
                   id="price-inr-input"
                   type="number"
@@ -375,9 +380,7 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Renewal Date */}
               <div className="form-field">
-                <label htmlFor="renewal-date-input">
-                  Next Contract Renewal Date:
-                </label>
+                <label htmlFor="renewal-date-input">Next Contract Renewal Date:</label>
                 <input
                   id="renewal-date-input"
                   type="date"
@@ -390,9 +393,7 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Max Students Capacity */}
               <div className="form-field">
-                <label htmlFor="max-students-input">
-                  Enrolled Students Ceiling:
-                </label>
+                <label htmlFor="max-students-input">Enrolled Students Ceiling:</label>
                 <input
                   id="max-students-input"
                   type="number"
@@ -407,9 +408,7 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Max Faculty Capacity */}
               <div className="form-field">
-                <label htmlFor="max-faculty-input">
-                  Faculty & Staff Accounts Ceiling:
-                </label>
+                <label htmlFor="max-faculty-input">Faculty & Staff Accounts Ceiling:</label>
                 <input
                   id="max-faculty-input"
                   type="number"
@@ -424,9 +423,7 @@ export const PlatformPlansPage: React.FC = () => {
 
               {/* Reason / Notes */}
               <div className="form-field">
-                <label htmlFor="audit-reason-input">
-                  Audit Log Reason:
-                </label>
+                <label htmlFor="audit-reason-input">Audit Log Reason:</label>
                 <input
                   id="audit-reason-input"
                   type="text"
@@ -462,9 +459,7 @@ export const PlatformPlansPage: React.FC = () => {
                 <div className="spec-card">
                   <span className="spec-label">Status</span>
                   <span className="spec-value">
-                    <span className={`status-pill status-${status.toLowerCase()}`}>
-                      {status}
-                    </span>
+                    <span className={`status-pill status-${status.toLowerCase()}`}>{status}</span>
                   </span>
                 </div>
                 <div className="spec-card">
@@ -474,7 +469,8 @@ export const PlatformPlansPage: React.FC = () => {
                 <div className="spec-card spec-card--full">
                   <span className="spec-label">Enforced Capacity Ceilings</span>
                   <span className="spec-value font-bold text-slate-800">
-                    {maxStudents.toLocaleString()} Students • {maxFaculty.toLocaleString()} Faculty Accounts
+                    {maxStudents.toLocaleString()} Students • {maxFaculty.toLocaleString()} Faculty
+                    Accounts
                   </span>
                 </div>
               </div>
@@ -490,11 +486,7 @@ export const PlatformPlansPage: React.FC = () => {
               >
                 Reset to Current
               </button>
-              <button
-                type="submit"
-                className="platform-btn platform-btn-primary"
-                disabled={saving}
-              >
+              <button type="submit" className="platform-btn platform-btn-primary" disabled={saving}>
                 {saving ? 'Committing Changes...' : 'Commit & Enforce Subscription'}
               </button>
             </div>
@@ -504,7 +496,12 @@ export const PlatformPlansPage: React.FC = () => {
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="guarded-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-sub-title">
+        <div
+          className="guarded-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-sub-title"
+        >
           <div className="guarded-modal-card">
             <div className="guarded-modal-header">
               <h3 id="confirm-sub-title">Confirm Subscription Terms Update</h3>
@@ -514,23 +511,37 @@ export const PlatformPlansPage: React.FC = () => {
             </div>
             <div className="guarded-modal-body">
               <p className="text-sm">
-                You are about to enforce updated contractual terms for <strong>{instDetail?.name}</strong>:
+                You are about to enforce updated contractual terms for{' '}
+                <strong>{instDetail?.name}</strong>:
               </p>
               <ul className="text-xs space-y-1.5 mt-3 p-3 bg-slate-50 border rounded">
-                <li>• <strong>Plan:</strong> {planName} ({selectedPlanId})</li>
-                <li>• <strong>Pricing:</strong> ₹{priceInr.toLocaleString('en-IN')} ({billingCycle})</li>
-                <li>• <strong>Status:</strong> {status}</li>
-                <li>• <strong>Renewal:</strong> {renewalDate}</li>
-                <li>• <strong>Student Limit:</strong> {maxStudents.toLocaleString()}</li>
-                <li>• <strong>Faculty Limit:</strong> {maxFaculty.toLocaleString()}</li>
-                <li>• <strong>Audit Reason:</strong> {auditReason}</li>
+                <li>
+                  • <strong>Plan:</strong> {planName} ({selectedPlanId})
+                </li>
+                <li>
+                  • <strong>Pricing:</strong> ₹{priceInr.toLocaleString('en-IN')} ({billingCycle})
+                </li>
+                <li>
+                  • <strong>Status:</strong> {status}
+                </li>
+                <li>
+                  • <strong>Renewal:</strong> {renewalDate}
+                </li>
+                <li>
+                  • <strong>Student Limit:</strong> {maxStudents.toLocaleString()}
+                </li>
+                <li>
+                  • <strong>Faculty Limit:</strong> {maxFaculty.toLocaleString()}
+                </li>
+                <li>
+                  • <strong>Audit Reason:</strong> {auditReason}
+                </li>
               </ul>
               <div className="guarded-guarantee-list">
                 <strong>Platform Governance Guarantee:</strong>
                 <br />
                 • Student and institutional databases are never reset or purged during plan updates.
-                <br />
-                • In-flight admissions and term classes continue seamlessly.
+                <br />• In-flight admissions and term classes continue seamlessly.
               </div>
             </div>
             <div className="guarded-modal-footer">
@@ -545,7 +556,9 @@ export const PlatformPlansPage: React.FC = () => {
               <button
                 type="button"
                 className="platform-btn platform-btn-primary"
-                onClick={handleConfirmSave}
+                onClick={() => {
+                  void handleConfirmSave();
+                }}
                 disabled={saving}
               >
                 {saving ? 'Enforcing...' : 'Confirm & Apply Subscription'}
@@ -581,40 +594,63 @@ export const PlatformPlansPage: React.FC = () => {
           {safeBundles.map((bundle) => {
             const isPopular = bundle.id === 'COMPLETE_ERP';
             return (
-              <div
-                key={bundle.id}
-                className={`plan-tier-card ${isPopular ? 'is-popular' : ''}`}
-              >
+              <div key={bundle.id} className={`plan-tier-card ${isPopular ? 'is-popular' : ''}`}>
                 {isPopular && <div className="popular-badge">RECOMMENDED FOR INSTITUTIONS</div>}
 
                 <div className="plan-tier-header">
-                  <span className={`cat-pill cat-${isPopular ? 'core' : 'academic'}`}>{bundle.tier}</span>
+                  <span className={`cat-pill cat-${isPopular ? 'core' : 'academic'}`}>
+                    {bundle.tier}
+                  </span>
                   <h3 className="plan-tier-title">{bundle.name}</h3>
                   <p className="plan-tier-desc">{bundle.description}</p>
                 </div>
 
                 <div className="plan-tier-price-box">
                   <span className="price-currency">₹</span>
-                  <span className="price-figure">{bundle.priceInrAnnual.toLocaleString('en-IN')}</span>
+                  <span className="price-figure">
+                    {bundle.priceInrAnnual.toLocaleString('en-IN')}
+                  </span>
                   <span className="price-cycle">/ year</span>
                 </div>
 
                 <div className="flex flex-col gap-1 text-xs text-slate-600 border-t pt-3 border-slate-100">
                   <div className="flex items-center gap-2">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />
                     </svg>
-                    <span>Up to <strong>{bundle.maxStudents.toLocaleString()}</strong> Students</span>
+                    <span>
+                      Up to <strong>{bundle.maxStudents.toLocaleString()}</strong> Students
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
                       <line x1="16" x2="16" y1="2" y2="6" />
                       <line x1="8" x2="8" y1="2" y2="6" />
                       <line x1="3" x2="21" y1="10" y2="10" />
                     </svg>
-                    <span>Up to <strong>{bundle.maxFaculty.toLocaleString()}</strong> Faculty & Staff</span>
+                    <span>
+                      Up to <strong>{bundle.maxFaculty.toLocaleString()}</strong> Faculty & Staff
+                    </span>
                   </div>
                 </div>
 

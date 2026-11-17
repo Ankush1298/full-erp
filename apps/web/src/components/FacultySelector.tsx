@@ -1,9 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { ApiClient } from '../lib/api/client';
-import {
-  searchFacultyForAssignment,
-  type FacultyAssignee,
-} from '../lib/api/academics-api';
+import { searchFacultyForAssignment, type FacultyAssignee } from '../lib/api/academics-api';
 
 export interface FacultySelectorProps {
   client: ApiClient;
@@ -55,28 +52,30 @@ export function FacultySelector({
   useEffect(() => {
     if (selectedFaculty) return; // Don't search if item already selected
     let cancelled = false;
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const data = await searchFacultyForAssignment(client, {
-          ...(query.trim() ? { q: query.trim() } : {}),
-          ...(campusId ? { campusId } : {}),
-          limit: 20,
-        });
-        if (!cancelled) {
-          setResults(data);
-          setActiveIndex(-1);
+    const timer = setTimeout(() => {
+      void (async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+          const data = await searchFacultyForAssignment(client, {
+            ...(query.trim() ? { q: query.trim() } : {}),
+            ...(campusId ? { campusId } : {}),
+            limit: 20,
+          });
+          if (!cancelled) {
+            setResults(data);
+            setActiveIndex(-1);
+          }
+        } catch {
+          if (!cancelled) {
+            setLoadError('Failed to load faculty options.');
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
         }
-      } catch {
-        if (!cancelled) {
-          setLoadError('Failed to load faculty options.');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+      })();
     }, 300);
 
     return () => {
@@ -290,14 +289,19 @@ export function FacultySelector({
                   id={`${id}-opt-${idx}`}
                   role="option"
                   aria-selected={isHighlight}
+                  tabIndex={0}
                   onClick={() => handleSelect(f)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelect(f);
+                    }
+                  }}
                   onMouseEnter={() => setActiveIndex(idx)}
                   style={{
                     padding: '8px 12px',
                     cursor: 'pointer',
-                    background: isHighlight
-                      ? 'var(--color-primary-soft, #e8f0fe)'
-                      : 'transparent',
+                    background: isHighlight ? 'var(--color-primary-soft, #e8f0fe)' : 'transparent',
                     borderBottom:
                       idx < results.length - 1
                         ? '1px solid var(--color-border-subtle, #f0f0f0)'

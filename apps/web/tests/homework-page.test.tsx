@@ -57,7 +57,9 @@ describe('Homework & Assignments — Teacher Workflow', () => {
     const { container } = renderApp(backend, '/homework');
 
     // Wait for async data to load
-    expect(await screen.findByRole('heading', { name: 'Homework & Assignments' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Homework & Assignments' }),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Assigned Classes')).toBeInTheDocument();
     expect(screen.getByText('Active Homework')).toBeInTheDocument();
     expect(screen.getAllByText('Drafts').length).toBeGreaterThanOrEqual(1);
@@ -85,7 +87,9 @@ describe('Homework & Assignments — Teacher Workflow', () => {
     await user.click(createBtn);
 
     // Modal opens
-    expect(await screen.findByRole('heading', { name: 'Create Homework Assignment' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Create Homework Assignment' }),
+    ).toBeInTheDocument();
 
     // Live recipient preview check
     expect(await screen.findByText(/will receive this homework/i)).toBeInTheDocument();
@@ -121,7 +125,9 @@ describe('Homework & Assignments — Teacher Workflow', () => {
     const publishBtn = await screen.findByRole('button', { name: 'Publish' });
     await user.click(publishBtn);
 
-    expect(await screen.findByText(/Assignment published to students successfully/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Assignment published to students successfully/i),
+    ).toBeInTheDocument();
 
     // Locate the Close Assignment button for published homework
     const closeBtns = await screen.findAllByRole('button', { name: 'Close Assignment' });
@@ -143,7 +149,9 @@ describe('Homework & Assignments — Teacher Workflow', () => {
     await user.click(reviewBtn);
 
     // Modal opens showing submissions
-    expect(await screen.findByRole('heading', { name: /Submissions: Algebra Problem Set 1/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /Submissions: Algebra Problem Set 1/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Aarav Sharma')).toBeInTheDocument();
 
     // Click Grade / Feedback button for student
@@ -151,7 +159,9 @@ describe('Homework & Assignments — Teacher Workflow', () => {
     await user.click(gradeBtn);
 
     // Grade form opens
-    expect(await screen.findByRole('heading', { name: /Grade Submission: Aarav Sharma/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /Grade Submission: Aarav Sharma/i }),
+    ).toBeInTheDocument();
 
     // Enter marks and feedback
     const marksInput = screen.getByRole('spinbutton');
@@ -177,7 +187,9 @@ describe('Homework & Assignments — Student Workflow', () => {
     const backend = createFakeBackend({ session: true, me: STUDENT_ME });
     const { container } = renderApp(backend, '/homework');
 
-    expect(await screen.findByRole('heading', { name: 'My Homework & Assignments' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'My Homework & Assignments' }),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Total Assigned')).toBeInTheDocument();
     expect(screen.getAllByText('Submitted').length).toBeGreaterThanOrEqual(1);
 
@@ -256,7 +268,9 @@ describe('Homework & Assignments — Parent Portal Integration', () => {
     await user.click(homeworkTab);
 
     // Verifies homework assignments are displayed for child
-    expect(await screen.findByRole('heading', { name: 'Curriculum Homework & Assignments' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Curriculum Homework & Assignments' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Algebra Problem Set 1')).toBeInTheDocument();
     expect(screen.getByText('Mathematics Grade 9')).toBeInTheDocument();
   });

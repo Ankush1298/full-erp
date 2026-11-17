@@ -459,11 +459,15 @@ export function AppShell() {
                   /
                 </li>
                 <li className="topbar-breadcrumb-item current" aria-current="page">
-                  <span className="topbar-breadcrumb-current">{getModuleLabel(location.pathname, currentNav)}</span>
+                  <span className="topbar-breadcrumb-current">
+                    {getModuleLabel(location.pathname, currentNav)}
+                  </span>
                 </li>
               </ol>
             </nav>
-            <span className="topbar-module-title" aria-hidden="true">{getModuleLabel(location.pathname, currentNav)}</span>
+            <span className="topbar-module-title" aria-hidden="true">
+              {getModuleLabel(location.pathname, currentNav)}
+            </span>
           </div>
         )}
         <div className="topbar-actions">

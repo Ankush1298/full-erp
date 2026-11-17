@@ -54,12 +54,7 @@ export const PARENT: MeData = {
   actor_kind: 'STAFF',
   display_name: 'Priya Parent',
   roles: ['PARENT'],
-  capabilities: [
-    'session.read',
-    'session.revoke',
-    'parent.portal.access',
-    'document.read',
-  ],
+  capabilities: ['session.read', 'session.revoke', 'parent.portal.access', 'document.read'],
 };
 export const STAFF: MeData = {
   tenant_id: 't1',
@@ -333,6 +328,25 @@ export function createFakeBackend(
           status: 'ACTIVE',
         },
       ] as Array<Record<string, unknown>>,
+      promotionPolicy: {
+        mode: 'PRINCIPAL_APPROVAL',
+        minimumAggregatePercentage: 35,
+        minimumSubjectPercentage: 35,
+        maxFailingSubjectsForSupplementary: 2,
+        graceMarksPolicy: {
+          enabled: true,
+          maxGraceMarksTotal: 5,
+          maxGraceMarksPerSubject: 3,
+        },
+        attendanceRequirement: {
+          enabled: false,
+          minimumAttendancePercentage: 75,
+        },
+        terminalPeriodNo: 12,
+        streamSelectionPeriodNo: 10,
+        notifyGuardians: false,
+      },
+      rolloverBatches: [] as Array<Record<string, unknown>>,
     },
     mfa: {
       enrolled: false,
@@ -2231,7 +2245,7 @@ export function createFakeBackend(
       const dupMatch = /^\/examinations\/policies\/([^/?]+)\/duplicate$/.exec(path);
       if (dupMatch && method === 'POST') {
         const id = dupMatch[1]!;
-        const existing: any = exState.policyList.find((p: any) => p.id === id) ?? {
+        const existing = exState.policyList.find((p) => p.id === id) ?? {
           name: 'Policy Copy',
           min_attendance_percentage: 75,
           check_attendance: true,
@@ -2240,10 +2254,10 @@ export function createFakeBackend(
           allow_late_enrolment_review: true,
           scope: 'INSTITUTION',
         };
-        const dup = {
+        const dup: Record<string, unknown> = {
           ...existing,
           id: `pol-${Date.now()}`,
-          name: (reqBody.name as string) ?? `${existing.name ?? 'Policy'} (Copy)`,
+          name: reqBody.name ?? `${String(existing.name ?? 'Policy')} (Copy)`,
           status: 'DRAFT',
           version: 1,
         };
@@ -2320,7 +2334,10 @@ export function createFakeBackend(
         return json(200, { data: updated });
       }
 
-      if ((path === '/examinations/policies' || path.startsWith('/examinations/policies?')) && method === 'GET') {
+      if (
+        (path === '/examinations/policies' || path.startsWith('/examinations/policies?')) &&
+        method === 'GET'
+      ) {
         return json(200, { data: exState.policyList });
       }
 
@@ -3267,7 +3284,7 @@ export function createFakeBackend(
           existing.merchant_key_masked = String(reqBody.merchant_key || '••••••••1234');
           existing.has_secret_key = true;
           existing.has_webhook_secret = !!reqBody.webhook_secret;
-          existing.settings = (reqBody.settings as Record<string, unknown>) || {};
+          existing.settings = reqBody.settings || {};
           existing.updated_at = new Date().toISOString();
           return json(201, { data: existing });
         }
@@ -3293,7 +3310,7 @@ export function createFakeBackend(
         return json(200, {
           data: {
             healthy: true,
-            message: `Successfully connected to ${reqBody.provider || 'Gateway'} API`,
+            message: `Successfully connected to ${String(reqBody.provider ?? 'Gateway')} API`,
             details: { mode: reqBody.mode || 'SANDBOX' },
           },
         });
@@ -3416,7 +3433,7 @@ export function createFakeBackend(
         fState.refunds.push(refObj);
         if (refAmt >= Number(rec.amount)) {
           rec.status = 'REVERSED';
-          rec.reversal_reason = `Refunded: ${reqBody.reason || 'Customer request'}`;
+          rec.reversal_reason = `Refunded: ${String(reqBody.reason ?? 'Customer request')}`;
         }
         return json(200, {
           data: {
@@ -3445,7 +3462,9 @@ export function createFakeBackend(
             total_failed_online_count: fState.paymentAttempts.filter((a) => a.status === 'FAILED')
               .length,
             total_offline_receipt_amount: fState.receipts
-              .filter((r) => r.status === 'POSTED' && !String(r.payment_method).startsWith('ONLINE_'))
+              .filter(
+                (r) => r.status === 'POSTED' && !String(r.payment_method).startsWith('ONLINE_'),
+              )
               .reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
             total_offline_receipt_count: fState.receipts.filter(
               (r) => r.status === 'POSTED' && !String(r.payment_method).startsWith('ONLINE_'),
@@ -3682,7 +3701,10 @@ export function createFakeBackend(
         const reqBody = typeof reqInit?.body === 'string' ? JSON.parse(reqInit.body) : {};
         const active = state.vault.devices.filter((d: any) => d.status === 'ACTIVE');
         if (active.length >= 2) {
-          return json(400, { code: 'DEVICE_LIMIT_EXCEEDED', message: 'Maximum of 2 hardware authenticators reached.' });
+          return json(400, {
+            code: 'DEVICE_LIMIT_EXCEEDED',
+            message: 'Maximum of 2 hardware authenticators reached.',
+          });
         }
         const hasSlot1 = active.some((d: any) => d.deviceNumber === 1);
         const deviceNumber = hasSlot1 ? 2 : 1;
@@ -3815,6 +3837,109 @@ export function createFakeBackend(
       if (path === '/academics/setup-wizard') {
         if (a.campusScopedOnly) return err(403, 'FORBIDDEN');
         return json(200, { success: true, data: a.wizard });
+      }
+      if (path === '/academics/promotion-policy') {
+        if (method === 'GET') return json(200, { success: true, data: a.promotionPolicy });
+        if (method === 'PUT') {
+          a.promotionPolicy = { ...a.promotionPolicy, ...reqBody };
+          return json(200, { success: true, data: a.promotionPolicy });
+        }
+      }
+      if (path === '/academics/rollover/preview' && method === 'POST') {
+        const batchId = `b-${a.rolloverBatches.length + 1}`;
+        const sourceTerm = a.terms.find((t) => t.id === (reqBody as { sourceTermId: string }).sourceTermId) ?? a.terms[0];
+        const targetTerm = a.terms.find((t) => t.id === (reqBody as { targetTermId: string }).targetTermId) ?? a.terms[1] ?? a.terms[0];
+        const previewManifest = {
+          batchId,
+          status: 'PENDING_APPROVAL',
+          sourceTerm: {
+            id: (sourceTerm as { id: string }).id,
+            name: (sourceTerm as { name: string }).name,
+            code: (sourceTerm as { code: string }).code,
+            startDate: (sourceTerm as { startDate: string }).startDate,
+            endDate: (sourceTerm as { endDate: string }).endDate,
+            academicYearId: (sourceTerm as { academicYearId: string }).academicYearId,
+            academicYearLabel: '2026-27',
+          },
+          targetTerm: {
+            id: (targetTerm as { id: string }).id,
+            name: (targetTerm as { name: string }).name,
+            code: (targetTerm as { code: string }).code,
+            startDate: (targetTerm as { startDate: string }).startDate,
+            endDate: (targetTerm as { endDate: string }).endDate,
+            academicYearId: (targetTerm as { academicYearId: string }).academicYearId,
+            academicYearLabel: '2026-27',
+          },
+          policy: { ...(a.promotionPolicy as Record<string, unknown>) },
+          summary: { totalStudents: 1, promoted: 1, retained: 0, pendingReview: 0, graduated: 0 },
+          students: [
+            {
+              studentId: '0194a000-0000-7000-8000-000000000001',
+              enrollmentId: '0194a000-0000-7000-8000-000000000002',
+              fullName: 'Asha Student',
+              admissionNumber: 'ADM-001',
+              currentCohortPeriodId: 'cp1',
+              currentPeriodNo: 5,
+              currentSectionId: null,
+              currentSectionName: null,
+              targetCohortPeriodId: 'cp2',
+              targetPeriodNo: 6,
+              targetSectionId: null,
+              targetSectionName: null,
+              recommendedOutcome: 'PROMOTED',
+              finalOutcome: 'PROMOTED',
+              overrideReason: null,
+              overrideBy: null,
+              evaluationDetails: {
+                aggregatePercentage: 85,
+                totalMarksObtained: 425,
+                totalMaxMarks: 500,
+                failingSubjectCount: 0,
+                hasUnpublishedExams: false,
+                hasMissingMarks: false,
+                hasWithheldMarks: false,
+                appliedGraceMarks: 0,
+                attendancePercentage: null,
+                notes: [],
+              },
+            },
+          ],
+          createdAt: new Date().toISOString(),
+          createdBy: state.me.user_id,
+          approvedAt: null,
+          approvedBy: null,
+          executedAt: null,
+          executedBy: null,
+        };
+        a.rolloverBatches.push(previewManifest);
+        return json(200, { success: true, data: previewManifest });
+      }
+      const excMatch = /^\/academics\/rollover\/preview\/([^/]+)\/exceptions$/.exec(path);
+      if (excMatch && method === 'PATCH') {
+        const b = a.rolloverBatches.find((x) => (x as { batchId: string }).batchId === excMatch[1]);
+        if (!b) return err(404, 'RESOURCE_NOT_FOUND');
+        b.status = 'APPROVED';
+        return json(200, { success: true, data: b });
+      }
+      if (path === '/academics/rollover/execute' && method === 'POST') {
+        const b = a.rolloverBatches.find((x) => x.batchId === (reqBody as { batchId: string }).batchId);
+        if (!b) return err(404, 'RESOURCE_NOT_FOUND');
+        b.status = 'EXECUTED';
+        b.executedAt = new Date().toISOString();
+        return json(200, {
+          success: true,
+          data: {
+            batchId: (b as { batchId: string }).batchId,
+            executedAt: new Date().toISOString(),
+            promotedCount: 1,
+            retainedCount: 0,
+            graduatedCount: 0,
+            skippedCount: 0,
+          },
+        });
+      }
+      if (path === '/academics/rollover/batches' && method === 'GET') {
+        return list(a.rolloverBatches);
       }
       const act = /^\/academics\/terms\/([^/]+)\/activation$/.exec(path);
       if (act && method === 'POST') {
@@ -4495,8 +4620,7 @@ export function createFakeBackend(
         if (!enr[2] && method === 'POST') {
           if (!headers['idempotency-key']) return err(428, 'IDEMPOTENCY_KEY_REQUIRED');
           const custom = state.students.timelines[student] as
-            | { position?: { programme?: unknown } }
-            | undefined;
+            { position?: { programme?: unknown } } | undefined;
           if (custom?.position?.programme === null) {
             return err(409, 'CONFLICT', {}, 'The student has no active program enrolment.');
           }

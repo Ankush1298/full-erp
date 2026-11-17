@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import {
   platformApi,
@@ -73,56 +73,56 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
         return instType === 'SCHOOL'
           ? 'Principal / Headmaster'
           : instType === 'UNIVERSITY'
-          ? 'Vice Chancellor / President'
-          : 'Director / Dean';
+            ? 'Vice Chancellor / President'
+            : 'Director / Dean';
       case 'REGISTRAR':
         return instType === 'SCHOOL'
           ? 'Vice Principal / Academic In-Charge'
           : instType === 'UNIVERSITY'
-          ? 'University Registrar'
-          : 'Registrar';
+            ? 'University Registrar'
+            : 'Registrar';
       case 'HOD':
         return instType === 'SCHOOL'
           ? 'Subject Coordinator / Department Head'
           : instType === 'UNIVERSITY'
-          ? 'Dean of Faculty / Chair'
-          : 'Head of Department (HOD)';
+            ? 'Dean of Faculty / Chair'
+            : 'Head of Department (HOD)';
       case 'FACULTY':
         return instType === 'SCHOOL'
           ? 'Class Teacher / Subject Teacher'
           : instType === 'UNIVERSITY'
-          ? 'Faculty Fellow / Lecturer'
-          : 'Professor / Assistant Professor';
+            ? 'Faculty Fellow / Lecturer'
+            : 'Professor / Assistant Professor';
       case 'EXAM_OFFICER':
         return instType === 'SCHOOL'
           ? 'Exam Coordinator'
           : instType === 'UNIVERSITY'
-          ? 'Controller of Examinations'
-          : 'Controller of Examinations (COE)';
+            ? 'Controller of Examinations'
+            : 'Controller of Examinations (COE)';
       case 'FINANCE_OFFICER':
         return instType === 'SCHOOL'
           ? 'Bursar / Accounts Officer'
           : instType === 'UNIVERSITY'
-          ? 'Comptroller / Finance Director'
-          : 'Finance Officer';
+            ? 'Comptroller / Finance Director'
+            : 'Finance Officer';
       case 'STUDENT':
         return instType === 'SCHOOL'
           ? 'Enrolled Pupil / Student'
           : instType === 'UNIVERSITY'
-          ? 'University Candidate / Scholar'
-          : 'Undergraduate / Postgraduate Scholar';
+            ? 'University Candidate / Scholar'
+            : 'Undergraduate / Postgraduate Scholar';
       case 'PARENT':
         return instType === 'SCHOOL'
           ? 'Parent / Primary Guardian'
           : instType === 'UNIVERSITY'
-          ? 'Guardian (Optional)'
-          : 'Guardian / Sponsor';
+            ? 'Guardian (Optional)'
+            : 'Guardian / Sponsor';
       default:
         return defaultName;
     }
   };
 
-  const fetchDetail = () => {
+  const fetchDetail = useCallback(() => {
     if (!id) return;
     setLoading(true);
     platformApi
@@ -131,18 +131,27 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
         setDetail(data);
         setModulesState(data.entitlements.modules);
         setSelectedBundle(data.entitlements.planBundle);
-        setSubForm(data.subscription as any);
+        const sub = data.subscription;
+        if (sub) {
+          setSubForm({
+            ...sub,
+            status: (sub.status as SubscriptionConfig['status']) || 'ACTIVE',
+            billingCycle: (sub.billingCycle as SubscriptionConfig['billingCycle']) || 'ANNUAL',
+          });
+        } else {
+          setSubForm({});
+        }
         setLoading(false);
       })
-      .catch((err) => {
-        setError(err.message);
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Unknown error');
         setLoading(false);
       });
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchDetail();
-  }, [id]);
+  }, [fetchDetail]);
 
   if (loading) {
     return (
@@ -193,7 +202,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
     detail.entitlements.modules.forEach((orig) => {
       const cur = updated.find((m) => m.key === orig.key);
       if (cur && cur.enabled !== orig.enabled) {
-        diffs.push(`${cur.name}: ${orig.enabled ? 'ENABLED' : 'DISABLED'} → ${cur.enabled ? 'ENABLED' : 'DISABLED'}`);
+        diffs.push(
+          `${cur.name}: ${orig.enabled ? 'ENABLED' : 'DISABLED'} → ${cur.enabled ? 'ENABLED' : 'DISABLED'}`,
+        );
       }
     });
     setEntitlementDiff(diffs);
@@ -205,7 +216,15 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
     let allowedKeys: string[] = [];
     if (bundle === 'STARTER_CORE') allowedKeys = ['students', 'academics', 'attendance', 'reports'];
     else if (bundle === 'ACADEMIC_PLUS')
-      allowedKeys = ['students', 'academics', 'attendance', 'homework', 'examinations', 'reports', 'notifications'];
+      allowedKeys = [
+        'students',
+        'academics',
+        'attendance',
+        'homework',
+        'examinations',
+        'reports',
+        'notifications',
+      ];
     else if (bundle === 'COMPLETE_ERP' || bundle === 'ENTERPRISE_SUITE')
       allowedKeys = modulesState.map((m) => m.key);
 
@@ -219,7 +238,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
     detail.entitlements.modules.forEach((orig) => {
       const cur = updated.find((m) => m.key === orig.key);
       if (cur && cur.enabled !== orig.enabled) {
-        diffs.push(`${cur.name}: ${orig.enabled ? 'ENABLED' : 'DISABLED'} → ${cur.enabled ? 'ENABLED' : 'DISABLED'}`);
+        diffs.push(
+          `${cur.name}: ${orig.enabled ? 'ENABLED' : 'DISABLED'} → ${cur.enabled ? 'ENABLED' : 'DISABLED'}`,
+        );
       }
     });
     setEntitlementDiff(diffs);
@@ -300,7 +321,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
         justification: justification.trim(),
         approvedBy: approvedBy.trim(),
       });
-      setAuthSuccess(`Successfully assigned ${res.authority} to ${res.grantedTo} (${res.grantedPermissionsCount} capabilities granted).`);
+      setAuthSuccess(
+        `Successfully assigned ${res.authority} to ${res.grantedTo} (${res.grantedPermissionsCount} capabilities granted).`,
+      );
       setTargetEmail('');
       setJustification('');
       fetchDetail();
@@ -325,9 +348,7 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
       {/* Institution Banner Card */}
       <div className="institution-detail-header-card">
         <div className="inst-header-left">
-          <div className="inst-avatar-large">
-            {detail.name.slice(0, 2).toUpperCase()}
-          </div>
+          <div className="inst-avatar-large">{detail.name.slice(0, 2).toUpperCase()}</div>
           <div>
             <div className="inst-title-row">
               <h2 className="inst-display-name">{detail.name}</h2>
@@ -341,7 +362,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
             <div className="inst-meta-row">
               <span className="inst-slug-tag">Code: /{detail.slug}</span>
               <span className="inst-id-tag">UUID: {detail.id}</span>
-              <span className="inst-date">Provisioned: {new Date(detail.createdAt).toLocaleDateString()}</span>
+              <span className="inst-date">
+                Provisioned: {new Date(detail.createdAt).toLocaleDateString()}
+              </span>
             </div>
           </div>
         </div>
@@ -418,7 +441,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
           <div className="platform-grid-2">
             <div className="platform-card">
               <h3 className="card-title">Campus & Physical Locations</h3>
-              <p className="card-subtitle">Constituent academic campuses operating under this institution</p>
+              <p className="card-subtitle">
+                Constituent academic campuses operating under this institution
+              </p>
               <div className="campuses-list mt-4">
                 {detail.campuses.map((c) => (
                   <div key={c.id} className="campus-item-card">
@@ -442,21 +467,24 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                   <span className="boundary-status">Enforced</span>
                   <span className="boundary-title">PostgreSQL Row-Level Security</span>
                   <p className="boundary-desc">
-                    All student, attendance, grade, and fee queries enforce <code>app.current_tenant_id() = '{detail.id}'</code>.
+                    All student, attendance, grade, and fee queries enforce{' '}
+                    <code>app.current_tenant_id() = '{detail.id}'</code>.
                   </p>
                 </div>
                 <div className="boundary-item">
                   <span className="boundary-status">Enforced</span>
                   <span className="boundary-title">Zero-Access Secret Isolation</span>
                   <p className="boundary-desc">
-                    School Vault zero-access envelopes are locked by institution recovery threshold keyrings; platform operators have zero access to plain text credentials.
+                    School Vault zero-access envelopes are locked by institution recovery threshold
+                    keyrings; platform operators have zero access to plain text credentials.
                   </p>
                 </div>
                 <div className="boundary-item">
                   <span className="boundary-status">Enforced</span>
                   <span className="boundary-title">Immutable Audit Trail</span>
                   <p className="boundary-desc">
-                    Security decisions, privilege escalations, and authorization rejections are hashed and append-only.
+                    Security decisions, privilege escalations, and authorization rejections are
+                    hashed and append-only.
                   </p>
                 </div>
               </div>
@@ -473,7 +501,8 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
               <div>
                 <h3 className="card-title">ERP Module Entitlements & Marketplace</h3>
                 <p className="card-subtitle">
-                  Activate, trial, or suspend specific ERP functionality for this institution. Server-side fail-closed checks deny access to unentitled modules.
+                  Activate, trial, or suspend specific ERP functionality for this institution.
+                  Server-side fail-closed checks deny access to unentitled modules.
                 </p>
               </div>
 
@@ -510,7 +539,8 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
 
             {entitlementsSaved && (
               <div className="success-banner" role="status">
-                Entitlements successfully updated and committed to <code>app.organization_settings</code>.
+                Entitlements successfully updated and committed to{' '}
+                <code>app.organization_settings</code>.
               </div>
             )}
 
@@ -558,7 +588,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                 type="button"
                 className="platform-btn platform-btn-primary"
                 disabled={savingEntitlements || entitlementDiff.length === 0}
-                onClick={handleSaveEntitlements}
+                onClick={() => {
+                  void handleSaveEntitlements();
+                }}
               >
                 {savingEntitlements ? 'Saving Entitlements...' : 'Save & Enforce Entitlements'}
               </button>
@@ -582,7 +614,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSaveSubscription} className="mt-6">
+            <form
+              onSubmit={(e) => {
+                void handleSaveSubscription(e);
+              }}
+              className="mt-6"
+            >
               <div className="form-row">
                 <div className="form-group flex-1">
                   <label htmlFor="sub-plan">SaaS Plan Tier</label>
@@ -602,7 +639,10 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                     id="sub-status"
                     value={subForm.status || 'ACTIVE'}
                     onChange={(e) =>
-                      setSubForm({ ...subForm, status: e.target.value as any })
+                      setSubForm({
+                        ...subForm,
+                        status: e.target.value as SubscriptionConfig['status'],
+                      })
                     }
                     className="platform-select"
                   >
@@ -635,7 +675,10 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                     id="sub-cycle"
                     value={subForm.billingCycle || 'ANNUAL'}
                     onChange={(e) =>
-                      setSubForm({ ...subForm, billingCycle: e.target.value as any })
+                      setSubForm({
+                        ...subForm,
+                        billingCycle: e.target.value as SubscriptionConfig['billingCycle'],
+                      })
                     }
                     className="platform-select"
                   >
@@ -698,9 +741,7 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={subForm.autoRenew ?? true}
-                      onChange={(e) =>
-                        setSubForm({ ...subForm, autoRenew: e.target.checked })
-                      }
+                      onChange={(e) => setSubForm({ ...subForm, autoRenew: e.target.checked })}
                     />
                     <span>Automatic Annual Contract Renewal</span>
                   </label>
@@ -729,7 +770,8 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
               <div>
                 <h3 className="card-title">Universal Role & Capability Grants</h3>
                 <p className="card-subtitle">
-                  Inspect the institution's effective roles and capability grants. Reconcile missing canonical permissions without altering custom grants or institution policies.
+                  Inspect the institution's effective roles and capability grants. Reconcile missing
+                  canonical permissions without altering custom grants or institution policies.
                 </p>
               </div>
               <button
@@ -745,8 +787,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
             {/* Reconciliation Success Summary */}
             {reconcileResult && (
               <div className="info-callout mt-4">
-                <strong>Reconciliation Summary:</strong> {reconcileResult.grantedPermissions} permissions granted,{' '}
-                {reconcileResult.createdRoles.length} missing roles created, {reconcileResult.deniedProtected} explicitly denied permissions safely respected.
+                <strong>Reconciliation Summary:</strong> {reconcileResult.grantedPermissions}{' '}
+                permissions granted, {reconcileResult.createdRoles.length} missing roles created,{' '}
+                {reconcileResult.deniedProtected} explicitly denied permissions safely respected.
               </div>
             )}
 
@@ -820,7 +863,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
 
           {/* Guarded Reconciliation Modal */}
           {reconcileModalOpen && (
-            <div className="guarded-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reconcile-modal-title">
+            <div
+              className="guarded-modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reconcile-modal-title"
+            >
               <div className="guarded-modal-card">
                 <div className="guarded-modal-header">
                   <h3 id="reconcile-modal-title">Guarded Canonical Role Reconciliation</h3>
@@ -830,15 +878,28 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                 </div>
                 <div className="guarded-modal-body">
                   <p className="text-sm text-slate-700">
-                    This procedure scans all 8 canonical institution role templates and safely populates any missing baseline permissions for this tenant.
+                    This procedure scans all 8 canonical institution role templates and safely
+                    populates any missing baseline permissions for this tenant.
                   </p>
                   <div className="guarded-guarantee-list">
                     <strong>Guarded Execution Guarantees:</strong>
                     <ul className="mt-1 list-disc pl-4 space-y-1">
-                      <li><strong>Zero Deletions:</strong> No existing role assignments or custom grants will be dropped.</li>
-                      <li><strong>Explicit Denies Preserved:</strong> Capabilities explicitly denied (<code>explicitly_denied: true</code>) remain permanently enforced.</li>
-                      <li><strong>Multi-Campus Safe:</strong> Organization and Campus scopes are preserved without data leakage.</li>
-                      <li><strong>Audited:</strong> Logs an immutable record to <code>app.audit_events</code> under <code>platform.roles.reconcile</code>.</li>
+                      <li>
+                        <strong>Zero Deletions:</strong> No existing role assignments or custom
+                        grants will be dropped.
+                      </li>
+                      <li>
+                        <strong>Explicit Denies Preserved:</strong> Capabilities explicitly denied (
+                        <code>explicitly_denied: true</code>) remain permanently enforced.
+                      </li>
+                      <li>
+                        <strong>Multi-Campus Safe:</strong> Organization and Campus scopes are
+                        preserved without data leakage.
+                      </li>
+                      <li>
+                        <strong>Audited:</strong> Logs an immutable record to{' '}
+                        <code>app.audit_events</code> under <code>platform.roles.reconcile</code>.
+                      </li>
                     </ul>
                   </div>
                   <p className="text-xs text-slate-500 mt-2">
@@ -857,7 +918,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                     type="button"
                     className="platform-btn platform-btn-primary"
                     disabled={reconciling}
-                    onClick={handleConfirmReconcileRoles}
+                    onClick={() => {
+                      void handleConfirmReconcileRoles();
+                    }}
                   >
                     {reconciling ? 'Reconciling...' : 'Confirm & Execute Reconciliation'}
                   </button>
@@ -874,7 +937,9 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
           <div className="platform-card">
             <h3 className="card-title">Controlled Critical Authority Delegation</h3>
             <p className="card-subtitle">
-              Delegating sensitive authority (such as Financial Gateway Administration or Security Device Authority) requires strict verification, two-person authorization, and immutable audit logs.
+              Delegating sensitive authority (such as Financial Gateway Administration or Security
+              Device Authority) requires strict verification, two-person authorization, and
+              immutable audit logs.
             </p>
 
             {authSuccess && (
@@ -883,10 +948,37 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleGrantAuthority} className="mt-6">
-              <div className="form-row">
-                <div className="form-group flex-1">
-                  <label htmlFor="auth-type">Authority Type *</label>
+            <form
+              onSubmit={(e) => {
+                void handleGrantAuthority(e);
+              }}
+              className="mt-6"
+            >
+              <div className="security-callout-banner">
+                <svg
+                  className="security-callout-icon"
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <strong>High-Privilege Security Delegation:</strong> Appointing an executive to
+                  critical authorities grants emergency administrative access. This delegation is
+                  recorded in the immutable platform audit ledger with your operator identity.
+                </div>
+              </div>
+
+              <div className="form-row-2col">
+                <div className="form-group">
+                  <label htmlFor="auth-type">
+                    Authority Type <span className="required-star">*</span>
+                  </label>
                   <select
                     id="auth-type"
                     value={authorityType}
@@ -902,8 +994,10 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="form-group flex-1">
-                  <label htmlFor="auth-email">Appointed Executive Email *</label>
+                <div className="form-group">
+                  <label htmlFor="auth-email">
+                    Appointed Executive Email <span className="required-star">*</span>
+                  </label>
                   <input
                     id="auth-email"
                     type="email"
@@ -916,32 +1010,40 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group flex-1">
-                  <label htmlFor="auth-justification">Business & Security Justification *</label>
-                  <textarea
-                    id="auth-justification"
-                    rows={3}
-                    value={justification}
-                    onChange={(e) => setJustification(e.target.value)}
-                    placeholder="Document institutional board resolution or executive authorization..."
-                    className="platform-textarea"
-                    required
-                  />
-                </div>
+              <div className="form-group mb-4">
+                <label htmlFor="auth-justification">
+                  Business & Security Justification <span className="required-star">*</span>
+                </label>
+                <textarea
+                  id="auth-justification"
+                  rows={4}
+                  value={justification}
+                  onChange={(e) => setJustification(e.target.value)}
+                  placeholder="Document formal institutional board resolution, executive authorization ticket, or emergency change reference..."
+                  className="platform-textarea"
+                  required
+                />
+                <span className="input-hint">
+                  Provide detailed context for this delegation. This text is committed verbatim to
+                  the tamper-evident audit log.
+                </span>
+              </div>
 
-                <div className="form-group flex-1">
-                  <label htmlFor="auth-approved-by">Authorizing Operator *</label>
-                  <input
-                    id="auth-approved-by"
-                    type="text"
-                    value={approvedBy}
-                    onChange={(e) => setApprovedBy(e.target.value)}
-                    className="platform-input"
-                    required
-                  />
-                  <span className="input-hint">Name/ID of the platform operator authorizing this action</span>
-                </div>
+              <div className="form-group mb-6" style={{ maxWidth: '420px' }}>
+                <label htmlFor="auth-approved-by">
+                  Authorizing Operator <span className="required-star">*</span>
+                </label>
+                <input
+                  id="auth-approved-by"
+                  type="text"
+                  value={approvedBy}
+                  onChange={(e) => setApprovedBy(e.target.value)}
+                  className="platform-input"
+                  required
+                />
+                <span className="input-hint">
+                  Name/ID of the platform operator authorizing this action
+                </span>
               </div>
 
               <div className="card-actions-footer">
@@ -964,13 +1066,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
           <div className="platform-card">
             <h3 className="card-title">Tenant Organization Settings & Configuration</h3>
             <p className="card-subtitle">
-              Low-level tenant configurations stored securely in <code>app.organization_settings</code>.
+              Low-level tenant configurations stored securely in{' '}
+              <code>app.organization_settings</code>.
             </p>
 
             <div className="settings-inspector mt-6">
-              <pre className="json-code-box">
-                {JSON.stringify(detail.settings, null, 2)}
-              </pre>
+              <pre className="json-code-box">{JSON.stringify(detail.settings, null, 2)}</pre>
             </div>
           </div>
         </div>

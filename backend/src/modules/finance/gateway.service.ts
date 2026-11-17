@@ -9,7 +9,10 @@ import {
   decryptGatewayCredentials,
   maskSecret,
 } from '../../shared/crypto/gateway-crypto.js';
-import { defaultGatewayRegistry, PaymentGatewayRegistry } from './gateways/gateway-registry.js';
+import {
+  defaultGatewayRegistry,
+  type PaymentGatewayRegistry,
+} from './gateways/gateway-registry.js';
 import type {
   GatewayConfig,
   PaymentGatewayProvider,

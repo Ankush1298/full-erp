@@ -183,10 +183,9 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       start_date: '2026-06-01',
       end_date: '2027-05-31',
     });
-    await adminQuery(
-      `UPDATE app.academic_years SET status = 'ACTIVE' WHERE id = $1`,
-      [academicYearId],
-    );
+    await adminQuery(`UPDATE app.academic_years SET status = 'ACTIVE' WHERE id = $1`, [
+      academicYearId,
+    ]);
 
     const semType = await insert('period_types', {
       code: `SEM_${RUN}`.slice(0, 10),
@@ -217,10 +216,7 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       start_date: '2026-06-01',
       end_date: '2026-11-30',
     });
-    await adminQuery(
-      `UPDATE app.terms SET status = 'ACTIVE' WHERE id = $1`,
-      [termId],
-    );
+    await adminQuery(`UPDATE app.terms SET status = 'ACTIVE' WHERE id = $1`, [termId]);
 
     cohortPeriodId = await insert('cohort_periods', {
       cohort_id: cohortId,
@@ -254,10 +250,9 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       status: 'DRAFT',
     });
 
-    await adminQuery(
-      `UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`,
-      [courseOfferingId],
-    );
+    await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+      courseOfferingId,
+    ]);
 
     // Assign Teacher to Course Offering
     await insert('faculty_assignments', {
@@ -321,10 +316,10 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       status: 'REGISTERED',
     });
 
-    await adminQuery(
-      `UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`,
-      [te1, te2],
-    );
+    await adminQuery(`UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`, [
+      te1,
+      te2,
+    ]);
     await insert('section_memberships', {
       student_id: student2Id,
       term_enrollment_id: te2,
@@ -465,10 +460,9 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       registration_policy: 'MANUAL',
       status: 'DRAFT',
     });
-    await adminQuery(
-      `UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`,
-      [otherOfferingId],
-    );
+    await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+      otherOfferingId,
+    ]);
 
     const resUnassigned = await app.inject({
       method: 'POST',
@@ -553,7 +547,9 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       headers: { cookie: `session_token=${s.student1.cookie}` },
     });
     expect(resDl.statusCode).toBe(200);
-    expect(resDl.json<{ data: { fileName: string } }>().data.fileName).toBe('Optics_Worksheet_Ch4.pdf');
+    expect(resDl.json<{ data: { fileName: string } }>().data.fileName).toBe(
+      'Optics_Worksheet_Ch4.pdf',
+    );
 
     // 3d. Student 1 uploads submission file and submits homework
     const solBuf = Buffer.from('%PDF-1.4\nStudent 1 Optics Solutions\n%%EOF');
@@ -695,7 +691,9 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       },
     });
     expect(resBlockedPublish.statusCode).toBe(403);
-    expect(resBlockedPublish.json<{ error: { code: string } }>().error.code).toBe('STEP_UP_REQUIRED');
+    expect(resBlockedPublish.json<{ error: { code: string } }>().error.code).toBe(
+      'STEP_UP_REQUIRED',
+    );
 
     // Elevate Principal session for CRITICAL result publication
     await elevateSession(s.principal.cookie);
@@ -719,8 +717,12 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       headers: { cookie: `session_token=${s.student1.cookie}` },
     });
     expect(resStuReport.statusCode).toBe(200);
-    const results = resStuReport.json<{ data: Array<{ marks_obtained: unknown; is_passing: boolean }> }>().data;
-    expect(results.some((r) => Number(r.marks_obtained) === 88 && r.is_passing === true)).toBe(true);
+    const results = resStuReport.json<{
+      data: Array<{ marks_obtained: unknown; is_passing: boolean }>;
+    }>().data;
+    expect(results.some((r) => Number(r.marks_obtained) === 88 && r.is_passing === true)).toBe(
+      true,
+    );
 
     // 4g. Security: Student 2 cannot view Student 1 results (403)
     const resSecRes = await app.inject({
@@ -793,9 +795,7 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
         payment_method: 'CASH',
         amount: 1000000,
         currency: 'INR',
-        allocations: [
-          { student_due_id: studentDueId, amount: 1000000 },
-        ],
+        allocations: [{ student_due_id: studentDueId, amount: 1000000 }],
       },
     });
     expect(resReceipt.statusCode).toBe(201);
@@ -821,7 +821,8 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       headers: { cookie: `session_token=${s.parent1.cookie}` },
     });
     expect(resChildren.statusCode).toBe(200);
-    const children = resChildren.json<{ success: boolean; data: Array<{ studentId: string }> }>().data;
+    const children = resChildren.json<{ success: boolean; data: Array<{ studentId: string }> }>()
+      .data;
     expect(children.length).toBe(1);
     expect(children[0]!.studentId).toBe(student1Id);
 
@@ -849,8 +850,15 @@ describe('Master ERP Quality Assurance: End-to-End Workflow & Multi-Role Accepta
       headers: { cookie: `session_token=${s.parent1.cookie}` },
     });
     expect(resHw.statusCode).toBe(200);
-    const hwList = resHw.json<{ success: boolean; data: Array<{ title: string; submissionStatus: string }> }>().data;
-    expect(hwList.some((h) => h.title === 'Optics & Refraction Problems' && h.submissionStatus === 'REVIEWED')).toBe(true);
+    const hwList = resHw.json<{
+      success: boolean;
+      data: Array<{ title: string; submissionStatus: string }>;
+    }>().data;
+    expect(
+      hwList.some(
+        (h) => h.title === 'Optics & Refraction Problems' && h.submissionStatus === 'REVIEWED',
+      ),
+    ).toBe(true);
 
     // 6d. Security: Parent cannot query unlinked Student 2 (403 Forbidden)
     const resForbiddenChild = await app.inject({

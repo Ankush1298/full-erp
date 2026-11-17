@@ -4,7 +4,9 @@ import pg from 'pg';
 import { registerPlatformRoutes } from './platform.routes.js';
 import type { PlatformDb } from './platform.service.js';
 
-export function createPlatformDb(connectionString: string): PlatformDb & { close: () => Promise<void> } {
+export function createPlatformDb(
+  connectionString: string,
+): PlatformDb & { close: () => Promise<void> } {
   const pool = new pg.Pool({
     connectionString,
     max: 10,
@@ -12,11 +14,18 @@ export function createPlatformDb(connectionString: string): PlatformDb & { close
   });
 
   return {
-    async withSystem<T>(work: (tx: { query: <R = any>(sql: string, params?: unknown[]) => Promise<{ rows: R[]; rowCount: number | null }> }) => Promise<T>): Promise<T> {
+    async withSystem<T>(
+      work: (tx: {
+        query: <R = Record<string, unknown>>(
+          sql: string,
+          params?: unknown[],
+        ) => Promise<{ rows: R[]; rowCount: number | null }>;
+      }) => Promise<T>,
+    ): Promise<T> {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        const result = await work(client as any);
+        const result = await work(client);
         await client.query('COMMIT');
         return result;
       } catch (err) {
@@ -26,8 +35,11 @@ export function createPlatformDb(connectionString: string): PlatformDb & { close
         client.release();
       }
     },
-    async query<T = any>(sql: string, params?: unknown[]): Promise<{ rows: T[]; rowCount: number | null }> {
-      const res = await pool.query(sql, params as any[]);
+    async query<T = Record<string, unknown>>(
+      sql: string,
+      params?: unknown[],
+    ): Promise<{ rows: T[]; rowCount: number | null }> {
+      const res = await pool.query(sql, params ?? []);
       return { rows: res.rows as T[], rowCount: res.rowCount };
     },
     async close(): Promise<void> {
@@ -36,7 +48,7 @@ export function createPlatformDb(connectionString: string): PlatformDb & { close
   };
 }
 
-export function buildPlatformServer(opts: { db: any }) {
+export function buildPlatformServer(opts: { db: PlatformDb }) {
   const app = Fastify({
     logger: false,
   });
@@ -56,10 +68,11 @@ async function start() {
   const host = process.env['PLATFORM_HOST'] || '127.0.0.1';
 
   const connectionString =
-    process.env['PLATFORM_DATABASE_URL'] ||
-    process.env['DATABASE_ADMIN_URL'];
+    process.env['PLATFORM_DATABASE_URL'] || process.env['DATABASE_ADMIN_URL'];
   if (!connectionString) {
-    throw new Error('PLATFORM_DATABASE_URL or DATABASE_ADMIN_URL environment variable is required.');
+    throw new Error(
+      'PLATFORM_DATABASE_URL or DATABASE_ADMIN_URL environment variable is required.',
+    );
   }
 
   const db = createPlatformDb(connectionString);
@@ -73,8 +86,12 @@ async function start() {
     await db.close();
     process.exit(0);
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => {
+    void shutdown();
+  });
+  process.on('SIGTERM', () => {
+    void shutdown();
+  });
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {

@@ -23,13 +23,62 @@ export interface PolicyEditorProps {
 }
 
 const DEFAULT_GRADE_SCALE: GradeBoundary[] = [
-  { grade: 'A+', min_percentage: 90, max_percentage: 100, grade_point: 10, description: 'Outstanding', is_passing: true },
-  { grade: 'A', min_percentage: 80, max_percentage: 89.99, grade_point: 9, description: 'Excellent', is_passing: true },
-  { grade: 'B+', min_percentage: 70, max_percentage: 79.99, grade_point: 8, description: 'Very Good', is_passing: true },
-  { grade: 'B', min_percentage: 60, max_percentage: 69.99, grade_point: 7, description: 'Good', is_passing: true },
-  { grade: 'C', min_percentage: 50, max_percentage: 59.99, grade_point: 6, description: 'Above Average', is_passing: true },
-  { grade: 'D', min_percentage: 40, max_percentage: 49.99, grade_point: 5, description: 'Pass', is_passing: true },
-  { grade: 'F', min_percentage: 0, max_percentage: 39.99, grade_point: 0, description: 'Fail', is_passing: false },
+  {
+    grade: 'A+',
+    min_percentage: 90,
+    max_percentage: 100,
+    grade_point: 10,
+    description: 'Outstanding',
+    is_passing: true,
+  },
+  {
+    grade: 'A',
+    min_percentage: 80,
+    max_percentage: 89.99,
+    grade_point: 9,
+    description: 'Excellent',
+    is_passing: true,
+  },
+  {
+    grade: 'B+',
+    min_percentage: 70,
+    max_percentage: 79.99,
+    grade_point: 8,
+    description: 'Very Good',
+    is_passing: true,
+  },
+  {
+    grade: 'B',
+    min_percentage: 60,
+    max_percentage: 69.99,
+    grade_point: 7,
+    description: 'Good',
+    is_passing: true,
+  },
+  {
+    grade: 'C',
+    min_percentage: 50,
+    max_percentage: 59.99,
+    grade_point: 6,
+    description: 'Above Average',
+    is_passing: true,
+  },
+  {
+    grade: 'D',
+    min_percentage: 40,
+    max_percentage: 49.99,
+    grade_point: 5,
+    description: 'Pass',
+    is_passing: true,
+  },
+  {
+    grade: 'F',
+    min_percentage: 0,
+    max_percentage: 39.99,
+    grade_point: 0,
+    description: 'Fail',
+    is_passing: false,
+  },
 ];
 
 export function PolicyEditor({
@@ -49,7 +98,9 @@ export function PolicyEditor({
 
   // Attendance
   const [checkAttendance, setCheckAttendance] = useState(initialPolicy?.check_attendance ?? true);
-  const [minAttendance, setMinAttendance] = useState(String(initialPolicy?.min_attendance_percentage ?? 75));
+  const [minAttendance, setMinAttendance] = useState(
+    String(initialPolicy?.min_attendance_percentage ?? 75),
+  );
   const [attendanceCutoffDays, setAttendanceCutoffDays] = useState(
     String(initialPolicy?.attendance_cutoff_days_prior ?? 0),
   );
@@ -70,9 +121,9 @@ export function PolicyEditor({
   );
 
   // Academic Eligibility
-  const [requiredEnrolmentStatus, setRequiredEnrolmentStatus] = useState<'ACTIVE' | 'REGISTERED' | 'ANY'>(
-    initialPolicy?.academic_rules?.required_enrolment_status ?? 'REGISTERED',
-  );
+  const [requiredEnrolmentStatus, setRequiredEnrolmentStatus] = useState<
+    'ACTIVE' | 'REGISTERED' | 'ANY'
+  >(initialPolicy?.academic_rules?.required_enrolment_status ?? 'REGISTERED');
   const [minEnrolmentDays, setMinEnrolmentDays] = useState(
     String(initialPolicy?.academic_rules?.min_enrolment_days ?? 0),
   );
@@ -85,7 +136,9 @@ export function PolicyEditor({
 
   // Fee Clearance
   const [checkFees, setCheckFees] = useState(initialPolicy?.check_fees ?? false);
-  const [feeTolerance, setFeeTolerance] = useState(String(initialPolicy?.fee_rules?.max_balance_tolerance ?? 0));
+  const [feeTolerance, setFeeTolerance] = useState(
+    String(initialPolicy?.fee_rules?.max_balance_tolerance ?? 0),
+  );
   const [allowConcessionExemption, setAllowConcessionExemption] = useState(
     initialPolicy?.fee_rules?.allow_concession_exemption ?? true,
   );
@@ -110,8 +163,20 @@ export function PolicyEditor({
   // Examination Components
   const [components, setComponents] = useState<AssessmentComponent[]>(
     initialPolicy?.assessment_rules?.components ?? [
-      { name: 'Theory Paper', component_type: 'THEORY', max_marks: 70, pass_marks: 28, weight_percentage: 70 },
-      { name: 'Internal Assessment', component_type: 'INTERNAL', max_marks: 30, pass_marks: 12, weight_percentage: 30 },
+      {
+        name: 'Theory Paper',
+        component_type: 'THEORY',
+        max_marks: 70,
+        pass_marks: 28,
+        weight_percentage: 70,
+      },
+      {
+        name: 'Internal Assessment',
+        component_type: 'INTERNAL',
+        max_marks: 30,
+        pass_marks: 12,
+        weight_percentage: 30,
+      },
     ],
   );
   const [allowGraceMarks, setAllowGraceMarks] = useState(
@@ -122,9 +187,9 @@ export function PolicyEditor({
   );
 
   // Grading Rules
-  const [gradingSystem, setGradingSystem] = useState<'PERCENTAGE' | 'LETTER_GRADE' | 'GRADE_POINT' | 'MARKS_ONLY'>(
-    initialPolicy?.grading_rules?.grading_system ?? 'PERCENTAGE',
-  );
+  const [gradingSystem, setGradingSystem] = useState<
+    'PERCENTAGE' | 'LETTER_GRADE' | 'GRADE_POINT' | 'MARKS_ONLY'
+  >(initialPolicy?.grading_rules?.grading_system ?? 'PERCENTAGE');
   const [gradeScale, setGradeScale] = useState<GradeBoundary[]>(
     initialPolicy?.grading_rules?.grade_scale?.length
       ? initialPolicy.grading_rules.grade_scale
@@ -194,15 +259,15 @@ export function PolicyEditor({
   }
 
   function handleUpdateComponent(index: number, updates: Partial<AssessmentComponent>) {
-    setComponents((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, ...updates } : c)),
-    );
+    setComponents((prev) => prev.map((c, i) => (i === index ? { ...c, ...updates } : c)));
   }
 
-  function handleGradeBoundaryChange(index: number, field: keyof GradeBoundary, val: any) {
-    setGradeScale((prev) =>
-      prev.map((b, i) => (i === index ? { ...b, [field]: val } : b)),
-    );
+  function handleGradeBoundaryChange(
+    index: number,
+    field: keyof GradeBoundary,
+    val: GradeBoundary[keyof GradeBoundary],
+  ) {
+    setGradeScale((prev) => prev.map((b, i) => (i === index ? { ...b, [field]: val } : b)));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -258,13 +323,7 @@ export function PolicyEditor({
         allow_individual_override: allowIndividualExemption,
         results_workflow:
           governanceMode === 'PRINCIPAL_FINAL_AUTHORITY' ? 'DIRECT_PUBLISH' : resultsWorkflow,
-        delegated_roles: [
-          'COLLEGE_ADMIN',
-          'CAMPUS_ADMIN',
-          'REGISTRAR',
-          'DEPARTMENT_ADMIN',
-          'HOD',
-        ],
+        delegated_roles: ['COLLEGE_ADMIN', 'CAMPUS_ADMIN', 'REGISTRAR', 'DEPARTMENT_ADMIN', 'HOD'],
         effective_date: effectiveDate,
         notes: approvalNotes || undefined,
       },
@@ -272,15 +331,20 @@ export function PolicyEditor({
 
     try {
       await onSave(payload);
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to save examination policy.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save examination policy.');
     } finally {
       setSaving(false);
     }
   }
 
   const content = (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      className="space-y-6"
+    >
       {error && <Alert tone="error">{error}</Alert>}
 
       {/* SECTION 1: General Policy & Scope */}
@@ -302,10 +366,14 @@ export function PolicyEditor({
           />
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
+            <label
+              htmlFor="policy-scope-select"
+              className="text-xs font-semibold text-foreground uppercase tracking-wider block"
+            >
               Policy Scope
             </label>
             <select
+              id="policy-scope-select"
               value={scope}
               onChange={(e) => setScope(e.target.value as PolicyScope)}
               className="w-full h-10 px-3 rounded-md border border-input bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -321,10 +389,14 @@ export function PolicyEditor({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
+            <label
+              htmlFor="policy-status-select"
+              className="text-xs font-semibold text-foreground uppercase tracking-wider block"
+            >
               Lifecycle Status
             </label>
             <select
+              id="policy-status-select"
               value={status}
               onChange={(e) => setStatus(e.target.value as PolicyStatus)}
               className="w-full h-10 px-3 rounded-md border border-input bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -336,10 +408,14 @@ export function PolicyEditor({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
+            <label
+              htmlFor="policy-description-input"
+              className="text-xs font-semibold text-foreground uppercase tracking-wider block"
+            >
               Description / Notes
             </label>
             <input
+              id="policy-description-input"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -391,12 +467,18 @@ export function PolicyEditor({
             />
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground block">
+              <label
+                htmlFor="calculation-period-select"
+                className="text-xs font-semibold text-foreground block"
+              >
                 Calculation Period
               </label>
               <select
+                id="calculation-period-select"
                 value={calculationPeriod}
-                onChange={(e) => setCalculationPeriod(e.target.value as any)}
+                onChange={(e) =>
+                  setCalculationPeriod(e.target.value as 'FULL_TERM' | 'SEMESTER' | 'CUSTOM')
+                }
                 className="w-full h-9 px-2 rounded-md border border-input bg-surface text-xs text-foreground"
               >
                 <option value="FULL_TERM">Full Term Cumulative</option>
@@ -406,12 +488,18 @@ export function PolicyEditor({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground block">
+              <label
+                htmlFor="excused-treatment-select"
+                className="text-xs font-semibold text-foreground block"
+              >
                 Excused Absence Treatment
               </label>
               <select
+                id="excused-treatment-select"
                 value={excusedTreatment}
-                onChange={(e) => setExcusedTreatment(e.target.value as any)}
+                onChange={(e) =>
+                  setExcusedTreatment(e.target.value as 'EXEMPT' | 'PRESENT' | 'ABSENT')
+                }
                 className="w-full h-9 px-2 rounded-md border border-input bg-surface text-xs text-foreground"
               >
                 <option value="EXEMPT">Exempt from denominator (Does not lower percentage)</option>
@@ -421,12 +509,18 @@ export function PolicyEditor({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground block">
+              <label
+                htmlFor="late-treatment-select"
+                className="text-xs font-semibold text-foreground block"
+              >
                 Late Arrival Treatment
               </label>
               <select
+                id="late-treatment-select"
                 value={lateTreatment}
-                onChange={(e) => setLateTreatment(e.target.value as any)}
+                onChange={(e) =>
+                  setLateTreatment(e.target.value as 'PRESENT' | 'HALF_DAY' | 'ABSENT')
+                }
                 className="w-full h-9 px-2 rounded-md border border-input bg-surface text-xs text-foreground"
               >
                 <option value="PRESENT">Count as Full Present</option>
@@ -444,7 +538,9 @@ export function PolicyEditor({
                 onChange={(e) => setExcludeCancelled(e.target.checked)}
                 className="rounded border-input text-brand-600 h-4 w-4"
               />
-              <span className="text-foreground">Exclude cancelled or unscheduled class sessions</span>
+              <span className="text-foreground">
+                Exclude cancelled or unscheduled class sessions
+              </span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -453,7 +549,9 @@ export function PolicyEditor({
                 onChange={(e) => setProrateLateEnrolment(e.target.checked)}
                 className="rounded border-input text-brand-600 h-4 w-4"
               />
-              <span className="text-foreground">Pro-rate attendance for students enrolled mid-term</span>
+              <span className="text-foreground">
+                Pro-rate attendance for students enrolled mid-term
+              </span>
             </label>
           </div>
         </PolicySettingRow>
@@ -470,12 +568,18 @@ export function PolicyEditor({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-foreground block">
+            <label
+              htmlFor="required-enrolment-status-select"
+              className="text-xs font-semibold text-foreground block"
+            >
               Required Enrolment Status
             </label>
             <select
+              id="required-enrolment-status-select"
               value={requiredEnrolmentStatus}
-              onChange={(e) => setRequiredEnrolmentStatus(e.target.value as any)}
+              onChange={(e) =>
+                setRequiredEnrolmentStatus(e.target.value as 'ACTIVE' | 'REGISTERED' | 'ANY')
+              }
               className="w-full h-9 px-2 rounded-md border border-input bg-surface text-xs text-foreground"
             >
               <option value="REGISTERED">REGISTERED (Enrolled and rostered)</option>
@@ -595,10 +699,14 @@ export function PolicyEditor({
           onChange={setAllowIndividualExemption}
         >
           <div className="space-y-1 max-w-xs">
-            <label className="text-xs font-semibold text-foreground block">
+            <label
+              htmlFor="exemption-approver-role-select"
+              className="text-xs font-semibold text-foreground block"
+            >
               Required Exemption Approver Role
             </label>
             <select
+              id="exemption-approver-role-select"
               value={exemptionApproverRole}
               onChange={(e) => setExemptionApproverRole(e.target.value)}
               className="w-full h-9 px-2 rounded-md border border-input bg-surface text-xs text-foreground"
@@ -632,10 +740,14 @@ export function PolicyEditor({
               className="p-3 border border-border rounded-lg bg-surface flex flex-wrap items-center gap-3"
             >
               <div className="flex-1 min-w-[140px]">
-                <label className="text-[10px] font-semibold text-muted uppercase block">
+                <label
+                  htmlFor={`comp-name-${idx}`}
+                  className="text-[10px] font-semibold text-muted uppercase block"
+                >
                   Component Name
                 </label>
                 <input
+                  id={`comp-name-${idx}`}
                   type="text"
                   value={comp.name}
                   onChange={(e) => handleUpdateComponent(idx, { name: e.target.value })}
@@ -645,11 +757,19 @@ export function PolicyEditor({
               </div>
 
               <div className="w-32">
-                <label className="text-[10px] font-semibold text-muted uppercase block">Type</label>
+                <label
+                  htmlFor={`comp-type-${idx}`}
+                  className="text-[10px] font-semibold text-muted uppercase block"
+                >
+                  Type
+                </label>
                 <select
+                  id={`comp-type-${idx}`}
                   value={comp.component_type}
                   onChange={(e) =>
-                    handleUpdateComponent(idx, { component_type: e.target.value as any })
+                    handleUpdateComponent(idx, {
+                      component_type: e.target.value as AssessmentComponent['component_type'],
+                    })
                   }
                   className="w-full h-8 px-2 rounded border border-input bg-surface text-xs text-foreground"
                 >
@@ -663,8 +783,14 @@ export function PolicyEditor({
               </div>
 
               <div className="w-20">
-                <label className="text-[10px] font-semibold text-muted uppercase block">Max Marks</label>
+                <label
+                  htmlFor={`comp-max-${idx}`}
+                  className="text-[10px] font-semibold text-muted uppercase block"
+                >
+                  Max Marks
+                </label>
                 <input
+                  id={`comp-max-${idx}`}
                   type="number"
                   value={comp.max_marks}
                   onChange={(e) =>
@@ -677,8 +803,14 @@ export function PolicyEditor({
               </div>
 
               <div className="w-20">
-                <label className="text-[10px] font-semibold text-muted uppercase block">Pass Marks</label>
+                <label
+                  htmlFor={`comp-pass-${idx}`}
+                  className="text-[10px] font-semibold text-muted uppercase block"
+                >
+                  Pass Marks
+                </label>
                 <input
+                  id={`comp-pass-${idx}`}
                   type="number"
                   value={comp.pass_marks}
                   onChange={(e) =>
@@ -691,8 +823,14 @@ export function PolicyEditor({
               </div>
 
               <div className="w-20">
-                <label className="text-[10px] font-semibold text-muted uppercase block">Weight %</label>
+                <label
+                  htmlFor={`comp-weight-${idx}`}
+                  className="text-[10px] font-semibold text-muted uppercase block"
+                >
+                  Weight %
+                </label>
                 <input
+                  id={`comp-weight-${idx}`}
                   type="number"
                   value={comp.weight_percentage}
                   onChange={(e) =>
@@ -728,7 +866,9 @@ export function PolicyEditor({
                 Note: Total component weightage is {totalWeightage}% (recommended: 100%).
               </span>
             ) : (
-              <span className="text-emerald-600 font-medium">✓ Total weightage balanced (100%)</span>
+              <span className="text-emerald-600 font-medium">
+                ✓ Total weightage balanced (100%)
+              </span>
             )}
           </div>
         </div>
@@ -763,10 +903,20 @@ export function PolicyEditor({
         </div>
 
         <div className="space-y-2 max-w-xs">
-          <label className="text-xs font-semibold text-foreground block">Grading System</label>
+          <label
+            htmlFor="grading-system-select"
+            className="text-xs font-semibold text-foreground block"
+          >
+            Grading System
+          </label>
           <select
+            id="grading-system-select"
             value={gradingSystem}
-            onChange={(e) => setGradingSystem(e.target.value as any)}
+            onChange={(e) =>
+              setGradingSystem(
+                e.target.value as 'PERCENTAGE' | 'LETTER_GRADE' | 'GRADE_POINT' | 'MARKS_ONLY',
+              )
+            }
             className="w-full h-9 px-2 rounded-md border border-input bg-surface text-xs text-foreground"
           >
             <option value="PERCENTAGE">Percentage Only (0% - 100%)</option>
@@ -942,73 +1092,95 @@ export function PolicyEditor({
       {/* SECTION 9: Result Approval Authority & Publication */}
       <div className="space-y-4">
         <div className="border-b border-border pb-2">
-          <h4 className="text-base font-bold text-foreground">9. Results Approval Authority & Publication Workflow</h4>
+          <h4 className="text-base font-bold text-foreground">
+            9. Results Approval Authority & Publication Workflow
+          </h4>
           <p className="text-xs text-muted">
-            Configure institutional governance authority, maker-checker separation rules, and result release workflows.
+            Configure institutional governance authority, maker-checker separation rules, and result
+            release workflows.
           </p>
         </div>
 
         <div className="space-y-3">
-          <label className="text-xs font-semibold text-foreground block">
+          <span className="text-xs font-semibold text-foreground block">
             Results Approval Governance Mode
-          </label>
+          </span>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div
+            <button
+              type="button"
               onClick={() => setGovernanceMode('PRINCIPAL_FINAL_AUTHORITY')}
-              className={`p-3 rounded-lg border cursor-pointer transition-all ${
+              className={`text-left p-3 rounded-lg border cursor-pointer transition-all ${
                 governanceMode === 'PRINCIPAL_FINAL_AUTHORITY'
                   ? 'border-primary bg-primary/5 ring-1 ring-primary'
                   : 'border-border bg-surface hover:border-border/80'
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-foreground">Mode A: Principal Final Authority</span>
+                <span className="text-xs font-bold text-foreground">
+                  Mode A: Principal Final Authority
+                </span>
                 {governanceMode === 'PRINCIPAL_FINAL_AUTHORITY' && (
-                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Active</span>
+                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                    Active
+                  </span>
                 )}
               </div>
               <p className="text-[11px] text-muted leading-relaxed">
-                Principal serves as final academic authority. No mandatory second-person approval required for Principal submitted marks. Suitable for single-administrator institutions.
+                Principal serves as final academic authority. No mandatory second-person approval
+                required for Principal submitted marks. Suitable for single-administrator
+                institutions.
               </p>
-            </div>
+            </button>
 
-            <div
+            <button
+              type="button"
               onClick={() => setGovernanceMode('INDEPENDENT_REVIEW')}
-              className={`p-3 rounded-lg border cursor-pointer transition-all ${
+              className={`text-left p-3 rounded-lg border cursor-pointer transition-all ${
                 governanceMode === 'INDEPENDENT_REVIEW'
                   ? 'border-primary bg-primary/5 ring-1 ring-primary'
                   : 'border-border bg-surface hover:border-border/80'
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-foreground">Mode B: Independent Review</span>
+                <span className="text-xs font-bold text-foreground">
+                  Mode B: Independent Review
+                </span>
                 {governanceMode === 'INDEPENDENT_REVIEW' && (
-                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Active</span>
+                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                    Active
+                  </span>
                 )}
               </div>
               <p className="text-[11px] text-muted leading-relaxed">
-                Strict maker-checker separation: Marks submitter and publisher must be distinct authorized actors. Required for schools with formal examination committees.
+                Strict maker-checker separation: Marks submitter and publisher must be distinct
+                authorized actors. Required for schools with formal examination committees.
               </p>
-            </div>
+            </button>
 
-            <div
+            <button
+              type="button"
               onClick={() => setGovernanceMode('DELEGATED_APPROVAL')}
-              className={`p-3 rounded-lg border cursor-pointer transition-all ${
+              className={`text-left p-3 rounded-lg border cursor-pointer transition-all ${
                 governanceMode === 'DELEGATED_APPROVAL'
                   ? 'border-primary bg-primary/5 ring-1 ring-primary'
                   : 'border-border bg-surface hover:border-border/80'
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-foreground">Mode C: Delegated Authority</span>
+                <span className="text-xs font-bold text-foreground">
+                  Mode C: Delegated Authority
+                </span>
                 {governanceMode === 'DELEGATED_APPROVAL' && (
-                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Active</span>
+                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                    Active
+                  </span>
                 )}
               </div>
               <p className="text-[11px] text-muted leading-relaxed">
-                Principal authorizes designated leadership roles (Campus Admin, Registrar, HOD) to review and sign off results within their assigned academic scope.
+                Principal authorizes designated leadership roles (Campus Admin, Registrar, HOD) to
+                review and sign off results within their assigned academic scope.
               </p>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -1022,25 +1194,34 @@ export function PolicyEditor({
           </div>
           {governanceMode === 'PRINCIPAL_FINAL_AUTHORITY' ? (
             <p className="text-muted text-[11px]">
-              The Principal may enter marks, submit them, authorize corrections, and directly publish results. Faculty members require Principal review. All actions are immutably logged with audit risk tier 2.
+              The Principal may enter marks, submit them, authorize corrections, and directly
+              publish results. Faculty members require Principal review. All actions are immutably
+              logged with audit risk tier 2.
             </p>
           ) : governanceMode === 'INDEPENDENT_REVIEW' ? (
             <p className="text-muted text-[11px]">
-              Independent sign-off is mandatory. The user who submitted paper marks cannot authorize or publish results. An independent administrator or coordinator must certify the candidate list and marks register.
+              Independent sign-off is mandatory. The user who submitted paper marks cannot authorize
+              or publish results. An independent administrator or coordinator must certify the
+              candidate list and marks register.
             </p>
           ) : (
             <p className="text-muted text-[11px]">
-              Results approval is delegated to assigned roles: Principal, Campus Administrator, Registrar, Department Admin, and HOD.
+              Results approval is delegated to assigned roles: Principal, Campus Administrator,
+              Registrar, Department Admin, and HOD.
             </p>
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-foreground block">
+            <label
+              htmlFor="policy-effective-date"
+              className="text-xs font-semibold text-foreground block"
+            >
               Policy Effective Date
             </label>
             <input
+              id="policy-effective-date"
               type="date"
               value={effectiveDate}
               onChange={(e) => setEffectiveDate(e.target.value)}
@@ -1052,10 +1233,14 @@ export function PolicyEditor({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-foreground block">
+            <label
+              htmlFor="approval-notes-input"
+              className="text-xs font-semibold text-foreground block"
+            >
               Administrative Governance Notes
             </label>
             <input
+              id="approval-notes-input"
               type="text"
               placeholder="e.g. Approved by School Academic Board for 2026-27"
               value={approvalNotes}
@@ -1067,12 +1252,18 @@ export function PolicyEditor({
 
         {governanceMode !== 'PRINCIPAL_FINAL_AUTHORITY' && (
           <div className="space-y-1 max-w-sm pt-2">
-            <label className="text-xs font-semibold text-foreground block">
+            <label
+              htmlFor="intermediate-workflow-select"
+              className="text-xs font-semibold text-foreground block"
+            >
               Intermediate Review Workflow
             </label>
             <select
+              id="intermediate-workflow-select"
               value={resultsWorkflow}
-              onChange={(e) => setResultsWorkflow(e.target.value as any)}
+              onChange={(e) =>
+                setResultsWorkflow(e.target.value as 'DRAFT_REVIEW_PUBLISH' | 'DIRECT_PUBLISH')
+              }
               className="w-full h-9 px-2 rounded-md border border-input bg-surface text-xs text-foreground"
             >
               <option value="DRAFT_REVIEW_PUBLISH">
@@ -1092,81 +1283,84 @@ export function PolicyEditor({
                 Simulate Policy Impact
               </span>
               <span className="text-[11px] text-muted block">
-                Preview how this policy would evaluate currently enrolled candidates without modifying database state.
+                Preview how this policy would evaluate currently enrolled candidates without
+                modifying database state.
               </span>
             </div>
             <Button
               type="button"
               variant="secondary"
               disabled={simulating}
-              onClick={async () => {
-                setSimulating(true);
-                try {
-                  const payload: SaveEligibilityPolicyInput = {
-                    name,
-                    description,
-                    scope,
-                    status,
-                    min_attendance_percentage: Number(minAttendance),
-                    check_attendance: checkAttendance,
-                    check_fees: checkFees,
-                    attendance_cutoff_days_prior: Number(attendanceCutoffDays),
-                    allow_late_enrolment_review: allowLateEnrolmentReview,
-                    attendance_rules: {
-                      calculation_period: calculationPeriod,
-                      excused_treatment: excusedTreatment,
-                      late_treatment: lateTreatment,
-                      cancelled_sessions_excluded: excludeCancelled,
-                      prorate_late_enrolment: prorateLateEnrolment,
-                      min_sessions: 0,
-                      allow_exemption: allowIndividualExemption,
-                      exemption_approver_role: exemptionApproverRole,
-                    },
-                    fee_rules: {
-                      max_balance_tolerance: Number(feeTolerance),
-                      allow_concession_exemption: allowConcessionExemption,
-                      deadline_days_prior: Number(feeDeadlineDays),
-                      require_payment_verification: requirePaymentVerification,
-                    },
-                    academic_rules: {
-                      required_enrolment_status: requiredEnrolmentStatus,
-                      min_enrolment_days: Number(minEnrolmentDays),
-                      allow_academic_exception: allowAcademicException,
-                      supplementary_eligible: supplementaryEligible,
-                    },
-                    assessment_rules: {
-                      components,
-                      allow_grace_marks: allowGraceMarks,
-                      max_grace_marks: Number(maxGraceMarks),
-                    },
-                    grading_rules: {
-                      grading_system: gradingSystem,
-                      grade_scale: gradeScale,
-                    },
-                    approval_rules: {
-                      governance_mode: governanceMode,
-                      require_coordinator_review: requireCoordinatorReview,
-                      require_principal_approval: requirePrincipalApproval,
-                      allow_individual_override: allowIndividualExemption,
-                      results_workflow:
-                        governanceMode === 'PRINCIPAL_FINAL_AUTHORITY'
-                          ? 'DIRECT_PUBLISH'
-                          : resultsWorkflow,
-                      delegated_roles: [
-                        'COLLEGE_ADMIN',
-                        'CAMPUS_ADMIN',
-                        'REGISTRAR',
-                        'DEPARTMENT_ADMIN',
-                        'HOD',
-                      ],
-                      effective_date: effectiveDate,
-                      notes: approvalNotes || undefined,
-                    },
-                  };
-                  await onSimulateImpact(payload);
-                } finally {
-                  setSimulating(false);
-                }
+              onClick={() => {
+                void (async () => {
+                  setSimulating(true);
+                  try {
+                    const payload: SaveEligibilityPolicyInput = {
+                      name,
+                      description,
+                      scope,
+                      status,
+                      min_attendance_percentage: Number(minAttendance),
+                      check_attendance: checkAttendance,
+                      check_fees: checkFees,
+                      attendance_cutoff_days_prior: Number(attendanceCutoffDays),
+                      allow_late_enrolment_review: allowLateEnrolmentReview,
+                      attendance_rules: {
+                        calculation_period: calculationPeriod,
+                        excused_treatment: excusedTreatment,
+                        late_treatment: lateTreatment,
+                        cancelled_sessions_excluded: excludeCancelled,
+                        prorate_late_enrolment: prorateLateEnrolment,
+                        min_sessions: 0,
+                        allow_exemption: allowIndividualExemption,
+                        exemption_approver_role: exemptionApproverRole,
+                      },
+                      fee_rules: {
+                        max_balance_tolerance: Number(feeTolerance),
+                        allow_concession_exemption: allowConcessionExemption,
+                        deadline_days_prior: Number(feeDeadlineDays),
+                        require_payment_verification: requirePaymentVerification,
+                      },
+                      academic_rules: {
+                        required_enrolment_status: requiredEnrolmentStatus,
+                        min_enrolment_days: Number(minEnrolmentDays),
+                        allow_academic_exception: allowAcademicException,
+                        supplementary_eligible: supplementaryEligible,
+                      },
+                      assessment_rules: {
+                        components,
+                        allow_grace_marks: allowGraceMarks,
+                        max_grace_marks: Number(maxGraceMarks),
+                      },
+                      grading_rules: {
+                        grading_system: gradingSystem,
+                        grade_scale: gradeScale,
+                      },
+                      approval_rules: {
+                        governance_mode: governanceMode,
+                        require_coordinator_review: requireCoordinatorReview,
+                        require_principal_approval: requirePrincipalApproval,
+                        allow_individual_override: allowIndividualExemption,
+                        results_workflow:
+                          governanceMode === 'PRINCIPAL_FINAL_AUTHORITY'
+                            ? 'DIRECT_PUBLISH'
+                            : resultsWorkflow,
+                        delegated_roles: [
+                          'COLLEGE_ADMIN',
+                          'CAMPUS_ADMIN',
+                          'REGISTRAR',
+                          'DEPARTMENT_ADMIN',
+                          'HOD',
+                        ],
+                        effective_date: effectiveDate,
+                        notes: approvalNotes || undefined,
+                      },
+                    };
+                    await onSimulateImpact(payload);
+                  } finally {
+                    setSimulating(false);
+                  }
+                })();
               }}
             >
               {simulating ? 'Simulating...' : 'Simulate Policy Impact'}

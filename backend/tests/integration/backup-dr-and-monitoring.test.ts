@@ -102,7 +102,9 @@ describe('Enterprise Backup, Disaster Recovery & Monitoring Suite (P0)', () => {
           targetDatabaseUrl: prodUrl,
           encryptionKey: testKey,
         }),
-      ).rejects.toThrow(/PERSISTENT_DB_MUTATION_BLOCKED.*not a recognized disposable test database/);
+      ).rejects.toThrow(
+        /PERSISTENT_DB_MUTATION_BLOCKED.*not a recognized disposable test database/,
+      );
     });
   });
 
@@ -159,7 +161,7 @@ describe('Enterprise Backup, Disaster Recovery & Monitoring Suite (P0)', () => {
 
       // Tamper with one byte in the ciphertext
       const cipherData = fs.readFileSync(backupResult.filePath);
-      cipherData[50] = (cipherData[50]! ^ 0xff); // flip bits of byte 50
+      cipherData[50] = cipherData[50]! ^ 0xff; // flip bits of byte 50
       fs.writeFileSync(backupResult.filePath, cipherData);
 
       const verifyRes = await manager.verifyBackup(backupResult.metaPath, testKey);
@@ -178,12 +180,16 @@ describe('Enterprise Backup, Disaster Recovery & Monitoring Suite (P0)', () => {
       const wrongKey = 'wrong-key-completely-different-32chars!';
       const verifyRes = await manager.verifyBackup(backupResult.metaPath, wrongKey);
       expect(verifyRes.valid).toBe(false);
-      expect(verifyRes.errors.some((e) => e.includes('keyId mismatch') || e.includes('Unsupported state'))).toBe(true);
+      expect(
+        verifyRes.errors.some(
+          (e) => e.includes('keyId mismatch') || e.includes('Unsupported state'),
+        ),
+      ).toBe(true);
     });
   });
 
   describe('4. Retention Policy Pruning', () => {
-    it('prunes expired backups while retaining recent ones', async () => {
+    it('prunes expired backups while retaining recent ones', () => {
       // Create a mock old backup
       const oldMetaPath = path.join(tempStorageDir, 'backup-old-test.meta.json');
       const oldDumpPath = path.join(tempStorageDir, 'backup-old-test.dump.enc');
@@ -275,7 +281,13 @@ describe('Enterprise Backup, Disaster Recovery & Monitoring Suite (P0)', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json();
+      const body = res.json<{
+        status: string;
+        database: string;
+        backups: string;
+        storage: string;
+        uptimeSeconds: number;
+      }>();
       expect(body.status).toMatch(/^(HEALTHY|DEGRADED)$/);
       expect(body.database).toBe('CONNECTED');
       expect(body.backups).toMatch(/^(FRESH|WARNING|STALE|NONE)$/);
@@ -305,7 +317,15 @@ describe('Enterprise Backup, Disaster Recovery & Monitoring Suite (P0)', () => {
       });
 
       expect(authRes.statusCode).toBe(200);
-      const body = authRes.json();
+      const body = authRes.json<{
+        success: boolean;
+        data: {
+          database: { connected: boolean; latencyMs: number };
+          storage: { documentStoreReady: boolean };
+          api: { memoryMb: { heapUsed: number } };
+          security: { rlsEnforcedGlobally: boolean };
+        };
+      }>();
       expect(body.success).toBe(true);
       expect(body.data.database.connected).toBe(true);
       expect(typeof body.data.database.latencyMs).toBe('number');

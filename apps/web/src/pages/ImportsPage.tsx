@@ -52,7 +52,8 @@ const KINDS: Record<ImportKind, KindConfig> = {
     label: 'Student records',
     shortLabel: 'Students',
     icon: 'student',
-    description: 'Enrol admitted students into institutional cohorts with admission number and official admission date.',
+    description:
+      'Enrol admitted students into institutional cohorts with admission number and official admission date.',
     permission: 'student.record.create',
     columns:
       'email, admissionNumber, admissionDate, optional campusId; optional, used only to look for a possible duplicate and never stored (sent again with each step and kept in this page only): name, dateOfBirth (YYYY-MM-DD), guardianPhone',
@@ -67,7 +68,8 @@ const KINDS: Record<ImportKind, KindConfig> = {
     label: 'Employee records (faculty and staff)',
     shortLabel: 'Employees',
     icon: 'employee',
-    description: 'Enrol teaching faculty and operational staff with unique employee code, role classification, and joining date.',
+    description:
+      'Enrol teaching faculty and operational staff with unique employee code, role classification, and joining date.',
     permission: 'employee.record.create',
     columns: 'email, employeeCode, employeeType, joiningDate',
     requiredColumns: ['email', 'employeeCode', 'employeeType', 'joiningDate'],
@@ -360,7 +362,14 @@ export function ImportsPage() {
       <section className="import-intro-panel" aria-label="Import process overview">
         <div className="import-intro-header">
           <div className="import-intro-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
@@ -369,24 +378,38 @@ export function ImportsPage() {
           <h2 className="import-intro-title">Institutional Bulk Record Ingestion</h2>
         </div>
         <p className="import-intro-desc">
-          Automate student cohort enrolment and employee onboarding safely. Bulk ingestion eliminates manual record entry while strictly enforcing institution-wide schema validation, duplicate detection, and two-phase preview before committing.
+          Automate student cohort enrolment and employee onboarding safely. Bulk ingestion
+          eliminates manual record entry while strictly enforcing institution-wide schema
+          validation, duplicate detection, and two-phase preview before committing.
         </p>
         <div className="import-highlights-grid">
           <div className="import-highlight-item">
             <strong>Target Administrators</strong>
-            <p>Designed for Admissions Registrars, Academic Deans, and HR Staff managing large batches.</p>
+            <p>
+              Designed for Admissions Registrars, Academic Deans, and HR Staff managing large
+              batches.
+            </p>
           </div>
           <div className="import-highlight-item">
             <strong>Created vs Matched</strong>
-            <p>Created records bind to active accounts. Name, DOB, and phone are matching-only probes and are never stored.</p>
+            <p>
+              Created records bind to active accounts. Name, DOB, and phone are matching-only probes
+              and are never stored.
+            </p>
           </div>
           <div className="import-highlight-item">
             <strong>Strict Review Gate</strong>
-            <p>No records are written to the database until an authorized administrator verifies the preview and provides an audit reason.</p>
+            <p>
+              No records are written to the database until an authorized administrator verifies the
+              preview and provides an audit reason.
+            </p>
           </div>
           <div className="import-highlight-item">
             <strong>Security & Injection Safe</strong>
-            <p>Tenant-isolated with RLS enforcement, formula prefix neutralization, and full audit logging.</p>
+            <p>
+              Tenant-isolated with RLS enforcement, formula prefix neutralization, and full audit
+              logging.
+            </p>
           </div>
         </div>
       </section>
@@ -400,7 +423,9 @@ export function ImportsPage() {
             <span className="import-step-name">Prepare & Upload</span>
           </div>
         </div>
-        <span className="import-step-arrow" aria-hidden="true">→</span>
+        <span className="import-step-arrow" aria-hidden="true">
+          →
+        </span>
         <div
           className={`import-step-node ${
             currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''
@@ -412,7 +437,9 @@ export function ImportsPage() {
             <span className="import-step-name">Validate & Review</span>
           </div>
         </div>
-        <span className="import-step-arrow" aria-hidden="true">→</span>
+        <span className="import-step-arrow" aria-hidden="true">
+          →
+        </span>
         <div
           className={`import-step-node ${
             currentStep === 3 && job?.status === 'COMMITTED'
@@ -435,16 +462,20 @@ export function ImportsPage() {
         <Card title="1. Choose the file">
           <form onSubmit={start} noValidate aria-label="Upload import file">
             <fieldset style={{ border: 'none', padding: 0, margin: '0 0 var(--space-4) 0' }}>
-              <legend style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: 'var(--space-3)' }}>
+              <legend
+                style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: 'var(--space-3)' }}
+              >
                 Records to import
               </legend>
               <div className="import-kinds-container">
                 {allowed.map((k) => (
                   <label
                     key={k}
+                    htmlFor={`import-kind-${k}`}
                     className={`import-kind-option ${kind === k ? 'selected' : ''}`}
                   >
                     <input
+                      id={`import-kind-${k}`}
                       type="radio"
                       name="kind"
                       checked={kind === k}
@@ -454,8 +485,8 @@ export function ImportsPage() {
                       }}
                     />
                     <div className="import-kind-content">
-                      <div className="import-kind-title">{KINDS[k].label}</div>
-                      <div className="import-kind-summary">{KINDS[k].description}</div>
+                      <span className="import-kind-title">{KINDS[k].label}</span>
+                      <span className="import-kind-summary">{KINDS[k].description}</span>
                     </div>
                   </label>
                 ))}
@@ -469,13 +500,10 @@ export function ImportsPage() {
             {/* Template Download and Documentation Bar */}
             <div className="import-template-actions">
               <div className="import-template-info">
-                <strong>Need an example format?</strong> Download a pre-formatted CSV template with standard institutional column headers.
+                <strong>Need an example format?</strong> Download a pre-formatted CSV template with
+                standard institutional column headers.
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => downloadTemplate(kind)}
-              >
+              <Button type="button" variant="secondary" onClick={() => downloadTemplate(kind)}>
                 Download {KINDS[kind].shortLabel} CSV Template
               </Button>
             </div>
@@ -502,7 +530,14 @@ export function ImportsPage() {
                 aria-label="Upload CSV file"
               />
               <div className="import-dropzone-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="36"
+                  height="36"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
                   <path d="M12 12v9" />
                   <path d="m8 16 4-4 4 4" />
@@ -512,13 +547,21 @@ export function ImportsPage() {
                 Drag and drop your institutional CSV file here, or click to browse
               </div>
               <div className="import-dropzone-sub">
-                Supports UTF-8 CSV up to 1,000 rows. Clean spreadsheet formatting is verified on upload.
+                Supports UTF-8 CSV up to 1,000 rows. Clean spreadsheet formatting is verified on
+                upload.
               </div>
             </div>
 
             {/* Secondary Paste Mode */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 'var(--space-2)',
+                }}
+              >
                 <label htmlFor="csv-text" style={{ fontWeight: 600, fontSize: '0.875rem' }}>
                   Or paste the CSV text
                 </label>
@@ -553,7 +596,15 @@ export function ImportsPage() {
             {/* In-Memory Parsed Preview (before validation) */}
             {previewRows.length > 0 && (
               <div className="import-parsed-preview">
-                <div style={{ padding: '0.5rem 0.75rem', background: '#f5f3f9', fontWeight: 600, fontSize: '0.8125rem', borderBottom: '1px solid var(--color-border)' }}>
+                <div
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    background: '#f5f3f9',
+                    fontWeight: 600,
+                    fontSize: '0.8125rem',
+                    borderBottom: '1px solid var(--color-border)',
+                  }}
+                >
                   Detected Data Preview ({parsedPreview?.rows.length ?? 0} rows found in CSV)
                 </div>
                 <table className="import-parsed-table">
@@ -684,18 +735,32 @@ export function ImportsPage() {
                     <div>
                       <strong>Row {r.rowNo}</strong> <Badge>{r.status}</Badge>
                       {isNew && <span className="badge-row-new">NEW RECORD</span>}
-                      {isDuplicate && <span className="badge-row-duplicate">POSSIBLE DUPLICATE</span>}
+                      {isDuplicate && (
+                        <span className="badge-row-duplicate">POSSIBLE DUPLICATE</span>
+                      )}
                       {isInvalid && <span className="badge-row-invalid">REJECTED / INVALID</span>}
                     </div>
                   </div>
                   <div className="import-row-change">{describeChange(r)}</div>
                   {r.errors.map((i, n) => (
-                    <div key={`e${n}`} role="note" style={{ color: 'var(--color-coral)', fontSize: '0.8125rem', marginTop: '0.25rem' }}>
+                    <div
+                      key={`e${n}`}
+                      role="note"
+                      style={{
+                        color: 'var(--color-coral)',
+                        fontSize: '0.8125rem',
+                        marginTop: '0.25rem',
+                      }}
+                    >
                       Error: {issueText(i)}
                     </div>
                   ))}
                   {r.warnings.map((i, n) => (
-                    <div key={`w${n}`} role="note" style={{ color: '#b45309', fontSize: '0.8125rem', marginTop: '0.25rem' }}>
+                    <div
+                      key={`w${n}`}
+                      role="note"
+                      style={{ color: '#b45309', fontSize: '0.8125rem', marginTop: '0.25rem' }}
+                    >
                       Warning: {issueText(i)}
                     </div>
                   ))}
@@ -719,10 +784,19 @@ export function ImportsPage() {
       {/* Step 3: Confirm & Commit */}
       {job?.status === 'VALIDATED' && (
         <Card title="3. Commit">
-          <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3) var(--space-4)', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius)' }}>
+          <div
+            style={{
+              marginBottom: 'var(--space-4)',
+              padding: 'var(--space-3) var(--space-4)',
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              borderRadius: 'var(--radius)',
+            }}
+          >
             <strong style={{ color: '#065f46' }}>Ready to commit:</strong>{' '}
             <span style={{ color: '#047857' }}>
-              {job.summary.validRows ?? 0} record{(job.summary.validRows ?? 0) === 1 ? '' : 's'} will be safely created. No existing records will be silently overwritten.
+              {job.summary.validRows ?? 0} record{(job.summary.validRows ?? 0) === 1 ? '' : 's'}{' '}
+              will be safely created. No existing records will be silently overwritten.
             </span>
           </div>
 
@@ -757,7 +831,9 @@ export function ImportsPage() {
           {job.status === 'COMMITTED' && (
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <p style={{ fontSize: '0.9375rem', marginBottom: 'var(--space-3)' }}>
-                The import job has completed successfully and all audit records have been permanently logged. You can view the newly created records directly in the module register:
+                The import job has completed successfully and all audit records have been
+                permanently logged. You can view the newly created records directly in the module
+                register:
               </p>
               <Link
                 to={KINDS[kind].targetRoute}

@@ -122,6 +122,7 @@ export default tseslint.config(
       'backend/scripts/**/*.ts',
       'backend/tools/**/*.ts',
       'backend/vitest.config.ts',
+      'backend/src/shared/database/test-guard.ts',
     ],
     rules: { 'no-restricted-syntax': 'off' },
   },
@@ -133,6 +134,7 @@ export default tseslint.config(
     rules: {
       ...jsxA11y.flatConfigs.recommended.rules,
       ...reactHooks.configs.flat.recommended.rules,
+      'jsx-a11y/label-has-associated-control': ['error', { assert: 'either', depth: 3 }],
       'react-hooks/set-state-in-effect': 'off', // session restore legitimately sets state from an effect
       'no-restricted-globals': [
         'error',

@@ -183,7 +183,8 @@ export function FeatureUnavailableState({
       >
         <div className="space-y-4 text-sm" style={{ color: 'var(--color-text)', lineHeight: 1.6 }}>
           <p>
-            This feature is managed centrally for your institution. You can continue using your available Anesa Campus OS features as normal.
+            This feature is managed centrally for your institution. You can continue using your
+            available Anesa Campus OS features as normal.
           </p>
           <div
             style={{
@@ -204,11 +205,14 @@ export function FeatureUnavailableState({
               Module Availability & Inquiries
             </h4>
             <p style={{ margin: 0, color: 'var(--color-muted)' }}>
-              Module availability is managed by the Anesa Platform team. For questions about enabling this feature, please contact your institution&apos;s designated administrator, who can coordinate with the platform team.
+              Module availability is managed by the Anesa Platform team. For questions about
+              enabling this feature, please contact your institution&apos;s designated
+              administrator, who can coordinate with the platform team.
             </p>
           </div>
           <p style={{ color: 'var(--color-muted)' }}>
-            All existing institutional data across other active modules remains fully accessible and completely unaffected.
+            All existing institutional data across other active modules remains fully accessible and
+            completely unaffected.
           </p>
         </div>
       </Dialog>
@@ -273,7 +277,9 @@ export function InstitutionSuspendedState({
         </p>
 
         <p className="feature-unavailable-supporting">
-          All historical academic ledgers, student profiles, and examination records are immutable and safe. Please contact your campus leadership or system administration to restore active status.
+          All historical academic ledgers, student profiles, and examination records are immutable
+          and safe. Please contact your campus leadership or system administration to restore active
+          status.
         </p>
 
         <div className="feature-unavailable-actions">

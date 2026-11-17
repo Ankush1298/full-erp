@@ -291,12 +291,8 @@ describe('ANESA Universal Institution Roles & Permissions Unification', () => {
 
       // 2. Execute reconciliation with default options: verify fee.gateway.manage is NOT added
       const res = await reconcileTenantPermissions(exec, T.orgId, { allowCriticalGrants: false });
-      expect(
-        res.addedGrants.some((g) => g.permissionCode === 'fee.gateway.read'),
-      ).toBe(true);
-      expect(
-        res.addedGrants.some((g) => g.permissionCode === 'fee.gateway.manage'),
-      ).toBe(false);
+      expect(res.addedGrants.some((g) => g.permissionCode === 'fee.gateway.read')).toBe(true);
+      expect(res.addedGrants.some((g) => g.permissionCode === 'fee.gateway.manage')).toBe(false);
 
       // Verify custom grant was NOT deleted
       const checkCustom = await adminQuery(
@@ -329,11 +325,7 @@ describe('ANESA Universal Institution Roles & Permissions Unification', () => {
         `INSERT INTO app.organization_settings (organization_id, key, value, updated_by)
          VALUES ($1, 'authorization.denied_permissions', $2::jsonb, $3)
          ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value`,
-        [
-          T.orgId,
-          JSON.stringify({ HOD: ['exam.manage'] }),
-          T.users.admin,
-        ],
+        [T.orgId, JSON.stringify({ HOD: ['exam.manage'] }), T.users.admin],
       );
 
       // Remove exam.manage from HOD

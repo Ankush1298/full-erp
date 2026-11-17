@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -163,7 +163,8 @@ const MOCK_MODULES_CATALOG = [
     key: 'students',
     name: 'Student Management & Directory',
     category: 'CORE',
-    description: 'Admitted student onboarding, student profiles, identifiers, and scope-restricted directory lookups.',
+    description:
+      'Admitted student onboarding, student profiles, identifiers, and scope-restricted directory lookups.',
     dependencies: [],
     targetRoutes: ['/students', '/profile'],
     requiredCapabilities: ['student.profile.read', 'student.directory.search'],
@@ -172,7 +173,8 @@ const MOCK_MODULES_CATALOG = [
     key: 'school_vault',
     name: 'School Vault (Zero-Access Security)',
     category: 'SECURITY_AI',
-    description: 'Hardware WebAuthn FIDO2 authenticator-protected secret storage with 2-of-3 threshold quorum recovery.',
+    description:
+      'Hardware WebAuthn FIDO2 authenticator-protected secret storage with 2-of-3 threshold quorum recovery.',
     dependencies: [],
     targetRoutes: ['/security-center'],
     requiredCapabilities: ['vault.authority.read', 'vault.device.enroll'],
@@ -198,60 +200,68 @@ const MOCK_PLAN_BUNDLES = [
     priceInrAnnual: 149999,
     maxStudents: 5000,
     maxFaculty: 250,
-    includedModules: ['students', 'academics', 'attendance', 'homework', 'examinations', 'finance', 'school_vault'],
+    includedModules: [
+      'students',
+      'academics',
+      'attendance',
+      'homework',
+      'examinations',
+      'finance',
+      'school_vault',
+    ],
   },
 ];
 
 describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', async (url: string) => {
-      const u = typeof url === 'string' ? url : (url as any).url;
+    vi.stubGlobal('fetch', (url: string | URL | { url: string }) => {
+      const u = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
 
       if (u.includes('/api/v1/platform/stats')) {
-        return {
+        return Promise.resolve({
           ok: true,
-          json: async () => ({ success: true, data: MOCK_STATS }),
-        };
+          json: () => Promise.resolve({ success: true, data: MOCK_STATS }),
+        });
       }
       if (u.includes('/api/v1/platform/institutions/inst-1')) {
-        return {
+        return Promise.resolve({
           ok: true,
-          json: async () => ({ success: true, data: MOCK_INSTITUTION_DETAIL }),
-        };
+          json: () => Promise.resolve({ success: true, data: MOCK_INSTITUTION_DETAIL }),
+        });
       }
       if (u.includes('/api/v1/platform/institutions')) {
-        return {
+        return Promise.resolve({
           ok: true,
-          json: async () => ({ success: true, data: MOCK_INSTITUTIONS }),
-        };
+          json: () => Promise.resolve({ success: true, data: MOCK_INSTITUTIONS }),
+        });
       }
       if (u.includes('/api/v1/platform/catalog/modules')) {
-        return {
+        return Promise.resolve({
           ok: true,
-          json: async () => ({ success: true, data: MOCK_MODULES_CATALOG }),
-        };
+          json: () => Promise.resolve({ success: true, data: MOCK_MODULES_CATALOG }),
+        });
       }
       if (u.includes('/api/v1/platform/catalog/bundles')) {
-        return {
+        return Promise.resolve({
           ok: true,
-          json: async () => ({ success: true, data: MOCK_PLAN_BUNDLES }),
-        };
+          json: () => Promise.resolve({ success: true, data: MOCK_PLAN_BUNDLES }),
+        });
       }
       if (u.includes('/api/v1/platform/audit')) {
-        return {
+        return Promise.resolve({
           ok: true,
-          json: async () => ({ success: true, data: MOCK_STATS.recentAuditAlerts }),
-        };
+          json: () => Promise.resolve({ success: true, data: MOCK_STATS.recentAuditAlerts }),
+        });
       }
 
-      return {
+      return Promise.resolve({
         ok: true,
-        json: async () => ({ success: true, data: {} }),
-      };
+        json: () => Promise.resolve({ success: true, data: {} }),
+      });
     });
   });
 
-  it('renders PlatformShell navigation, operator badge, and trust banner', async () => {
+  it('renders PlatformShell navigation, operator badge, and trust banner', () => {
     render(
       <MemoryRouter initialEntries={['/platform']}>
         <Routes>
@@ -273,7 +283,7 @@ describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
   });
 
   it('renders Executive Dashboard with live operational health and stats', async () => {
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/platform']}>
         <Routes>
           <Route path="/platform" element={<PlatformShell />}>
@@ -289,10 +299,16 @@ describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
     expect(screen.getByText('Operational Health')).toBeInTheDocument();
     expect(screen.getByText('HEALTHY (PostgreSQL 16 Multi-Tenant RLS)')).toBeInTheDocument();
     expect(screen.getByText('ClamAV Active Antivirus Queue')).toBeInTheDocument();
+
+    // Verify structured grid design system classes
+    expect(container.querySelector('.platform-dashboard-grid')).toBeInTheDocument();
+    expect(container.querySelector('.platform-dashboard-main')).toBeInTheDocument();
+    expect(container.querySelector('.platform-dashboard-sidebar')).toBeInTheDocument();
+    expect(container.querySelector('.module-adoption-grid')).toBeInTheDocument();
   });
 
   it('renders Institutions Directory and provision button', async () => {
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/platform/institutions']}>
         <Routes>
           <Route path="/platform" element={<PlatformShell />}>
@@ -302,14 +318,21 @@ describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { level: 2, name: 'Institutions Directory' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Institutions Directory' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('+ Provision New Tenant')).toBeInTheDocument();
     expect(await screen.findByText('Anesa Demo School')).toBeInTheDocument();
     expect(screen.getByText('Apex Polytechnic College')).toBeInTheDocument();
+
+    // Verify directory toolbar and table action styling
+    expect(container.querySelector('.platform-filter-bar')).toBeInTheDocument();
+    expect(container.querySelector('.table-actions')).toBeInTheDocument();
+    expect(container.querySelector('.action-manage')).toBeInTheDocument();
   });
 
   it('renders Institution Detail with sub-tabs and module entitlements', async () => {
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/platform/institutions/inst-1']}>
         <Routes>
           <Route path="/platform" element={<PlatformShell />}>
@@ -319,12 +342,26 @@ describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { level: 2, name: 'Anesa Demo School' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Anesa Demo School' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Overview & Campuses')).toBeInTheDocument();
     expect(screen.getByText(/Module Entitlements/)).toBeInTheDocument();
     expect(screen.getByText('SaaS Subscription & Limits')).toBeInTheDocument();
     expect(screen.getByText('Roles & Permissions Matrix')).toBeInTheDocument();
     expect(screen.getAllByText('Main Campus').length).toBeGreaterThanOrEqual(1);
+
+    // Verify segmented tabs navigation
+    expect(container.querySelector('.platform-tabs-nav')).toBeInTheDocument();
+    expect(container.querySelectorAll('.platform-tab-btn').length).toBeGreaterThanOrEqual(5);
+
+    // Click Sensitive Authorities tab and verify design improvements
+    const authoritiesTab = screen.getByRole('button', { name: /Sensitive Authorities/ });
+    fireEvent.click(authoritiesTab);
+
+    expect(screen.getByText(/High-Privilege Security Delegation/)).toBeInTheDocument();
+    expect(container.querySelector('.security-callout-banner')).toBeInTheDocument();
+    expect(container.querySelector('.platform-textarea')).toBeInTheDocument();
   });
 
   it('renders Module Marketplace catalog with route and capability mappings', async () => {
@@ -338,7 +375,9 @@ describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('ERP Module Marketplace & Capability Catalog')).toBeInTheDocument();
+    expect(
+      await screen.findByText('ERP Module Marketplace & Capability Catalog'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Student Management & Directory')).toBeInTheDocument();
     expect(screen.getByText('School Vault (Zero-Access Security)')).toBeInTheDocument();
   });
@@ -361,7 +400,7 @@ describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
   });
 
   it('renders Universal Role Matrix and Scope explainer', async () => {
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/platform/roles']}>
         <Routes>
           <Route path="/platform" element={<PlatformShell />}>
@@ -371,13 +410,19 @@ describe('Platform Owner Control Center - Frontend Web Component Tests', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Universal Role Templates & Scope Architecture')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Universal Role Templates & Scope Architecture'),
+    ).toBeInTheDocument();
     expect(screen.getByText('ORGANIZATION')).toBeInTheDocument();
     expect(screen.getByText('CAMPUS')).toBeInTheDocument();
     expect(screen.getByText('DEPARTMENT')).toBeInTheDocument();
     expect(screen.getByText('ASSIGNED')).toBeInTheDocument();
     expect(screen.getByText('SELF')).toBeInTheDocument();
     expect(screen.getByText('Chief Executive Administrator')).toBeInTheDocument();
+
+    // Verify role cards and capabilities matrix
+    expect(container.querySelector('.role-templates-grid')).toBeInTheDocument();
+    expect(container.querySelector('.permissions-matrix-table')).toBeInTheDocument();
   });
 
   it('passes automated accessibility audit with zero WCAG violations', async () => {

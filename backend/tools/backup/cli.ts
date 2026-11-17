@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { BackupManager } from './backup-manager.js';
+import type { BackupMetadata } from '../../src/shared/backup/types.js';
 
 function parseArgs(argv: string[]): { command: string; flags: Record<string, string> } {
   const command = argv[0] || 'help';
@@ -53,23 +54,31 @@ Commands:
     process.exit(0);
   }
 
-  const key = flags['key'] || process.env['BACKUP_ENCRYPTION_KEY'] || 'anesa_campus_os_backup_key_32b_!';
+  const key =
+    flags['key'] || process.env['BACKUP_ENCRYPTION_KEY'] || 'anesa_campus_os_backup_key_32b_!';
 
   switch (command) {
     case 'backup:create': {
-      const dbUrl = flags['db'] || process.env['DATABASE_ADMIN_URL'] || process.env['PLATFORM_DATABASE_URL'];
+      const dbUrl =
+        flags['db'] || process.env['DATABASE_ADMIN_URL'] || process.env['PLATFORM_DATABASE_URL'];
       if (!dbUrl) {
         console.error('Error: Database URL is required via --db or DATABASE_ADMIN_URL.');
         process.exit(1);
       }
       const days = flags['retention-days'] ? parseInt(flags['retention-days'], 10) : 30;
       console.log(`[Backup] Initiating AES-256-GCM encrypted backup...`);
-      const res = await manager.createBackup({ databaseUrl: dbUrl, encryptionKey: key, retentionDays: days });
+      const res = await manager.createBackup({
+        databaseUrl: dbUrl,
+        encryptionKey: key,
+        retentionDays: days,
+      });
       console.log(`[Backup] Completed successfully.`);
       console.log(`  Backup ID:     ${res.metadata.backupId}`);
       console.log(`  Created:       ${res.metadata.createdAt}`);
       console.log(`  Source DB:     ${res.metadata.sourceDatabase}`);
-      console.log(`  Ciphertext:    ${res.filePath} (${(res.metadata.integrity.cipherSizeBytes / 1024).toFixed(1)} KB)`);
+      console.log(
+        `  Ciphertext:    ${res.filePath} (${(res.metadata.integrity.cipherSizeBytes / 1024).toFixed(1)} KB)`,
+      );
       console.log(`  SHA-256 Hash:  ${res.metadata.integrity.ciphertextSha256}`);
       console.log(`  Metadata:      ${res.metaPath}`);
       break;
@@ -83,7 +92,7 @@ Commands:
       }
       console.log(`[Verify] Verifying backup artifact integrity for: ${file}`);
       const res = await manager.verifyBackup(file, key);
-      if (res.valid) {
+      if (res.valid && res.metadata) {
         console.log(`[Verify] PASS - Cryptographic integrity and catalog valid.`);
         console.log(`  Backup ID:     ${res.backupId}`);
         console.log(`  Server:        ${res.metadata.serverVersion}`);
@@ -121,7 +130,9 @@ Commands:
       const days = flags['retention-days'] ? parseInt(flags['retention-days'], 10) : 30;
       console.log(`[Retention] Pruning backups older than ${days} days...`);
       const res = manager.pruneExpiredBackups(days);
-      console.log(`[Retention] Pruning complete: ${res.prunedCount} deleted, ${res.remainingCount} retained.`);
+      console.log(
+        `[Retention] Pruning complete: ${res.prunedCount} deleted, ${res.remainingCount} retained.`,
+      );
       break;
     }
 
@@ -140,10 +151,18 @@ Commands:
       });
       console.log(`[DR Rehearsal] Verdict: ${report.verdict}`);
       console.log(`  Duration:      ${report.durationMs}ms (RTO: ${report.evidence.rtoSeconds}s)`);
-      console.log(`  Ledger Check:  ${report.verifications.migrationLedgerPass ? 'PASS' : 'FAIL'} (${report.evidence.ledgerRows} migrations)`);
-      console.log(`  RLS Security:  ${report.verifications.rlsEnforcementPass ? 'PASS' : 'FAIL'} (${report.evidence.tablesAudited} tables audited)`);
-      console.log(`  Tenant Check:  ${report.verifications.tenantIsolationPass ? 'PASS' : 'FAIL'} (${report.evidence.orgCount} institutions)`);
-      console.log(`  Vault Isolation: ${report.verifications.vaultZeroAccessPass ? 'PASS' : 'FAIL'}`);
+      console.log(
+        `  Ledger Check:  ${report.verifications.migrationLedgerPass ? 'PASS' : 'FAIL'} (${report.evidence.ledgerRows} migrations)`,
+      );
+      console.log(
+        `  RLS Security:  ${report.verifications.rlsEnforcementPass ? 'PASS' : 'FAIL'} (${report.evidence.tablesAudited} tables audited)`,
+      );
+      console.log(
+        `  Tenant Check:  ${report.verifications.tenantIsolationPass ? 'PASS' : 'FAIL'} (${report.evidence.orgCount} institutions)`,
+      );
+      console.log(
+        `  Vault Isolation: ${report.verifications.vaultZeroAccessPass ? 'PASS' : 'FAIL'}`,
+      );
       console.log(`  Disposable DB Dropped: ${report.disposableDbDropped ? 'YES' : 'NO'}`);
       break;
     }
@@ -158,14 +177,16 @@ Commands:
       console.log(`[Backup] Total Backups: ${files.length} (directory: ${dir})\n`);
       for (const f of files) {
         try {
-          const meta = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'));
+          const meta = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')) as BackupMetadata;
           console.log(`- ${meta.backupId}`);
           console.log(`  Created:      ${meta.createdAt}`);
           console.log(`  Source DB:    ${meta.sourceDatabase}`);
           console.log(`  Status:       ${meta.status}`);
           console.log(`  Size:         ${(meta.integrity.cipherSizeBytes / 1024).toFixed(1)} KB`);
           console.log(`  File:         ${f}\n`);
-        } catch {}
+        } catch {
+          // ignore unreadable metadata files
+        }
       }
       break;
     }

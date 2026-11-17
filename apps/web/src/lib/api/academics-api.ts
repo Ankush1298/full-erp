@@ -877,3 +877,191 @@ export const fetchSetupChecklist = (c: ApiClient) =>
       schema: One(z.object({ complete: z.boolean(), items: z.array(ChecklistItemSchema) })),
     })
     .then((r) => r.data);
+
+// ---- Annual Promotion & Academic Year Rollover ------------------------------------------------
+export const PromotionPolicySchema = z.object({
+  mode: z.enum(['MANUAL', 'PRINCIPAL_APPROVAL', 'AUTOMATIC']),
+  minimumAggregatePercentage: z.number(),
+  minimumSubjectPercentage: z.number(),
+  maxFailingSubjectsForSupplementary: z.number(),
+  graceMarksPolicy: z.object({
+    enabled: z.boolean(),
+    maxGraceMarksTotal: z.number(),
+    maxGraceMarksPerSubject: z.number(),
+  }),
+  attendanceRequirement: z.object({
+    enabled: z.boolean(),
+    minimumAttendancePercentage: z.number(),
+  }),
+  streamSelectionPeriodNo: z.number(),
+  terminalPeriodNo: z.number(),
+  notifyGuardians: z.boolean(),
+});
+export type PromotionPolicy = z.infer<typeof PromotionPolicySchema>;
+
+export const RolloverEvaluationDetailsSchema = z.object({
+  aggregatePercentage: z.number().nullable(),
+  totalMarksObtained: z.number().nullable(),
+  totalMaxMarks: z.number().nullable(),
+  failingSubjectCount: z.number(),
+  hasUnpublishedExams: z.boolean(),
+  hasMissingMarks: z.boolean(),
+  hasWithheldMarks: z.boolean(),
+  appliedGraceMarks: z.number(),
+  attendancePercentage: z.number().nullable(),
+  notes: z.array(z.string()),
+});
+export type RolloverEvaluationDetails = z.infer<typeof RolloverEvaluationDetailsSchema>;
+
+export const RolloverStudentEvaluationSchema = z.object({
+  studentId: z.string(),
+  enrollmentId: z.string(),
+  fullName: z.string(),
+  admissionNumber: z.string(),
+  currentCohortPeriodId: z.string(),
+  currentPeriodNo: z.number(),
+  currentSectionId: z.string().nullable(),
+  currentSectionName: z.string().nullable(),
+  targetCohortPeriodId: z.string().nullable(),
+  targetPeriodNo: z.number().nullable(),
+  targetSectionId: z.string().nullable(),
+  targetSectionName: z.string().nullable(),
+  recommendedOutcome: z.enum(['PROMOTED', 'RETAINED', 'PENDING_REVIEW', 'GRADUATED']),
+  finalOutcome: z.enum(['PROMOTED', 'RETAINED', 'PENDING_REVIEW', 'GRADUATED']),
+  overrideReason: z.string().nullable(),
+  overrideBy: z.string().nullable(),
+  evaluationDetails: RolloverEvaluationDetailsSchema,
+});
+export type RolloverStudentEvaluation = z.infer<typeof RolloverStudentEvaluationSchema>;
+
+export const RolloverBatchSchema = z.object({
+  batchId: z.string(),
+  status: z.enum(['PREVIEW', 'PENDING_APPROVAL', 'APPROVED', 'EXECUTED']),
+  sourceTerm: z.object({
+    id: z.string(),
+    name: z.string(),
+    code: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    academicYearId: z.string(),
+    academicYearLabel: z.string(),
+  }),
+  targetTerm: z.object({
+    id: z.string(),
+    name: z.string(),
+    code: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    academicYearId: z.string(),
+    academicYearLabel: z.string(),
+  }),
+  policy: PromotionPolicySchema,
+  summary: z.object({
+    totalStudents: z.number(),
+    promoted: z.number(),
+    retained: z.number(),
+    pendingReview: z.number(),
+    graduated: z.number(),
+  }),
+  students: z.array(RolloverStudentEvaluationSchema),
+  createdAt: z.string(),
+  createdBy: z.string(),
+  approvedAt: z.string().nullable(),
+  approvedBy: z.string().nullable(),
+  executedAt: z.string().nullable(),
+  executedBy: z.string().nullable(),
+});
+export type RolloverBatch = z.infer<typeof RolloverBatchSchema>;
+
+export const RolloverBatchSummarySchema = z.object({
+  batchId: z.string(),
+  status: z.enum(['PREVIEW', 'PENDING_APPROVAL', 'APPROVED', 'EXECUTED']),
+  sourceTermId: z.string(),
+  sourceTermName: z.string(),
+  targetTermId: z.string(),
+  targetTermName: z.string(),
+  summary: z.object({
+    totalStudents: z.number(),
+    promoted: z.number(),
+    retained: z.number(),
+    pendingReview: z.number(),
+    graduated: z.number(),
+  }),
+  createdAt: z.string(),
+  createdBy: z.string(),
+  executedAt: z.string().nullable(),
+});
+export type RolloverBatchSummary = z.infer<typeof RolloverBatchSummarySchema>;
+
+export const fetchPromotionPolicy = (c: ApiClient) =>
+  c.get('/v1/academics/promotion-policy', { schema: One(PromotionPolicySchema) }).then((r) => r.data);
+
+export const updatePromotionPolicy = (c: ApiClient, policy: Partial<PromotionPolicy>) =>
+  c.put('/v1/academics/promotion-policy', {
+    schema: One(PromotionPolicySchema),
+    body: policy,
+  }).then((r) => r.data);
+
+export const generateRolloverPreview = (
+  c: ApiClient,
+  body: {
+    sourceTermId: string;
+    targetTermId: string;
+    cohortPeriodIds?: string[];
+    streamPreferences?: Array<{
+      studentId: string;
+      targetCohortPeriodId: string;
+      targetSectionId?: string;
+    }>;
+  },
+) =>
+  c.post('/v1/academics/rollover/preview', {
+    schema: One(RolloverBatchSchema),
+    body,
+  }).then((r) => r.data);
+
+export const updateRolloverExceptions = (
+  c: ApiClient,
+  batchId: string,
+  exceptions: Array<{
+    studentId: string;
+    outcome: 'PROMOTED' | 'RETAINED' | 'PENDING_REVIEW' | 'GRADUATED';
+    reason: string;
+    targetCohortPeriodId?: string;
+    targetSectionId?: string;
+  }>,
+) =>
+  c.patch(`/v1/academics/rollover/preview/${encodeURIComponent(batchId)}/exceptions`, {
+    schema: One(RolloverBatchSchema),
+    body: { exceptions },
+  }).then((r) => r.data);
+
+export const executeRollover = (
+  c: ApiClient,
+  batchId: string,
+  options?: {
+    notifyGuardians?: boolean;
+    confirmPendingReviewHandling?: 'SKIP' | 'FAIL';
+  },
+) =>
+  c.post('/v1/academics/rollover/execute', {
+    schema: One(
+      z.object({
+        batchId: z.string(),
+        executedAt: z.string(),
+        promotedCount: z.number(),
+        retainedCount: z.number(),
+        graduatedCount: z.number(),
+        skippedCount: z.number(),
+      }),
+    ),
+    body: { batchId, ...options },
+  }).then((r) => r.data);
+
+export const fetchRolloverBatches = (c: ApiClient) =>
+  c.get('/v1/academics/rollover/batches', { schema: List(RolloverBatchSummarySchema) }).then((r) => r.data);
+
+export const fetchRolloverBatch = (c: ApiClient, batchId: string) =>
+  c.get(`/v1/academics/rollover/batches/${encodeURIComponent(batchId)}`, {
+    schema: One(RolloverBatchSchema),
+  }).then((r) => r.data);

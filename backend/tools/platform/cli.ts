@@ -6,6 +6,7 @@
  *   tsx tools/platform/cli.ts support:grant --tenant <id|slug> --admin-email <email> [--duration-hours <1-8>]
  */
 import pg from 'pg';
+import type { InstitutionType } from '../../src/shared/institution/institution-config.js';
 import {
   SUPPORT_GRANTS_NOT_IMPLEMENTED_MESSAGE,
   createTenant,
@@ -68,7 +69,7 @@ async function main(argv: readonly string[]): Promise<void> {
         name,
         slug,
         adminEmail,
-        ...(rawType ? { institutionType: rawType.toUpperCase() as any } : {}),
+        ...(rawType ? { institutionType: rawType.toUpperCase() as InstitutionType } : {}),
         ...(adminTitle ? { adminTitle } : {}),
       });
       console.log('Tenant provisioned successfully:');
@@ -104,7 +105,9 @@ async function main(argv: readonly string[]): Promise<void> {
         if (res.plan.proposedAdditions.length > 0) {
           console.log('\n  Proposed Additions:');
           for (const a of res.plan.proposedAdditions) {
-            console.log(`    + [${a.roleCode}] ${a.permissionCode} (${a.scopeMode})${a.isCritical ? ' [CRITICAL]' : ''}`);
+            console.log(
+              `    + [${a.roleCode}] ${a.permissionCode} (${a.scopeMode})${a.isCritical ? ' [CRITICAL]' : ''}`,
+            );
           }
         }
         if (res.plan.skippedCritical.length > 0) {
@@ -125,7 +128,9 @@ async function main(argv: readonly string[]): Promise<void> {
         );
         if (res.reconciliation) {
           console.log(`  Added Grants:            ${res.reconciliation.addedGrants.length}`);
-          console.log(`  Preserved Custom Grants: ${res.reconciliation.preservedCustomGrants.length}`);
+          console.log(
+            `  Preserved Custom Grants: ${res.reconciliation.preservedCustomGrants.length}`,
+          );
           console.log(`  Skipped Critical Grants: ${res.reconciliation.skippedCriticalCount}`);
         }
       }
@@ -141,7 +146,7 @@ async function main(argv: readonly string[]): Promise<void> {
       console.log(`Tenant "${res.name}" (${res.id}) has been SUSPENDED.`);
     } else if (command === 'authority:grant') {
       const tenant = flags['tenant'];
-      const authority = flags['authority'] as any;
+      const authority = flags['authority'] as Parameters<typeof grantAuthority>[1]['authority'];
       const role = flags['role'] || 'COLLEGE_ADMIN';
       const approvedBy = flags['approved-by'];
       const justification = flags['justification'];

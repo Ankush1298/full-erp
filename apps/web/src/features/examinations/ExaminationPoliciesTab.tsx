@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Spinner';
@@ -60,26 +60,28 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
   const [editingPolicy, setEditingPolicy] = useState<EligibilityPolicyDto | null>(null);
 
   // Impact Simulation state
-  const [simulationResult, setSimulationResult] = useState<PolicyPreviewImpactResponse | null>(null);
+  const [simulationResult, setSimulationResult] = useState<PolicyPreviewImpactResponse | null>(
+    null,
+  );
   const [simulatingScheduleId, setSimulatingScheduleId] = useState<string>(schedules[0]?.id ?? '');
   const [showSimModal, setShowSimModal] = useState(false);
 
-  useEffect(() => {
-    void loadPolicies();
-  }, [client]);
-
-  async function loadPolicies() {
+  const loadPolicies = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const list = await fetchExamPolicies(client);
       setPolicies(list);
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to load examination policies.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load examination policies.');
     } finally {
       setLoading(false);
     }
-  }
+  }, [client]);
+
+  useEffect(() => {
+    void loadPolicies();
+  }, [loadPolicies]);
 
   async function handleCreatePolicy(data: SaveEligibilityPolicyInput) {
     setError(null);
@@ -89,8 +91,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
       setSuccess(`Policy "${created.name}" created successfully.`);
       setIsCreating(false);
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to create policy.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create policy.');
     }
   }
 
@@ -103,8 +105,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
       setSuccess(`Policy "${updated.name}" updated successfully.`);
       setEditingPolicy(null);
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to update policy.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update policy.');
     }
   }
 
@@ -115,8 +117,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
       const duplicated = await duplicateExamPolicy(client, p.id, { name: `${p.name} (Copy)` });
       setSuccess(`Duplicated policy as "${duplicated.name}".`);
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to duplicate policy.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to duplicate policy.');
     }
   }
 
@@ -127,8 +129,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
       await activateExamPolicy(client, p.id);
       setSuccess(`Policy "${p.name}" activated.`);
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to activate policy.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to activate policy.');
     }
   }
 
@@ -140,8 +142,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
       await archiveExamPolicy(client, p.id);
       setSuccess(`Policy "${p.name}" archived.`);
       void loadPolicies();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to archive policy.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to archive policy.');
     }
   }
 
@@ -159,8 +161,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
       });
       setSimulationResult(sim);
       setShowSimModal(true);
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to run policy impact simulation.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to run policy impact simulation.');
     }
   }
 
@@ -210,9 +212,7 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             <div className="p-3 rounded-lg border-2 border-brand-500 bg-brand-50/50 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-brand-800">
-                  1. Schedule Paper Override
-                </span>
+                <span className="text-xs font-bold text-brand-800">1. Schedule Paper Override</span>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-600 text-white uppercase tracking-wider">
                   Top Priority
                 </span>
@@ -224,9 +224,7 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
 
             <div className="p-3 rounded-lg border border-border bg-surface-muted/40 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-foreground">
-                  2. Examination Policy
-                </span>
+                <span className="text-xs font-bold text-foreground">2. Examination Policy</span>
                 <span className="text-[10px] font-semibold text-muted">Tier 2</span>
               </div>
               <p className="text-[11px] text-muted leading-snug">
@@ -236,9 +234,7 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
 
             <div className="p-3 rounded-lg border border-border bg-surface-muted/40 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-foreground">
-                  3. Campus Policy
-                </span>
+                <span className="text-xs font-bold text-foreground">3. Campus Policy</span>
                 <span className="text-[10px] font-semibold text-muted">Tier 3</span>
               </div>
               <p className="text-[11px] text-muted leading-snug">
@@ -267,7 +263,11 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
       {/* Editor view (Creating or Editing) */}
       {(isCreating || editingPolicy) && (
         <PolicyEditor
-          title={isCreating ? 'Create Examination Policy Template' : `Edit Policy: ${editingPolicy?.name}`}
+          title={
+            isCreating
+              ? 'Create Examination Policy Template'
+              : `Edit Policy: ${editingPolicy?.name}`
+          }
           subtitle="Configure attendance thresholds, fee rules, assessment components, and grading scales."
           initialPolicy={editingPolicy ? policyToInput(editingPolicy) : undefined}
           onSave={isCreating ? handleCreatePolicy : handleUpdatePolicy}
@@ -292,7 +292,7 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
                 <select
                   id="policy-scope-filter"
                   value={scopeFilter}
-                  onChange={(e) => setScopeFilter(e.target.value as any)}
+                  onChange={(e) => setScopeFilter(e.target.value as 'ALL' | PolicyScope)}
                   className="h-9 px-3 rounded-md border border-input bg-surface text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="ALL">All Scopes</option>
@@ -310,7 +310,7 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
                 <select
                   id="policy-status-filter"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  onChange={(e) => setStatusFilter(e.target.value as 'ALL' | PolicyStatus)}
                   className="h-9 px-3 rounded-md border border-input bg-surface text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="ALL">All Statuses</option>
@@ -343,7 +343,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
             </div>
 
             <div className="text-xs font-medium text-muted">
-              Showing {filteredPolicies.length} policy configuration{filteredPolicies.length !== 1 ? 's' : ''}
+              Showing {filteredPolicies.length} policy configuration
+              {filteredPolicies.length !== 1 ? 's' : ''}
             </div>
           </div>
 
@@ -353,7 +354,9 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
             </div>
           ) : filteredPolicies.length === 0 ? (
             <div className="text-center py-12 space-y-3 bg-surface-muted/20 rounded-xl border border-dashed border-border p-8">
-              <p className="text-sm font-medium text-muted">No examination policies found matching the filter criteria.</p>
+              <p className="text-sm font-medium text-muted">
+                No examination policies found matching the filter criteria.
+              </p>
               <Button
                 type="button"
                 variant="secondary"
@@ -378,7 +381,9 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
-                          <h3 className="text-sm font-bold text-foreground leading-snug">{pol.name}</h3>
+                          <h3 className="text-sm font-bold text-foreground leading-snug">
+                            {pol.name}
+                          </h3>
                           {pol.description && (
                             <p className="text-xs text-muted line-clamp-2 leading-relaxed">
                               {pol.description}
@@ -406,25 +411,35 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
                       {/* Rule Highlights */}
                       <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-border">
                         <div className="bg-surface-muted/40 p-2.5 rounded-lg border border-border/50">
-                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">Attendance</span>
+                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">
+                            Attendance
+                          </span>
                           <span className="font-semibold text-foreground">
-                            {pol.check_attendance ? `${pol.min_attendance_percentage}% Min` : 'Waived'}
+                            {pol.check_attendance
+                              ? `${pol.min_attendance_percentage}% Min`
+                              : 'Waived'}
                           </span>
                         </div>
                         <div className="bg-surface-muted/40 p-2.5 rounded-lg border border-border/50">
-                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">Fee Clearance</span>
+                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">
+                            Fee Clearance
+                          </span>
                           <span className="font-semibold text-foreground">
                             {pol.check_fees ? 'Required' : 'Waived'}
                           </span>
                         </div>
                         <div className="bg-surface-muted/40 p-2.5 rounded-lg border border-border/50">
-                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">Grading Scale</span>
+                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">
+                            Grading Scale
+                          </span>
                           <span className="font-semibold text-foreground">
                             {pol.grading_rules?.grading_system ?? 'PERCENTAGE'}
                           </span>
                         </div>
                         <div className="bg-surface-muted/40 p-2.5 rounded-lg border border-border/50">
-                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">Components</span>
+                          <span className="text-muted block text-[10px] uppercase font-medium mb-0.5">
+                            Components
+                          </span>
                           <span className="font-semibold text-foreground">
                             {pol.assessment_rules?.components?.length
                               ? `${pol.assessment_rules.components.length} Split`
@@ -522,7 +537,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
                   Policy Impact Simulation
                 </h3>
                 <p className="text-xs text-muted">
-                  Simulated candidate eligibility based on current class session and fee ledger records.
+                  Simulated candidate eligibility based on current class session and fee ledger
+                  records.
                 </p>
               </div>
               <Button type="button" variant="secondary" onClick={() => setShowSimModal(false)}>
@@ -538,19 +554,25 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
                 </span>
               </div>
               <div className="p-3 rounded bg-emerald-50 border border-emerald-200 text-center">
-                <span className="text-[10px] uppercase text-emerald-800 block font-semibold">Eligible</span>
+                <span className="text-[10px] uppercase text-emerald-800 block font-semibold">
+                  Eligible
+                </span>
                 <span className="text-xl font-bold text-emerald-700">
                   {simulationResult.simulated_eligible}
                 </span>
               </div>
               <div className="p-3 rounded bg-amber-50 border border-amber-200 text-center">
-                <span className="text-[10px] uppercase text-amber-800 block font-semibold">Needs Review</span>
+                <span className="text-[10px] uppercase text-amber-800 block font-semibold">
+                  Needs Review
+                </span>
                 <span className="text-xl font-bold text-amber-700">
                   {simulationResult.simulated_needs_review}
                 </span>
               </div>
               <div className="p-3 rounded bg-red-50 border border-red-200 text-center">
-                <span className="text-[10px] uppercase text-red-800 block font-semibold">Disqualified</span>
+                <span className="text-[10px] uppercase text-red-800 block font-semibold">
+                  Disqualified
+                </span>
                 <span className="text-xl font-bold text-red-700">
                   {simulationResult.simulated_not_eligible}
                 </span>
@@ -592,7 +614,8 @@ export function ExaminationPoliciesTab({ client, schedules = [] }: ExaminationPo
                           </span>
                         </td>
                         <td className="p-2 font-mono">
-                          {c.evidence_summary?.attendance_percentage != null
+                          {c.evidence_summary?.attendance_percentage !== null &&
+                          c.evidence_summary?.attendance_percentage !== undefined
                             ? `${c.evidence_summary.attendance_percentage}%`
                             : 'N/A'}
                         </td>

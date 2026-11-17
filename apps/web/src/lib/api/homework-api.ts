@@ -291,15 +291,12 @@ export async function reviewSubmission(
   submissionId: string,
   input: ReviewSubmissionInput,
 ): Promise<void> {
-  await c.post(
-    `/v1/homework/teacher/submissions/${encodeURIComponent(submissionId)}/review`,
-    {
-      body: input,
-      schema: z.object({
-        success: z.boolean(),
-      }),
-    },
-  );
+  await c.post(`/v1/homework/teacher/submissions/${encodeURIComponent(submissionId)}/review`, {
+    body: input,
+    schema: z.object({
+      success: z.boolean(),
+    }),
+  });
 }
 
 export async function fetchStudentHomework(c: ApiClient): Promise<StudentHomeworkItem[]> {
@@ -317,15 +314,12 @@ export async function submitHomework(
   homeworkId: string,
   input: SubmitHomeworkInput,
 ): Promise<void> {
-  await c.post(
-    `/v1/homework/student/assignments/${encodeURIComponent(homeworkId)}/submit`,
-    {
-      body: input,
-      schema: z.object({
-        success: z.boolean(),
-      }),
-    },
-  );
+  await c.post(`/v1/homework/student/assignments/${encodeURIComponent(homeworkId)}/submit`, {
+    body: input,
+    schema: z.object({
+      success: z.boolean(),
+    }),
+  });
 }
 
 export async function fetchParentStudentHomework(

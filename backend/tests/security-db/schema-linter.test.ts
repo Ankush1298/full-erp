@@ -138,8 +138,7 @@ describe('schema linter (S-2)', () => {
         // every probe compares session_user; the 0028 ones also pin the runtime session explicitly
         const expr = `${p.qual ?? ''} ${p.with_check ?? ''}`;
         expect(expr, id).toMatch(/session_user/i);
-        if (id !== 'users.SELECT.users_context_probe')
-          expect(expr, id).toMatch(/app_runtime/);
+        if (id !== 'users.SELECT.users_context_probe') expect(expr, id).toMatch(/app_runtime/);
         continue;
       }
       expect(p.roles, `${p.tablename}.${p.cmd}`).toBe('{app_runtime}');

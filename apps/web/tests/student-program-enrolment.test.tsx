@@ -84,7 +84,9 @@ describe('Academics page: programme assignment and term enrolment (Defect #5)', 
     // Verify "Programme admission required" card is displayed
     expect(await screen.findByText('Programme admission required')).toBeInTheDocument();
     expect(
-      screen.getByText(/An active programme enrolment is required before term enrolment can be completed/),
+      screen.getByText(
+        /An active programme enrolment is required before term enrolment can be completed/,
+      ),
     ).toBeInTheDocument();
 
     // Verify Assign to programme form is rendered
@@ -151,7 +153,9 @@ describe('Academics page: programme assignment and term enrolment (Defect #5)', 
     await userEvent.click(within(placeForm).getByRole('button', { name: 'Place student' }));
 
     expect(await screen.findByText('Student placed in the section.')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Class 5 - A (from 2026-04-01)')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Class 5 - A (from 2026-04-01)')).toBeInTheDocument(),
+    );
   });
 
   it('displays actionable error message if term enrolment is attempted without active programme enrolment', async () => {
@@ -227,7 +231,9 @@ describe('Academics page: programme assignment and term enrolment (Defect #5)', 
     await userEvent.click(within(enrolForm).getByRole('button', { name: 'Enrol student' }));
 
     expect(
-      await screen.findByText(/The student has no active programme enrolment. Assign them to a programme first./),
+      await screen.findByText(
+        /The student has no active programme enrolment. Assign them to a programme first./,
+      ),
     ).toBeInTheDocument();
   });
 });

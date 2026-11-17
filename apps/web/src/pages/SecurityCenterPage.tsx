@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../features/auth/AuthProvider';
 import { usePageTitle } from '../components/usePageTitle';
 import { SegmentedNav } from '../components/ui/SegmentedNav';
@@ -52,7 +52,7 @@ export function SecurityCenterPage() {
   const [activeCeremonyId, setActiveCeremonyId] = useState<string | null>(null);
   const [recoveryStatus, setRecoveryStatus] = useState<string>('IDLE');
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -70,16 +70,16 @@ export function SecurityCenterPage() {
       setAuthority(authData);
       setDevicesData(devData);
       setEpoch(epochData);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load Security Center data.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load Security Center data.');
     } finally {
       setLoading(false);
     }
-  }
+  }, [client]);
 
   useEffect(() => {
-    loadData();
-  }, [client]);
+    void loadData();
+  }, [loadData]);
 
   async function handleEnrollDevice(e: React.FormEvent) {
     e.preventDefault();
@@ -96,26 +96,32 @@ export function SecurityCenterPage() {
         deviceType,
         publicKey: mockKey,
       });
-      setFeedback(`Hardware authenticator "${deviceLabel}" successfully enrolled and device-bound.`);
+      setFeedback(
+        `Hardware authenticator "${deviceLabel}" successfully enrolled and device-bound.`,
+      );
       setDeviceLabel('');
       await loadData();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to enroll hardware authenticator.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to enroll hardware authenticator.');
     } finally {
       setEnrolling(false);
     }
   }
 
   async function handleRevokeDevice(deviceId: string) {
-    if (!window.confirm('Are you sure you want to revoke this hardware device? All associated key grants will be terminated.')) {
+    if (
+      !window.confirm(
+        'Are you sure you want to revoke this hardware device? All associated key grants will be terminated.',
+      )
+    ) {
       return;
     }
     try {
       await revokeVaultDevice(client, deviceId, 'Revoked by user via Security Center');
       setFeedback('Hardware authenticator revoked. Device session terminated.');
       await loadData();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to revoke hardware authenticator.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke hardware authenticator.');
     }
   }
 
@@ -130,8 +136,8 @@ export function SecurityCenterPage() {
       setActiveCeremonyId(ceremony.ceremonyId);
       setRecoveryStatus('IN_PROGRESS');
       setFeedback('2-of-3 Recovery Ceremony initiated. Waiting for 2 custodian shares.');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to initiate recovery ceremony.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to initiate recovery ceremony.');
     }
   }
 
@@ -149,12 +155,16 @@ export function SecurityCenterPage() {
       setShareData('');
       if (res.isComplete) {
         setRecoveryStatus('COMPLETED');
-        setFeedback('Quorum reached! Secret key reconstructed locally. Zero cloud backdoor verified.');
+        setFeedback(
+          'Quorum reached! Secret key reconstructed locally. Zero cloud backdoor verified.',
+        );
       } else {
-        setFeedback(`Share ${shareIndex} accepted. 1 more custodian share required to reach quorum.`);
+        setFeedback(
+          `Share ${shareIndex} accepted. 1 more custodian share required to reach quorum.`,
+        );
       }
-    } catch (err: any) {
-      setError(err?.message || 'Failed to present recovery share.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to present recovery share.');
     }
   }
 
@@ -173,7 +183,8 @@ export function SecurityCenterPage() {
             <Badge tone="purple">{institutionType} MODE</Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Hardware-bound cryptographic protection, 2-device policy, institution-owned 2-of-3 recovery quorum.
+            Hardware-bound cryptographic protection, 2-device policy, institution-owned 2-of-3
+            recovery quorum.
           </p>
         </div>
       </div>
@@ -202,27 +213,17 @@ export function SecurityCenterPage() {
           value={`${devicesData?.activeCount ?? 0} of ${devicesData?.maxAllowed ?? 2}`}
           tone={devicesData?.limitReached ? 'amber' : 'neutral'}
         />
-        <StatCard
-          label="Vault Epoch"
-          value={`Epoch ${epoch?.epoch ?? 1}`}
-          tone="neutral"
-        />
-        <StatCard
-          label="Recovery Scheme"
-          value="2-of-3 Quorum"
-          tone="emerald"
-        />
+        <StatCard label="Vault Epoch" value={`Epoch ${epoch?.epoch ?? 1}`} tone="neutral" />
+        <StatCard label="Recovery Scheme" value="2-of-3 Quorum" tone="emerald" />
       </div>
 
       {/* Segmented Navigation */}
-      <SegmentedNav
-        items={TABS}
-        activeId={activeTab}
-        onChange={(id) => setActiveTab(id as TabKey)}
-      />
+      <SegmentedNav items={TABS} activeId={activeTab} onChange={(id) => setActiveTab(id)} />
 
       {loading ? (
-        <div className="py-12 text-center text-muted-foreground">Loading vault security status...</div>
+        <div className="py-12 text-center text-muted-foreground">
+          Loading vault security status...
+        </div>
       ) : (
         <>
           {/* TAB 1: Institutional Security Authority (ISA) */}
@@ -234,29 +235,40 @@ export function SecurityCenterPage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-muted-foreground">Title / Role</label>
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Title / Role
+                    </span>
                     <p className="text-base font-medium text-foreground mt-1">
-                      {authority?.title ? authority.title.replace(/_/g, ' ') : 'School Principal / Owner'}
+                      {authority?.title
+                        ? authority.title.replace(/_/g, ' ')
+                        : 'School Principal / Owner'}
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-muted-foreground">Institution Level</label>
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Institution Level
+                    </span>
                     <p className="text-base font-medium text-foreground mt-1">
                       {institutionType === 'SCHOOL'
                         ? 'Primary / Secondary K-12 School'
                         : institutionType === 'COLLEGE'
-                        ? 'Undergraduate College / Institute'
-                        : 'Postgraduate / Autonomous University'}
+                          ? 'Undergraduate College / Institute'
+                          : 'Postgraduate / Autonomous University'}
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-muted-foreground">Designated User</label>
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Designated User
+                    </span>
                     <p className="text-base font-medium text-foreground mt-1">
-                      {authority?.userDisplayName || 'Institution Administrator'} ({authority?.userEmail || 'admin@school.test'})
+                      {authority?.userDisplayName || 'Institution Administrator'} (
+                      {authority?.userEmail || 'admin@school.test'})
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-muted-foreground">Status</label>
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Status
+                    </span>
                     <div className="mt-1">
                       <Badge tone="positive">{authority?.status || 'ACTIVE'}</Badge>
                     </div>
@@ -267,14 +279,20 @@ export function SecurityCenterPage() {
                   <button
                     type="button"
                     className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
-                    onClick={() => setFeedback('Succession delegation workflow initialized. Pending board review.')}
+                    onClick={() =>
+                      setFeedback(
+                        'Succession delegation workflow initialized. Pending board review.',
+                      )
+                    }
                   >
                     Delegate Security Authority
                   </button>
                   <button
                     type="button"
                     className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
-                    onClick={() => setFeedback('Cryptographic succession ceremony instructions generated.')}
+                    onClick={() =>
+                      setFeedback('Cryptographic succession ceremony instructions generated.')
+                    }
                   >
                     Generate Succession Key Ceremony
                   </button>
@@ -282,10 +300,13 @@ export function SecurityCenterPage() {
               </div>
 
               <div className="bg-muted/40 border border-border rounded-xl p-5">
-                <h3 className="font-semibold text-sm text-foreground">Separation of Authority Architecture</h3>
+                <h3 className="font-semibold text-sm text-foreground">
+                  Separation of Authority Architecture
+                </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  The Institutional Security Authority operates independently of platform-level sysadmins. Anesa engineers
-                  and cloud operators have zero cryptographic access to private student or academic data.
+                  The Institutional Security Authority operates independently of platform-level
+                  sysadmins. Anesa engineers and cloud operators have zero cryptographic access to
+                  private student or academic data.
                 </p>
               </div>
             </div>
@@ -300,12 +321,15 @@ export function SecurityCenterPage() {
                     Hardware-Bound Authenticators (Maximum 2 Devices)
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Each account may register up to two hardware authenticators (e.g. MacBook Touch ID / YubiKey).
+                    Each account may register up to two hardware authenticators (e.g. MacBook Touch
+                    ID / YubiKey).
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge tone={devicesData?.limitReached ? 'amber' : 'positive'}>
-                    {devicesData?.limitReached ? '2 of 2 Enrolled (Limit Reached)' : `${devicesData?.activeCount ?? 0} of 2 Enrolled`}
+                    {devicesData?.limitReached
+                      ? '2 of 2 Enrolled (Limit Reached)'
+                      : `${devicesData?.activeCount ?? 0} of 2 Enrolled`}
                   </Badge>
                 </div>
               </div>
@@ -334,7 +358,9 @@ export function SecurityCenterPage() {
                           <button
                             type="button"
                             className="text-xs text-destructive hover:underline"
-                            onClick={() => handleRevokeDevice(d.id)}
+                            onClick={() => {
+                              void handleRevokeDevice(d.id);
+                            }}
                           >
                             Revoke Device
                           </button>
@@ -361,21 +387,31 @@ export function SecurityCenterPage() {
                   {devicesData?.limitReached
                     ? 'Device Limit Reached (Max 2 Allowed)'
                     : devicesData?.activeCount === 1
-                    ? 'Enroll Secondary Hardware Authenticator (2 of 2)'
-                    : 'Enroll Primary Hardware Authenticator (1 of 2)'}
+                      ? 'Enroll Secondary Hardware Authenticator (2 of 2)'
+                      : 'Enroll Primary Hardware Authenticator (1 of 2)'}
                 </h3>
 
                 {devicesData?.limitReached ? (
                   <p className="text-sm text-amber-700 dark:text-amber-300">
-                    To enroll a replacement hardware authenticator, you must first revoke one of your existing active devices.
+                    To enroll a replacement hardware authenticator, you must first revoke one of
+                    your existing active devices.
                   </p>
                 ) : (
-                  <form onSubmit={handleEnrollDevice} className="space-y-4 max-w-lg">
+                  <form
+                    onSubmit={(e) => {
+                      void handleEnrollDevice(e);
+                    }}
+                    className="space-y-4 max-w-lg"
+                  >
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label
+                        htmlFor="device-label-input"
+                        className="block text-xs font-medium text-foreground mb-1"
+                      >
                         Device Name / Label
                       </label>
                       <input
+                        id="device-label-input"
                         type="text"
                         value={deviceLabel}
                         onChange={(e) => setDeviceLabel(e.target.value)}
@@ -385,15 +421,21 @@ export function SecurityCenterPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label
+                        htmlFor="device-type-select"
+                        className="block text-xs font-medium text-foreground mb-1"
+                      >
                         Authenticator Type
                       </label>
                       <select
+                        id="device-type-select"
                         value={deviceType}
                         onChange={(e) => setDeviceType(e.target.value)}
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       >
-                        <option value="PLATFORM_AUTHENTICATOR">Platform Authenticator (Touch ID, Windows Hello)</option>
+                        <option value="PLATFORM_AUTHENTICATOR">
+                          Platform Authenticator (Touch ID, Windows Hello)
+                        </option>
                         <option value="SECURITY_KEY">FIDO2 Hardware Key (YubiKey, Titan)</option>
                         <option value="SMART_CARD">Smart Card / Hardware Token</option>
                       </select>
@@ -419,7 +461,8 @@ export function SecurityCenterPage() {
                   Scoped Cryptographic Capability Key Grants
                 </h2>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Keys are bound to individual verified user authenticators and scoped strictly to authorized courses or cohorts.
+                  Keys are bound to individual verified user authenticators and scoped strictly to
+                  authorized courses or cohorts.
                 </p>
 
                 <div className="overflow-x-auto">
@@ -437,25 +480,35 @@ export function SecurityCenterPage() {
                         <td className="px-4 py-3 font-mono font-medium">CWK_STUDENTS_PII</td>
                         <td className="px-4 py-3">Assigned Students / Authorized Admissions</td>
                         <td className="px-4 py-3">AES-256-GCM + ECDH P-256</td>
-                        <td className="px-4 py-3"><Badge tone="positive">ACTIVE</Badge></td>
+                        <td className="px-4 py-3">
+                          <Badge tone="positive">ACTIVE</Badge>
+                        </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 font-mono font-medium">CWK_ACADEMICS_MARKS</td>
                         <td className="px-4 py-3">Assigned Subjects / Course Offerings</td>
                         <td className="px-4 py-3">AES-256-GCM + ECDH P-256</td>
-                        <td className="px-4 py-3"><Badge tone="positive">ACTIVE</Badge></td>
+                        <td className="px-4 py-3">
+                          <Badge tone="positive">ACTIVE</Badge>
+                        </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 font-mono font-medium">CWK_HOMEWORK_SUBMISSIONS</td>
+                        <td className="px-4 py-3 font-mono font-medium">
+                          CWK_HOMEWORK_SUBMISSIONS
+                        </td>
                         <td className="px-4 py-3">Course Faculty & Submitting Student</td>
                         <td className="px-4 py-3">AES-256-GCM + ECDH P-256</td>
-                        <td className="px-4 py-3"><Badge tone="positive">ACTIVE</Badge></td>
+                        <td className="px-4 py-3">
+                          <Badge tone="positive">ACTIVE</Badge>
+                        </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 font-mono font-medium">CWK_FINANCE_PRIVATE</td>
                         <td className="px-4 py-3">Finance Department & Account Holder</td>
                         <td className="px-4 py-3">AES-256-GCM + ECDH P-256</td>
-                        <td className="px-4 py-3"><Badge tone="positive">ACTIVE</Badge></td>
+                        <td className="px-4 py-3">
+                          <Badge tone="positive">ACTIVE</Badge>
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -472,28 +525,43 @@ export function SecurityCenterPage() {
                   2-of-3 Shamir's Secret Sharing Recovery Quorum
                 </h2>
                 <p className="text-sm text-muted-foreground mb-4">
-                  The institution owns its recovery material. Key reconstruction requires any 2 of the 3 appointed
-                  custodians. Anesa cloud engineers have NO unilateral recovery or decryption backdoor.
+                  The institution owns its recovery material. Key reconstruction requires any 2 of
+                  the 3 appointed custodians. Anesa cloud engineers have NO unilateral recovery or
+                  decryption backdoor.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="border border-border rounded-lg p-4 bg-muted/20">
                     <span className="text-xs font-semibold text-primary">Custodian #1</span>
-                    <h4 className="font-semibold text-foreground mt-1">Board of Trustees / School Owner</h4>
+                    <h4 className="font-semibold text-foreground mt-1">
+                      Board of Trustees / School Owner
+                    </h4>
                     <p className="text-xs text-muted-foreground mt-1">Institutional Oversight</p>
-                    <div className="mt-3"><Badge tone="purple">Share Index 1</Badge></div>
+                    <div className="mt-3">
+                      <Badge tone="purple">Share Index 1</Badge>
+                    </div>
                   </div>
                   <div className="border border-border rounded-lg p-4 bg-muted/20">
                     <span className="text-xs font-semibold text-primary">Custodian #2</span>
-                    <h4 className="font-semibold text-foreground mt-1">Institutional Legal Counsel</h4>
-                    <p className="text-xs text-muted-foreground mt-1">Independent Legal Safeguard</p>
-                    <div className="mt-3"><Badge tone="purple">Share Index 2</Badge></div>
+                    <h4 className="font-semibold text-foreground mt-1">
+                      Institutional Legal Counsel
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Independent Legal Safeguard
+                    </p>
+                    <div className="mt-3">
+                      <Badge tone="purple">Share Index 2</Badge>
+                    </div>
                   </div>
                   <div className="border border-border rounded-lg p-4 bg-muted/20">
                     <span className="text-xs font-semibold text-primary">Custodian #3</span>
-                    <h4 className="font-semibold text-foreground mt-1">Registrar / Vice-Principal</h4>
+                    <h4 className="font-semibold text-foreground mt-1">
+                      Registrar / Vice-Principal
+                    </h4>
                     <p className="text-xs text-muted-foreground mt-1">Operational Continuity</p>
-                    <div className="mt-3"><Badge tone="purple">Share Index 3</Badge></div>
+                    <div className="mt-3">
+                      <Badge tone="purple">Share Index 3</Badge>
+                    </div>
                   </div>
                 </div>
 
@@ -502,7 +570,9 @@ export function SecurityCenterPage() {
                     <button
                       type="button"
                       className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
-                      onClick={handleInitiateRecovery}
+                      onClick={() => {
+                        void handleInitiateRecovery();
+                      }}
                     >
                       Initiate 2-of-3 Key Reconstruction Ceremony
                     </button>
@@ -510,12 +580,24 @@ export function SecurityCenterPage() {
                 ) : recoveryStatus === 'IN_PROGRESS' ? (
                   <div className="pt-4 border-t border-border space-y-4">
                     <div className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded border border-amber-300 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200">
-                      Ceremony Active: {activeCeremonyId}. Present any 2 custodian shares to reconstruct.
+                      Ceremony Active: {activeCeremonyId}. Present any 2 custodian shares to
+                      reconstruct.
                     </div>
-                    <form onSubmit={handlePresentShare} className="space-y-3 max-w-lg">
+                    <form
+                      onSubmit={(e) => {
+                        void handlePresentShare(e);
+                      }}
+                      className="space-y-3 max-w-lg"
+                    >
                       <div>
-                        <label className="block text-xs font-medium text-foreground mb-1">Custodian Share Index</label>
+                        <label
+                          htmlFor="custodian-share-index"
+                          className="block text-xs font-medium text-foreground mb-1"
+                        >
+                          Custodian Share Index
+                        </label>
                         <select
+                          id="custodian-share-index"
                           value={shareIndex}
                           onChange={(e) => setShareIndex(Number(e.target.value))}
                           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
@@ -526,8 +608,14 @@ export function SecurityCenterPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-foreground mb-1">Custodian Secret Share (Base64)</label>
+                        <label
+                          htmlFor="custodian-secret-share"
+                          className="block text-xs font-medium text-foreground mb-1"
+                        >
+                          Custodian Secret Share (Base64)
+                        </label>
                         <input
+                          id="custodian-secret-share"
                           type="text"
                           value={shareData}
                           onChange={(e) => setShareData(e.target.value)}
@@ -547,7 +635,8 @@ export function SecurityCenterPage() {
                 ) : (
                   <div className="pt-4 border-t border-border">
                     <div className="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded border border-emerald-300 dark:border-emerald-800 text-sm text-emerald-800 dark:text-emerald-200">
-                      Ceremony Completed! Master Key successfully reconstructed via 2-of-3 threshold quorum.
+                      Ceremony Completed! Master Key successfully reconstructed via 2-of-3 threshold
+                      quorum.
                     </div>
                   </div>
                 )}

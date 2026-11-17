@@ -67,16 +67,52 @@ function setupPoliciesState(backend: ReturnType<typeof createFakeBackend>) {
       grading_rules: {
         grading_system: 'LETTER_GRADE',
         grade_scale: [
-          { grade: 'A+', min_percentage: 90, max_percentage: 100, grade_point: 10, is_passing: true },
-          { grade: 'A', min_percentage: 80, max_percentage: 89.99, grade_point: 9, is_passing: true },
-          { grade: 'B', min_percentage: 60, max_percentage: 79.99, grade_point: 7, is_passing: true },
-          { grade: 'F', min_percentage: 0, max_percentage: 59.99, grade_point: 0, is_passing: false },
+          {
+            grade: 'A+',
+            min_percentage: 90,
+            max_percentage: 100,
+            grade_point: 10,
+            is_passing: true,
+          },
+          {
+            grade: 'A',
+            min_percentage: 80,
+            max_percentage: 89.99,
+            grade_point: 9,
+            is_passing: true,
+          },
+          {
+            grade: 'B',
+            min_percentage: 60,
+            max_percentage: 79.99,
+            grade_point: 7,
+            is_passing: true,
+          },
+          {
+            grade: 'F',
+            min_percentage: 0,
+            max_percentage: 59.99,
+            grade_point: 0,
+            is_passing: false,
+          },
         ],
       },
       assessment_rules: {
         components: [
-          { name: 'Theory Paper', component_type: 'THEORY', max_marks: 80, pass_marks: 32, weight_percentage: 80 },
-          { name: 'Internal Assessment', component_type: 'INTERNAL', max_marks: 20, pass_marks: 8, weight_percentage: 20 },
+          {
+            name: 'Theory Paper',
+            component_type: 'THEORY',
+            max_marks: 80,
+            pass_marks: 32,
+            weight_percentage: 80,
+          },
+          {
+            name: 'Internal Assessment',
+            component_type: 'INTERNAL',
+            max_marks: 20,
+            pass_marks: 8,
+            weight_percentage: 20,
+          },
         ],
       },
     },
@@ -145,7 +181,9 @@ describe('Examination Policies & Settings System', () => {
     expect(screen.getByText('7. Passing & Grading Rules')).toBeInTheDocument();
     expect(screen.getByText('8. Candidate Approval Workflow')).toBeInTheDocument();
     expect(
-      screen.getByText(/9\. (Results Approval Authority & Publication Workflow|Result Review & Publication)/),
+      screen.getByText(
+        /9\. (Results Approval Authority & Publication Workflow|Result Review & Publication)/,
+      ),
     ).toBeInTheDocument();
 
     // Check setting descriptions exist beneath checkboxes
@@ -176,7 +214,9 @@ describe('Examination Policies & Settings System', () => {
     renderApp(backend, '/examinations');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Examination Policies & Settings' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Examination Policies & Settings' }),
+    );
     await user.click(await screen.findByRole('button', { name: '+ Create New Policy' }));
 
     // Interactive grading calculator input
@@ -200,7 +240,9 @@ describe('Examination Policies & Settings System', () => {
     renderApp(backend, '/examinations');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Examination Policies & Settings' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Examination Policies & Settings' }),
+    );
 
     // 1. Duplicate existing policy
     const dupBtn = await screen.findByRole('button', { name: 'Duplicate' });

@@ -4,13 +4,13 @@ import { PERMISSION_CATALOG } from '../authorization/catalog.js';
 import type { InstitutionType } from '../settings/institution.js';
 
 export type AdministrativeTier =
-  | 'TOP_EXECUTIVE'       // Principal / Dean / Chancellor
-  | 'SENIOR_ADMIN'        // Vice Principal / Campus Administrator / Provost
-  | 'DEPARTMENT_LEAD'     // Academic Coordinator / Department Administrator / HOD / Faculty Dean
-  | 'ACADEMIC_STAFF'      // Teacher / Lecturer / Professor
-  | 'OPERATIONS_STAFF'    // Admissions Office / Registrar / Admin Staff
-  | 'LEARNER'             // Student (Minor / Scholar)
-  | 'GUARDIAN';           // Parent / Guardian / Sponsor
+  | 'TOP_EXECUTIVE' // Principal / Dean / Chancellor
+  | 'SENIOR_ADMIN' // Vice Principal / Campus Administrator / Provost
+  | 'DEPARTMENT_LEAD' // Academic Coordinator / Department Administrator / HOD / Faculty Dean
+  | 'ACADEMIC_STAFF' // Teacher / Lecturer / Professor
+  | 'OPERATIONS_STAFF' // Admissions Office / Registrar / Admin Staff
+  | 'LEARNER' // Student (Minor / Scholar)
+  | 'GUARDIAN'; // Parent / Guardian / Sponsor
 
 export interface InstitutionRoleMapping {
   roleCode: RoleCode;
@@ -29,7 +29,10 @@ export interface InstitutionRoleMapping {
  * 3. Display title (e.g. Principal vs College Administrator)
  * 4. Administrative responsibility & governance mode
  */
-export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, InstitutionRoleMapping>> = {
+export const CANONICAL_ROLE_MAPPINGS: Record<
+  InstitutionType,
+  Record<RoleCode, InstitutionRoleMapping>
+> = {
   SCHOOL: {
     COLLEGE_ADMIN: {
       roleCode: 'COLLEGE_ADMIN',
@@ -38,7 +41,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       tier: 'TOP_EXECUTIVE',
       defaultScope: 'ORGANIZATION',
       governanceMode: 'PRINCIPAL_FINAL_AUTHORITY',
-      description: 'Head of School with final executive authority over academics, examinations, payment gateways, and security.',
+      description:
+        'Head of School with final executive authority over academics, examinations, payment gateways, and security.',
     },
     CAMPUS_ADMIN: {
       roleCode: 'CAMPUS_ADMIN',
@@ -46,7 +50,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Vice Principal',
       tier: 'SENIOR_ADMIN',
       defaultScope: 'CAMPUS',
-      description: 'Campus / Wing Head with operational oversight over daily school routines, attendance, and campus facilities.',
+      description:
+        'Campus / Wing Head with operational oversight over daily school routines, attendance, and campus facilities.',
     },
     DEPARTMENT_ADMIN: {
       roleCode: 'DEPARTMENT_ADMIN',
@@ -54,7 +59,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Academic coordinator',
       tier: 'DEPARTMENT_LEAD',
       defaultScope: 'DEPARTMENT',
-      description: 'Curriculum and grade coordinator overseeing subject syllabi, class allocations, and teacher schedules.',
+      description:
+        'Curriculum and grade coordinator overseeing subject syllabi, class allocations, and teacher schedules.',
     },
     HOD: {
       roleCode: 'HOD',
@@ -62,7 +68,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Head of department',
       tier: 'DEPARTMENT_LEAD',
       defaultScope: 'DEPARTMENT',
-      description: 'Subject department head leading subject-specific teaching quality and examination marks moderation.',
+      description:
+        'Subject department head leading subject-specific teaching quality and examination marks moderation.',
     },
     REGISTRAR: {
       roleCode: 'REGISTRAR',
@@ -70,7 +77,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Admissions office',
       tier: 'OPERATIONS_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'Admissions and student records officer managing inquiries, enrollments, guardian details, and identity documents.',
+      description:
+        'Admissions and student records officer managing inquiries, enrollments, guardian details, and identity documents.',
     },
     FACULTY: {
       roleCode: 'FACULTY',
@@ -78,7 +86,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Teacher',
       tier: 'ACADEMIC_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'Class and subject teacher managing daily attendance, homework assignments, student evaluation, and pastoral care.',
+      description:
+        'Class and subject teacher managing daily attendance, homework assignments, student evaluation, and pastoral care.',
     },
     STAFF: {
       roleCode: 'STAFF',
@@ -86,7 +95,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Administrative staff',
       tier: 'OPERATIONS_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'School operational staff supporting front desk, non-academic facilities, and administrative duties.',
+      description:
+        'School operational staff supporting front desk, non-academic facilities, and administrative duties.',
     },
     STUDENT: {
       roleCode: 'STUDENT',
@@ -94,7 +104,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Student',
       tier: 'LEARNER',
       defaultScope: 'ORGANIZATION',
-      description: 'Enrolled minor student receiving instructional education, subject to guardian custody and school pastoral care.',
+      description:
+        'Enrolled minor student receiving instructional education, subject to guardian custody and school pastoral care.',
     },
   },
   COLLEGE: {
@@ -105,7 +116,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       tier: 'TOP_EXECUTIVE',
       defaultScope: 'ORGANIZATION',
       governanceMode: 'DEAN_ACADEMIC_COUNCIL',
-      description: 'College Director or Principal governing degree programs, financial policies, accreditation, and institutional security.',
+      description:
+        'College Director or Principal governing degree programs, financial policies, accreditation, and institutional security.',
     },
     CAMPUS_ADMIN: {
       roleCode: 'CAMPUS_ADMIN',
@@ -113,7 +125,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Campus administrator',
       tier: 'SENIOR_ADMIN',
       defaultScope: 'CAMPUS',
-      description: 'Collegiate campus administrator managing physical infrastructure, campus discipline, and facilities.',
+      description:
+        'Collegiate campus administrator managing physical infrastructure, campus discipline, and facilities.',
     },
     DEPARTMENT_ADMIN: {
       roleCode: 'DEPARTMENT_ADMIN',
@@ -121,7 +134,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Department administrator',
       tier: 'DEPARTMENT_LEAD',
       defaultScope: 'DEPARTMENT',
-      description: 'Academic department officer administering degree requirements, lab timetables, and faculty assignments.',
+      description:
+        'Academic department officer administering degree requirements, lab timetables, and faculty assignments.',
     },
     HOD: {
       roleCode: 'HOD',
@@ -129,7 +143,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Head of department',
       tier: 'DEPARTMENT_LEAD',
       defaultScope: 'DEPARTMENT',
-      description: 'Head of academic department presiding over course curriculum, elective allotments, and faculty performance.',
+      description:
+        'Head of academic department presiding over course curriculum, elective allotments, and faculty performance.',
     },
     REGISTRAR: {
       roleCode: 'REGISTRAR',
@@ -137,7 +152,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Registrar',
       tier: 'OPERATIONS_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'College Registrar managing student matriculation, semester registration, transcripts, and official seals.',
+      description:
+        'College Registrar managing student matriculation, semester registration, transcripts, and official seals.',
     },
     FACULTY: {
       roleCode: 'FACULTY',
@@ -145,7 +161,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Faculty',
       tier: 'ACADEMIC_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'Lecturer / Assistant Professor delivering course lectures, conducting laboratory sessions, and evaluating exams.',
+      description:
+        'Lecturer / Assistant Professor delivering course lectures, conducting laboratory sessions, and evaluating exams.',
     },
     STAFF: {
       roleCode: 'STAFF',
@@ -153,7 +170,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Staff',
       tier: 'OPERATIONS_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'College administrative employee assisting library, accounts, examination cell, and student affairs.',
+      description:
+        'College administrative employee assisting library, accounts, examination cell, and student affairs.',
     },
     STUDENT: {
       roleCode: 'STUDENT',
@@ -161,7 +179,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Student',
       tier: 'LEARNER',
       defaultScope: 'ORGANIZATION',
-      description: 'Undergraduate or postgraduate student scholar with sovereign privacy rights and elective course choice.',
+      description:
+        'Undergraduate or postgraduate student scholar with sovereign privacy rights and elective course choice.',
     },
   },
   UNIVERSITY: {
@@ -172,7 +191,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       tier: 'TOP_EXECUTIVE',
       defaultScope: 'ORGANIZATION',
       governanceMode: 'SENATE_ACADEMIC_COUNCIL',
-      description: 'Vice-Chancellor / Registrar-General leading university senate governance, research charters, and institutional security.',
+      description:
+        'Vice-Chancellor / Registrar-General leading university senate governance, research charters, and institutional security.',
     },
     CAMPUS_ADMIN: {
       roleCode: 'CAMPUS_ADMIN',
@@ -180,7 +200,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Campus administrator',
       tier: 'SENIOR_ADMIN',
       defaultScope: 'CAMPUS',
-      description: 'Constituent campus provost or director managing branch campus academic operations and services.',
+      description:
+        'Constituent campus provost or director managing branch campus academic operations and services.',
     },
     DEPARTMENT_ADMIN: {
       roleCode: 'DEPARTMENT_ADMIN',
@@ -188,7 +209,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Department administrator',
       tier: 'DEPARTMENT_LEAD',
       defaultScope: 'DEPARTMENT',
-      description: 'Faculty officer managing collegiate postgraduate admissions, modular registrations, and degree auditing.',
+      description:
+        'Faculty officer managing collegiate postgraduate admissions, modular registrations, and degree auditing.',
     },
     HOD: {
       roleCode: 'HOD',
@@ -196,7 +218,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Head of department',
       tier: 'DEPARTMENT_LEAD',
       defaultScope: 'DEPARTMENT',
-      description: 'Academic chair heading university department, doctoral committees, and modular course designs.',
+      description:
+        'Academic chair heading university department, doctoral committees, and modular course designs.',
     },
     REGISTRAR: {
       roleCode: 'REGISTRAR',
@@ -204,7 +227,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'University registrar',
       tier: 'OPERATIONS_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'Chief University Registrar overseeing convocation, degree awarding, academic transcripts, and institutional archives.',
+      description:
+        'Chief University Registrar overseeing convocation, degree awarding, academic transcripts, and institutional archives.',
     },
     FACULTY: {
       roleCode: 'FACULTY',
@@ -212,7 +236,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Professor',
       tier: 'ACADEMIC_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'University Professor, Chair, or Reader directing advanced seminars, doctoral research, and comprehensive examinations.',
+      description:
+        'University Professor, Chair, or Reader directing advanced seminars, doctoral research, and comprehensive examinations.',
     },
     STAFF: {
       roleCode: 'STAFF',
@@ -220,7 +245,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'University staff',
       tier: 'OPERATIONS_STAFF',
       defaultScope: 'ORGANIZATION',
-      description: 'University secretariat and operational staff managing research administration, grants, and facilities.',
+      description:
+        'University secretariat and operational staff managing research administration, grants, and facilities.',
     },
     STUDENT: {
       roleCode: 'STUDENT',
@@ -228,7 +254,8 @@ export const CANONICAL_ROLE_MAPPINGS: Record<InstitutionType, Record<RoleCode, I
       displayTitle: 'Student',
       tier: 'LEARNER',
       defaultScope: 'ORGANIZATION',
-      description: 'Postgraduate or doctoral scholar managing individual research, credit-based courses, and dissertation progress.',
+      description:
+        'Postgraduate or doctoral scholar managing individual research, credit-based courses, and dissertation progress.',
     },
   },
 };
@@ -240,7 +267,10 @@ export function getInstitutionRoleMapping(
   institutionType: InstitutionType,
   roleCode: RoleCode,
 ): InstitutionRoleMapping {
-  return CANONICAL_ROLE_MAPPINGS[institutionType]?.[roleCode] ?? CANONICAL_ROLE_MAPPINGS.COLLEGE[roleCode];
+  return (
+    CANONICAL_ROLE_MAPPINGS[institutionType]?.[roleCode] ??
+    CANONICAL_ROLE_MAPPINGS.COLLEGE[roleCode]
+  );
 }
 
 /**
@@ -372,7 +402,8 @@ export const INSTITUTION_DOMAIN_POLICIES: Record<string, DomainPolicyDecision> =
     domain: 'GATEWAY_SETTINGS',
     schoolRole: 'Principal, Vice Principal, Admissions Office, School Bursar',
     collegeRole: 'College Administrator, Campus Administrator, Registrar, Finance Officer',
-    universityRole: 'University Administrator, Campus Administrator, University Registrar, Comptroller',
+    universityRole:
+      'University Administrator, Campus Administrator, University Registrar, Comptroller',
     allowedRoleCodes: ['COLLEGE_ADMIN', 'CAMPUS_ADMIN', 'REGISTRAR'],
     notes: 'Read-only gateway status visible to administrative and finance staff.',
   },
@@ -399,7 +430,14 @@ export const INSTITUTION_DOMAIN_POLICIES: Record<string, DomainPolicyDecision> =
     schoolRole: 'Teacher (Assigned), Principal, Vice Principal, Academic Coordinator, HOD',
     collegeRole: 'Faculty (Assigned), College Admin, Campus Admin, Dept Admin, HOD',
     universityRole: 'Professor (Assigned), University Admin, Campus Admin, Dept Admin, HOD',
-    allowedRoleCodes: ['FACULTY', 'COLLEGE_ADMIN', 'CAMPUS_ADMIN', 'DEPARTMENT_ADMIN', 'HOD', 'REGISTRAR'],
+    allowedRoleCodes: [
+      'FACULTY',
+      'COLLEGE_ADMIN',
+      'CAMPUS_ADMIN',
+      'DEPARTMENT_ADMIN',
+      'HOD',
+      'REGISTRAR',
+    ],
     notes: 'Creation, publishing, and assignment management.',
   },
   'homework.submit': {
@@ -471,7 +509,16 @@ export const INSTITUTION_DOMAIN_POLICIES: Record<string, DomainPolicyDecision> =
     schoolRole: 'Principal, Teacher, Staff (Up to 2 hardware-bound devices)',
     collegeRole: 'Administrator, Faculty, Staff (Up to 2 hardware-bound devices)',
     universityRole: 'Administrator, Professor, Staff (Up to 2 hardware-bound devices)',
-    allowedRoleCodes: ['COLLEGE_ADMIN', 'CAMPUS_ADMIN', 'DEPARTMENT_ADMIN', 'HOD', 'REGISTRAR', 'FACULTY', 'STAFF', 'STUDENT'],
+    allowedRoleCodes: [
+      'COLLEGE_ADMIN',
+      'CAMPUS_ADMIN',
+      'DEPARTMENT_ADMIN',
+      'HOD',
+      'REGISTRAR',
+      'FACULTY',
+      'STAFF',
+      'STUDENT',
+    ],
     notes: 'Enrollment of device-bound cryptographic credentials with 2-device enforcement.',
   },
 };

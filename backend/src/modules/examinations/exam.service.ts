@@ -708,7 +708,9 @@ export class ExamService {
     const maxMarks = Number(schedule.max_marks);
     const passMarks = Number(schedule.pass_marks);
     const isAbsentOrExempt =
-      validated.status === 'ABSENT' || validated.status === 'EXEMPT' || validated.status === 'WITHHELD';
+      validated.status === 'ABSENT' ||
+      validated.status === 'EXEMPT' ||
+      validated.status === 'WITHHELD';
     const marksVal = isAbsentOrExempt ? null : validated.marks_obtained;
 
     if (validated.status === 'ENTERED' || validated.status === 'SUBMITTED') {
@@ -908,11 +910,7 @@ export class ExamService {
 
     // Maker-checker & Governance mode validation:
     // If the caller submitted the marks:
-    if (
-      schedule.marks_submitted_by_user_id &&
-      schedule.marks_submitted_by_user_id === ctx.userId
-    ) {
-      let isAllowed = false;
+    if (schedule.marks_submitted_by_user_id && schedule.marks_submitted_by_user_id === ctx.userId) {
       const { EligibilityService } = await import('./eligibility.service.js');
       const policy = await EligibilityService.getOrResolvePolicy(
         tx,
@@ -930,9 +928,7 @@ export class ExamService {
       const isPrincipal = adminIds.includes(ctx.userId);
 
       if (governanceMode === 'PRINCIPAL_FINAL_AUTHORITY') {
-        if (isPrincipal) {
-          isAllowed = true;
-        } else {
+        if (!isPrincipal) {
           throw new AppError(
             403,
             'MAKER_CHECKER_VIOLATION',
@@ -940,9 +936,7 @@ export class ExamService {
           );
         }
       } else if (governanceMode === 'DELEGATED_APPROVAL') {
-        if (isPrincipal) {
-          isAllowed = true;
-        } else {
+        if (!isPrincipal) {
           throw new AppError(
             403,
             'MAKER_CHECKER_VIOLATION',
@@ -955,14 +949,6 @@ export class ExamService {
           403,
           'MAKER_CHECKER_VIOLATION',
           'Separation of duties required: Marks submitter cannot publish their own marks under the Independent Academic Review policy.',
-        );
-      }
-
-      if (!isAllowed) {
-        throw new AppError(
-          403,
-          'MAKER_CHECKER_VIOLATION',
-          'Separation of duties required: The user who submitted the marks cannot publish results without independent review.',
         );
       }
     }

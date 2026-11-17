@@ -50,7 +50,7 @@ describe('ANESA Universal Institution Provisioning & Feature Parity', () => {
 
       // 1. Verify organization table stores correct institution_type
       const orgRes = await client.query<{ institution_type: string }>(
-        'SELECT COALESCE(institution_type, \'SCHOOL\') AS institution_type FROM app.organizations WHERE id = $1',
+        "SELECT COALESCE(institution_type, 'SCHOOL') AS institution_type FROM app.organizations WHERE id = $1",
         [tenant.id],
       );
       expect(orgRes.rows[0]?.institution_type).toBe(instType);
@@ -60,7 +60,7 @@ describe('ANESA Universal Institution Provisioning & Feature Parity', () => {
       const expectedTitle = mapping.displayTitle;
 
       const rolesRes = await client.query<{ code: string; name: string }>(
-        'SELECT code, name FROM app.roles WHERE organization_id = $1 AND code = \'COLLEGE_ADMIN\'',
+        "SELECT code, name FROM app.roles WHERE organization_id = $1 AND code = 'COLLEGE_ADMIN'",
         [tenant.id],
       );
       expect(rolesRes.rows.length).toBe(1);
@@ -89,10 +89,9 @@ describe('ANESA Universal Institution Provisioning & Feature Parity', () => {
 
       // 5. Verify effective capabilities returned by AuthorizationEngine.describeActor()
       // Activate user so describeActor returns grants
-      await client.query(
-        'UPDATE app.users SET status = \'ACTIVE\' WHERE id = $1',
-        [tenant.adminUserId],
-      );
+      await client.query("UPDATE app.users SET status = 'ACTIVE' WHERE id = $1", [
+        tenant.adminUserId,
+      ]);
 
       const ctx = issueTrustedContext({
         tenantId: tenant.id,
@@ -151,7 +150,7 @@ describe('ANESA Universal Institution Provisioning & Feature Parity', () => {
     expect(assignRes.rows[0]?.scope_type).toBe('ORGANIZATION');
   });
 
-  it('guarantees School Principal feature parity: school capabilities never vanish', async () => {
+  it('guarantees School Principal feature parity: school capabilities never vanish', () => {
     // Audit that all 10 ERP domains have explicit School policy decisions
     const domainKeys = Object.keys(INSTITUTION_DOMAIN_POLICIES);
     expect(domainKeys.length).toBeGreaterThanOrEqual(15);

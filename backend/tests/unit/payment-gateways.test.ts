@@ -48,13 +48,14 @@ describe('Payment Gateway Adapters Unit Tests', () => {
     it('creates an order via createOrder', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          id: 'order_rzp_99999',
-          amount: 500000,
-          currency: 'INR',
-          status: 'created',
-        }),
-      } as unknown as Response);
+        json: () =>
+          Promise.resolve({
+            id: 'order_rzp_99999',
+            amount: 500000,
+            currency: 'INR',
+            status: 'created',
+          }),
+      });
 
       const adapter = new RazorpayAdapter({ fetchFn: mockFetch });
       const res = await adapter.createOrder(config, {
@@ -89,15 +90,16 @@ describe('Payment Gateway Adapters Unit Tests', () => {
 
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          id: paymentId,
-          order_id: orderId,
-          status: 'captured',
-          amount: 500000,
-          currency: 'INR',
-          method: 'upi',
-        }),
-      } as unknown as Response);
+        json: () =>
+          Promise.resolve({
+            id: paymentId,
+            order_id: orderId,
+            status: 'captured',
+            amount: 500000,
+            currency: 'INR',
+            method: 'upi',
+          }),
+      });
 
       const adapter = new RazorpayAdapter({ fetchFn: mockFetch });
       const verification = await adapter.verifyPayment(config, {
@@ -179,13 +181,14 @@ describe('Payment Gateway Adapters Unit Tests', () => {
     it('creates an order session via createOrder', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          cf_order_id: 'cf_ord_88888',
-          order_id: 'cf_ord_ref_123',
-          payment_session_id: 'session_token_xyz',
-          order_status: 'ACTIVE',
-        }),
-      } as unknown as Response);
+        json: () =>
+          Promise.resolve({
+            cf_order_id: 'cf_ord_88888',
+            order_id: 'cf_ord_ref_123',
+            payment_session_id: 'session_token_xyz',
+            order_status: 'ACTIVE',
+          }),
+      });
 
       const adapter = new CashfreeAdapter({ fetchFn: mockFetch });
       const res = await adapter.createOrder(config, {
@@ -209,7 +212,7 @@ describe('Payment Gateway Adapters Unit Tests', () => {
             'x-client-id': 'CF_APP_KEY_123',
             'x-client-secret': 'CF_SECRET_KEY_abc',
             'x-api-version': '2023-08-01',
-          }),
+          }) as unknown as Record<string, string>,
         }),
       );
     });
@@ -217,15 +220,16 @@ describe('Payment Gateway Adapters Unit Tests', () => {
     it('verifies cashfree order payments status via verifyPayment', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => [
-          {
-            cf_payment_id: 'cf_pay_9999',
-            payment_status: 'SUCCESS',
-            order_amount: 2500.0,
-            payment_currency: 'INR',
-          },
-        ],
-      } as unknown as Response);
+        json: () =>
+          Promise.resolve([
+            {
+              cf_payment_id: 'cf_pay_9999',
+              payment_status: 'SUCCESS',
+              order_amount: 2500.0,
+              payment_currency: 'INR',
+            },
+          ]),
+      });
 
       const adapter = new CashfreeAdapter({ fetchFn: mockFetch });
       const verification = await adapter.verifyPayment(config, {
@@ -296,20 +300,21 @@ describe('Payment Gateway Adapters Unit Tests', () => {
     it('creates an order with base64 payload and sha256 checksum', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          success: true,
-          code: 'PAYMENT_INITIATED',
-          message: 'Payment Initiated',
-          data: {
-            merchantTransactionId: 'att_pp_123',
-            instrumentResponse: {
-              redirectInfo: {
-                url: 'https://mercury-uat.phonepe.com/transact/simulator?token=abc',
+        json: () =>
+          Promise.resolve({
+            success: true,
+            code: 'PAYMENT_INITIATED',
+            message: 'Payment Initiated',
+            data: {
+              merchantTransactionId: 'att_pp_123',
+              instrumentResponse: {
+                redirectInfo: {
+                  url: 'https://mercury-uat.phonepe.com/transact/simulator?token=abc',
+                },
               },
             },
-          },
-        }),
-      } as unknown as Response);
+          }),
+      });
 
       const adapter = new PhonePeAdapter({ fetchFn: mockFetch });
       const res = await adapter.createOrder(config, {
@@ -327,8 +332,8 @@ describe('Payment Gateway Adapters Unit Tests', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'X-VERIFY': expect.stringMatching(/###1$/),
-          }),
+            'X-VERIFY': expect.stringMatching(/###1$/) as unknown as string,
+          }) as unknown as Record<string, string>,
         }),
       );
     });
@@ -336,22 +341,23 @@ describe('Payment Gateway Adapters Unit Tests', () => {
     it('verifies PhonePe status response via verifyPayment', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          success: true,
-          code: 'PAYMENT_SUCCESS',
-          message: 'Payment Success',
-          data: {
-            merchantTransactionId: 'att_pp_123',
-            transactionId: 'T2308151234567890',
-            amount: 150000,
-            state: 'COMPLETED',
-            responseCode: 'SUCCESS',
-            paymentInstrument: {
-              type: 'UPI',
+        json: () =>
+          Promise.resolve({
+            success: true,
+            code: 'PAYMENT_SUCCESS',
+            message: 'Payment Success',
+            data: {
+              merchantTransactionId: 'att_pp_123',
+              transactionId: 'T2308151234567890',
+              amount: 150000,
+              state: 'COMPLETED',
+              responseCode: 'SUCCESS',
+              paymentInstrument: {
+                type: 'UPI',
+              },
             },
-          },
-        }),
-      } as unknown as Response);
+          }),
+      });
 
       const adapter = new PhonePeAdapter({ fetchFn: mockFetch });
       const verification = await adapter.verifyPayment(config, {

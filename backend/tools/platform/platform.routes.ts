@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '../../src/shared/errors/http-errors.js';
 import { PlatformService, type PlatformDb } from './platform.service.js';
 import { ERP_MODULE_CATALOG, STANDARD_PLAN_BUNDLES } from './module-registry.js';
@@ -14,7 +14,7 @@ import type {
 } from './platform.schemas.js';
 
 export interface PlatformRoutesOptions {
-  db: PlatformDb | any;
+  db: PlatformDb;
 }
 
 const DEFAULT_PLATFORM_KEY = 'change_me_platform_dev_token';
@@ -77,7 +77,8 @@ export const platformSessionStore = new PlatformSessionStore();
 
 export function verifyPlatformAuth(req: FastifyRequest): PlatformSession | { role: 'OPERATOR' } {
   // 1. Check HttpOnly cookie
-  const cookieSessionId = (req as any).cookies?.['campusos_platform_session'];
+  const reqWithCookies = req as FastifyRequest & { cookies?: Record<string, string | undefined> };
+  const cookieSessionId = reqWithCookies.cookies?.['campusos_platform_session'];
   if (cookieSessionId) {
     const session = platformSessionStore.validateSession(cookieSessionId);
     if (session) return session;
@@ -113,16 +114,14 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
   app: FastifyInstance,
   opts: PlatformRoutesOptions,
 ) => {
+  await Promise.resolve();
   const platformService = new PlatformService(opts.db);
 
   // Guard all non-auth /platform routes with platform operator verification
   app.addHook('preHandler', async (req) => {
+    await Promise.resolve();
     const url = req.url.split('?')[0]!;
-    if (
-      url.endsWith('/auth/login') ||
-      url.endsWith('/auth/me') ||
-      url.endsWith('/auth/logout')
-    ) {
+    if (url.endsWith('/auth/login') || url.endsWith('/auth/me') || url.endsWith('/auth/logout')) {
       return;
     }
     verifyPlatformAuth(req);
@@ -140,7 +139,11 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
       }
       const session = platformSessionStore.createSession({ mfaVerified: true });
       const isProd = process.env['NODE_ENV'] === 'production';
-      (reply as any).setCookie('campusos_platform_session', session.id, {
+      (
+        reply as FastifyReply & {
+          setCookie: (name: string, value: string, options?: Record<string, unknown>) => void;
+        }
+      ).setCookie('campusos_platform_session', session.id, {
         path: '/',
         httpOnly: true,
         sameSite: 'lax',
@@ -160,42 +163,41 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
   );
 
   // Auth: Me / Session Status
-  app.get(
-    '/auth/me',
-    { config: { public: true } },
-    async (req) => {
-      try {
-        const auth = verifyPlatformAuth(req);
-        return {
-          success: true,
-          authenticated: true,
-          operator: {
-            role: 'OPERATOR',
-            authMethod: 'id' in auth ? 'SESSION_COOKIE' : 'HEADER_KEY',
-          },
-        };
-      } catch {
-        return {
-          success: false,
-          authenticated: false,
-        };
-      }
-    },
-  );
+  app.get('/auth/me', { config: { public: true } }, async (req) => {
+    await Promise.resolve();
+    try {
+      const auth = verifyPlatformAuth(req);
+      return {
+        success: true,
+        authenticated: true,
+        operator: {
+          role: 'OPERATOR',
+          authMethod: 'id' in auth ? 'SESSION_COOKIE' : 'HEADER_KEY',
+        },
+      };
+    } catch {
+      return {
+        success: false,
+        authenticated: false,
+      };
+    }
+  });
 
   // Auth: Logout
-  app.post(
-    '/auth/logout',
-    { config: { public: true } },
-    async (req, reply) => {
-      const cookieSessionId = (req as any).cookies?.['campusos_platform_session'];
-      if (cookieSessionId) {
-        platformSessionStore.revokeSession(cookieSessionId);
+  app.post('/auth/logout', { config: { public: true } }, async (req, reply) => {
+    await Promise.resolve();
+    const reqWithCookies = req as FastifyRequest & { cookies?: Record<string, string | undefined> };
+    const cookieSessionId = reqWithCookies.cookies?.['campusos_platform_session'];
+    if (cookieSessionId) {
+      platformSessionStore.revokeSession(cookieSessionId);
+    }
+    (
+      reply as FastifyReply & {
+        clearCookie: (name: string, options?: Record<string, unknown>) => void;
       }
-      (reply as any).clearCookie('campusos_platform_session', { path: '/' });
-      return { success: true, message: 'Platform operator session cleared' };
-    },
-  );
+    ).clearCookie('campusos_platform_session', { path: '/' });
+    return { success: true, message: 'Platform operator session cleared' };
+  });
 
   // 1. High-level Platform Stats & Health
   app.get(
@@ -216,6 +218,7 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
       config: { public: true },
     },
     async () => {
+      await Promise.resolve();
       return { success: true, data: ERP_MODULE_CATALOG };
     },
   );
@@ -226,6 +229,7 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
       config: { public: true },
     },
     async () => {
+      await Promise.resolve();
       return { success: true, data: STANDARD_PLAN_BUNDLES };
     },
   );
@@ -237,7 +241,9 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
       config: { public: true },
     },
     async (req) => {
-      const limit = req.query.limit ? Math.min(100, Math.max(1, parseInt(req.query.limit, 10))) : 50;
+      const limit = req.query.limit
+        ? Math.min(100, Math.max(1, parseInt(req.query.limit, 10)))
+        : 50;
       const events = await platformService.getPlatformAuditEvents(limit);
       return { success: true, data: events };
     },
@@ -299,7 +305,9 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
       config: { public: true },
     },
     async (req) => {
-      const result = await platformService.updateInstitution(req.params.id, { status: 'SUSPENDED' });
+      const result = await platformService.updateInstitution(req.params.id, {
+        status: 'SUSPENDED',
+      });
       return { success: true, data: result };
     },
   );

@@ -3,17 +3,17 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-import { FeatureUnavailableState, InstitutionSuspendedState } from '../src/components/ui/FeatureUnavailableState';
+import {
+  FeatureUnavailableState,
+  InstitutionSuspendedState,
+} from '../src/components/ui/FeatureUnavailableState';
 import {
   ApiError,
   isInstitutionSuspended,
   isModuleNotEntitled,
   kindForStatus,
 } from '../src/lib/api/errors';
-import {
-  MODULE_PREVIEWS,
-  resolveModuleError,
-} from '../src/lib/api/module-state';
+import { MODULE_PREVIEWS, resolveModuleError } from '../src/lib/api/module-state';
 import { createFakeBackend, type MeData } from './helpers/fakeBackend';
 import { renderApp } from './helpers/render';
 
@@ -73,14 +73,18 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
     });
 
     it('resolves module error states correctly via resolveModuleError', () => {
-      const notEntitledErr = new ApiError('module_not_entitled', 403, { code: 'MODULE_NOT_ENTITLED' });
+      const notEntitledErr = new ApiError('module_not_entitled', 403, {
+        code: 'MODULE_NOT_ENTITLED',
+      });
       const res1 = resolveModuleError(notEntitledErr, 'examinations');
       expect(res1.kind).toBe('not_entitled');
       if (res1.kind === 'not_entitled') {
         expect(res1.moduleName).toBe('Examinations & Results');
       }
 
-      const suspendedErr = new ApiError('institution_suspended', 403, { code: 'INSTITUTION_SUSPENDED' });
+      const suspendedErr = new ApiError('institution_suspended', 403, {
+        code: 'INSTITUTION_SUSPENDED',
+      });
       const res2 = resolveModuleError(suspendedErr, 'examinations');
       expect(res2.kind).toBe('suspended');
 
@@ -111,10 +115,7 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
     it('renders the friendly feature not active messaging and capability preview', () => {
       render(
         <MemoryRouter>
-          <FeatureUnavailableState
-            moduleKey="examinations"
-            moduleName="Examinations & Results"
-          />
+          <FeatureUnavailableState moduleKey="examinations" moduleName="Examinations & Results" />
         </MemoryRouter>,
       );
 
@@ -123,15 +124,21 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
 
       // Clear, positive body copy
       expect(
-        screen.getByText(/Examinations & Results is available when this module is enabled for your institution/),
+        screen.getByText(
+          /Examinations & Results is available when this module is enabled for your institution/,
+        ),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/Your workspace is working normally — this feature is simply not active right now/),
+        screen.getByText(
+          /Your workspace is working normally — this feature is simply not active right now/,
+        ),
       ).toBeInTheDocument();
 
       // Supporting guidance
       expect(
-        screen.getByText(/This feature is managed centrally for your institution. You can continue using your available Anesa Campus OS features as normal./),
+        screen.getByText(
+          /This feature is managed centrally for your institution. You can continue using your available Anesa Campus OS features as normal./,
+        ),
       ).toBeInTheDocument();
 
       // Capability preview card
@@ -147,10 +154,7 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
     it('never contains raw 403 or raw technical error strings', () => {
       render(
         <MemoryRouter>
-          <FeatureUnavailableState
-            moduleKey="finance"
-            moduleName="Fees & Finance Ledger"
-          />
+          <FeatureUnavailableState moduleKey="finance" moduleName="Fees & Finance Ledger" />
         </MemoryRouter>,
       );
 
@@ -164,10 +168,7 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
       const user = userEvent.setup();
       render(
         <MemoryRouter>
-          <FeatureUnavailableState
-            moduleKey="homework"
-            moduleName="Homework & Coursework"
-          />
+          <FeatureUnavailableState moduleKey="homework" moduleName="Homework & Coursework" />
         </MemoryRouter>,
       );
 
@@ -177,8 +178,12 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
       expect(
         screen.getByRole('heading', { name: 'Contact Campus Administrator' }),
       ).toBeInTheDocument();
-      expect(screen.getByText(/Module availability is managed by the Anesa Platform team/)).toBeInTheDocument();
-      expect(screen.getByText(/contact your institution's designated administrator/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Module availability is managed by the Anesa Platform team/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/contact your institution's designated administrator/i),
+      ).toBeInTheDocument();
       expect(screen.queryByText(/subscription tier/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/School Principal, Registrar/i)).not.toBeInTheDocument();
 
@@ -228,7 +233,8 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
 
       // Mock examinations endpoint to return 403 MODULE_NOT_ENTITLED
       backend.fetch = vi.fn((input: RequestInfo | URL, reqInit?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         if (url.includes('/api/v1/examinations')) {
           return Promise.resolve(
             new Response(
@@ -255,7 +261,9 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
 
       // Feature unavailable state is rendered
       expect(await screen.findByText('This feature is not currently active')).toBeInTheDocument();
-      expect(screen.getByText(/Examinations & Results is available when this module is enabled/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Examinations & Results is available when this module is enabled/),
+      ).toBeInTheDocument();
 
       // No raw error banner
       expect(screen.queryByText(/API forbidden \(403\)/i)).not.toBeInTheDocument();
@@ -267,7 +275,8 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
       const origFetch = backend.fetch;
 
       backend.fetch = vi.fn((input: RequestInfo | URL, reqInit?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         if (url.includes('/api/v1/homework')) {
           return Promise.resolve(
             new Response(
@@ -291,7 +300,9 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
         await screen.findByRole('heading', { name: 'Homework & Assignments' }),
       ).toBeInTheDocument();
       expect(await screen.findByText('This feature is not currently active')).toBeInTheDocument();
-      expect(screen.getByText(/Homework & Coursework is available when this module is enabled/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Homework & Coursework is available when this module is enabled/),
+      ).toBeInTheDocument();
 
       // Does not show raw error
       expect(screen.queryByText(/API forbidden \(403\)/i)).not.toBeInTheDocument();
@@ -303,7 +314,8 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
       const origFetch = backend.fetch;
 
       backend.fetch = vi.fn((input: RequestInfo | URL, reqInit?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         if (url.includes('/api/v1/finance')) {
           return Promise.resolve(
             new Response(
@@ -327,7 +339,9 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
         await screen.findByRole('heading', { name: 'Fees & Finance Management' }),
       ).toBeInTheDocument();
       expect(await screen.findByText('This feature is not currently active')).toBeInTheDocument();
-      expect(screen.getByText(/Fees & Finance Ledger is available when this module is enabled/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Fees & Finance Ledger is available when this module is enabled/),
+      ).toBeInTheDocument();
 
       expect(screen.queryByText(/API forbidden \(403\)/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/MODULE_NOT_ENTITLED/)).not.toBeInTheDocument();
@@ -338,7 +352,8 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
       const origFetch = backend.fetch;
 
       backend.fetch = vi.fn((input: RequestInfo | URL, reqInit?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         if (url.includes('/api/v1/reports')) {
           return Promise.resolve(
             new Response(
@@ -362,7 +377,11 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
         await screen.findByRole('heading', { name: 'Executive & Administrative Reports' }),
       ).toBeInTheDocument();
       expect(await screen.findByText('This feature is not currently active')).toBeInTheDocument();
-      expect(screen.getByText(/Institutional Analytics & Reports is available when this module is enabled/)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Institutional Analytics & Reports is available when this module is enabled/,
+        ),
+      ).toBeInTheDocument();
 
       expect(screen.queryByText(/API forbidden \(403\)/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/MODULE_NOT_ENTITLED/)).not.toBeInTheDocument();
@@ -373,7 +392,8 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
       const origFetch = backend.fetch;
 
       backend.fetch = vi.fn((input: RequestInfo | URL, reqInit?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         if (url.includes('/api/v1/documents')) {
           return Promise.resolve(
             new Response(
@@ -393,11 +413,11 @@ describe('Disabled ERP Module UX & FeatureUnavailableState Component', () => {
 
       renderApp(backend, '/documents');
 
-      expect(
-        await screen.findByRole('heading', { name: 'Document Center' }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Document Center' })).toBeInTheDocument();
       expect(await screen.findByText('This feature is not currently active')).toBeInTheDocument();
-      expect(screen.getByText(/Document Center & Storage is available when this module is enabled/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Document Center & Storage is available when this module is enabled/),
+      ).toBeInTheDocument();
 
       expect(screen.queryByText(/API forbidden \(403\)/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/MODULE_NOT_ENTITLED/)).not.toBeInTheDocument();

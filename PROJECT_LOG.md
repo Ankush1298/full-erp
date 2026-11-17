@@ -22,7 +22,6 @@
 - **4. Comprehensive Report Deliverable**:
   - Deliverable created: `anesa-module-readiness-and-demo-release-report.md`.
 
-
 ## [2026-11-16] Master Security Verification, Vulnerability Remediation & Production Hardening
 
 - **Actor**: Antigravity Autonomous Security Verification Agent
@@ -105,7 +104,6 @@
   - Ran web authentication and onboarding suites (`auth-flow.test.tsx`, `mfa.test.tsx`, `self-service-mfa-onboarding.test.tsx`): 30/30 passed.
 - **5. Payment Integrity Verification (Issue 5)**:
   - Verified offline payments and online multi-gateway integrations across Razorpay, Cashfree, and PhonePe (`payment-gateways.test.ts`, `finance-slice1.test.ts`, `fees-page.test.tsx`): 35/35 passed.
-
 
 ## [2026-11-13] Fees & Finance UI Consistency Repair
 
@@ -3821,7 +3819,6 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
   - Institutional bulk data export remains **DEFERRED BY OWNER**.
   - Immediate Next Priority: **Task 7: PR-1 School Input and Invitation Mailer Integration (G4)**, followed by school setup wizard remaining steps rehearsal.
 
-
 ## [2026-11-16] UX Polish for Disabled/Closed ERP Modules (`MODULE_NOT_ENTITLED`)
 
 - **Actor**: Antigravity. Preserved all backend entitlement checks, RLS policies, and 403 enforcement unchanged.
@@ -3853,7 +3850,6 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
      - `pnpm check:secrets`: passed.
      - `git diff --check`: passed (0 whitespace errors).
 
-
 ## [2026-11-16] Platform Owner Exclusive Module Control & Dynamic Role-Based Navigation
 
 - **Actor**: Antigravity. Preserved all six existing institutions in `campusos_demo` untouched. No destructive commands, no credential changes, no unauthorized commits or pushes.
@@ -3876,9 +3872,9 @@ CI on a pushed commit; production secret manager for `IMPORT_MATCHING_KEYS`; out
   3. **Direct URL Security & Professional Unavailable States**:
      - Verified direct URL security: navigation is a UX convenience only; backend `auth.hook.ts` enforces fail-closed 403 `MODULE_NOT_ENTITLED` on every API route.
      - Updated `apps/web/src/components/ui/FeatureUnavailableState.tsx`:
-       - Heading: *"This feature is not currently active"*
-       - Description: *"This feature is managed centrally for your institution. You can continue using your available Anesa Campus OS features as normal."*
-       - Support dialog: *"Module availability is managed by the Anesa Platform team. For questions about enabling this feature, please contact your institution's designated administrator, who can coordinate with the platform team."*
+       - Heading: _"This feature is not currently active"_
+       - Description: _"This feature is managed centrally for your institution. You can continue using your available Anesa Campus OS features as normal."_
+       - Support dialog: _"Module availability is managed by the Anesa Platform team. For questions about enabling this feature, please contact your institution's designated administrator, who can coordinate with the platform team."_
        - Completely removed misleading references to "School Principal, Registrar can activate" and eliminated commercial/plan-shaming terminology ("lower plan", "subscription tier").
   4. **Verification & Test Suite**:
      - Updated `apps/web/tests/navigation.test.tsx` (21/21 passed): verified entitlement-aware filtering, role permission filtering, parent portal visibility, and axe-core accessibility.

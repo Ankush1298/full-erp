@@ -179,7 +179,7 @@ export class PhonePeAdapter implements IPaymentGatewayAdapter {
         ? `PHONEPE_${data.data.paymentInstrument.type.toUpperCase()}`
         : 'ONLINE_PHONEPE',
       failureReason: isSuccess ? undefined : data.message || `PhonePe response: ${data.code}`,
-      rawResponse: data as Record<string, unknown>,
+      rawResponse: data,
     };
   }
 
@@ -187,6 +187,7 @@ export class PhonePeAdapter implements IPaymentGatewayAdapter {
     config: GatewayConfig,
     params: WebhookVerificationParams,
   ): Promise<WebhookProcessResult> {
+    await Promise.resolve();
     const xVerify =
       params.headers['x-verify'] || params.headers['X-VERIFY'] || params.headers['X-Verify'];
 
@@ -205,7 +206,7 @@ export class PhonePeAdapter implements IPaymentGatewayAdapter {
 
     let bodyObj: { response?: string };
     try {
-      bodyObj = JSON.parse(rawString);
+      bodyObj = JSON.parse(rawString) as typeof bodyObj;
     } catch {
       return {
         isValid: false,
@@ -253,7 +254,9 @@ export class PhonePeAdapter implements IPaymentGatewayAdapter {
     };
 
     try {
-      decoded = JSON.parse(Buffer.from(base64Response, 'base64').toString('utf8'));
+      decoded = JSON.parse(
+        Buffer.from(base64Response, 'base64').toString('utf8'),
+      ) as typeof decoded;
     } catch {
       return {
         isValid: false,
@@ -277,7 +280,7 @@ export class PhonePeAdapter implements IPaymentGatewayAdapter {
       status: isSuccess ? 'SUCCESS' : isFailed ? 'FAILED' : 'PENDING',
       amount: decoded.data?.amount ? Number(decoded.data.amount) : undefined,
       failureReason: isSuccess ? undefined : decoded.code,
-      rawEvent: decoded as Record<string, unknown>,
+      rawEvent: decoded,
     };
   }
 
@@ -335,11 +338,12 @@ export class PhonePeAdapter implements IPaymentGatewayAdapter {
       success: isSuccess,
       gatewayRefundRef: data.data?.transactionId || refundTxnId,
       status: isSuccess ? 'SUCCESS' : 'PENDING',
-      rawResponse: data as Record<string, unknown>,
+      rawResponse: data,
     };
   }
 
   async checkHealth(config: GatewayConfig): Promise<HealthCheckResult> {
+    await Promise.resolve();
     const { saltKey, saltIndex } = this.#getSaltKeyAndIndex(config);
     if (!saltKey || saltKey.length < 8) {
       return {

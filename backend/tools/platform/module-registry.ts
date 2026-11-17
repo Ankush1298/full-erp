@@ -13,7 +13,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'students',
     name: 'Student Management & Directory',
     category: 'CORE',
-    description: 'Admitted student onboarding, student profiles, identifiers, and scope-restricted directory lookups.',
+    description:
+      'Admitted student onboarding, student profiles, identifiers, and scope-restricted directory lookups.',
     dependencies: [],
     targetRoutes: ['/students', '/profile'],
     requiredCapabilities: ['student.profile.read', 'student.directory.search'],
@@ -22,7 +23,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'academics',
     name: 'Academics & Cohort Management',
     category: 'ACADEMIC',
-    description: 'Degree programs, academic terms, courses, syllabus, class sections, and faculty teaching assignments.',
+    description:
+      'Degree programs, academic terms, courses, syllabus, class sections, and faculty teaching assignments.',
     dependencies: [],
     targetRoutes: ['/academics', '/curriculum'],
     requiredCapabilities: ['academic.program.read', 'academic.term.manage'],
@@ -31,7 +33,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'attendance',
     name: 'Attendance & Class Tracking',
     category: 'ACADEMIC',
-    description: 'Class session roll-calls, student attendance logging, correction workflow, and audit locking.',
+    description:
+      'Class session roll-calls, student attendance logging, correction workflow, and audit locking.',
     dependencies: ['academics'],
     targetRoutes: ['/attendance'],
     requiredCapabilities: ['attendance.session.mark', 'attendance.record.read'],
@@ -40,7 +43,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'homework',
     name: 'Homework & Assignment Workflow',
     category: 'ACADEMIC',
-    description: 'Teacher assignment creation, due date management, student digital submission, and feedback review.',
+    description:
+      'Teacher assignment creation, due date management, student digital submission, and feedback review.',
     dependencies: ['academics'],
     targetRoutes: ['/homework'],
     requiredCapabilities: ['homework.read', 'homework.manage', 'homework.submit'],
@@ -49,7 +53,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'examinations',
     name: 'Examinations, Marks & Report Cards',
     category: 'ACADEMIC',
-    description: 'Exam scheduling, marks entry, hall tickets, grade curve normalization, and signed result publication.',
+    description:
+      'Exam scheduling, marks entry, hall tickets, grade curve normalization, and signed result publication.',
     dependencies: ['academics'],
     targetRoutes: ['/examinations'],
     requiredCapabilities: ['exam.manage', 'exam.marks.enter', 'result.publish'],
@@ -58,7 +63,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'finance',
     name: 'Fees & Finance Ledger',
     category: 'FINANCE',
-    description: 'Fee structures, student due calculation, double-entry receipts, refunds, and online gateway integration.',
+    description:
+      'Fee structures, student due calculation, double-entry receipts, refunds, and online gateway integration.',
     dependencies: ['students'],
     targetRoutes: ['/finance'],
     requiredCapabilities: ['fee.structure.read', 'fee.receipt.read', 'fee.receipt.record'],
@@ -67,7 +73,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'parent_portal',
     name: 'Parent / Guardian Portal',
     category: 'OPERATIONS',
-    description: 'Multi-child switcher, real-time attendance alerts, published report cards, and fee payment access.',
+    description:
+      'Multi-child switcher, real-time attendance alerts, published report cards, and fee payment access.',
     dependencies: ['students'],
     targetRoutes: ['/parent'],
     requiredCapabilities: ['parent.portal.access', 'parent.student.read'],
@@ -76,7 +83,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'documents',
     name: 'Document Center & Storage',
     category: 'OPERATIONS',
-    description: 'Tenant-isolated institutional file repository with ClamAV malware scanning and presigned downloads.',
+    description:
+      'Tenant-isolated institutional file repository with ClamAV malware scanning and presigned downloads.',
     dependencies: [],
     targetRoutes: ['/documents'],
     requiredCapabilities: ['document.read', 'document.upload'],
@@ -85,7 +93,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'imports',
     name: 'Bulk Data Imports',
     category: 'OPERATIONS',
-    description: 'Three-stage CSV batch enrollment for student records, staff onboarding, and matching duplicate guards.',
+    description:
+      'Three-stage CSV batch enrollment for student records, staff onboarding, and matching duplicate guards.',
     dependencies: [],
     targetRoutes: ['/imports'],
     requiredCapabilities: ['import.job.manage', 'student.record.create'],
@@ -94,7 +103,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'reports',
     name: 'Institutional Analytics & Reports',
     category: 'OPERATIONS',
-    description: 'Enrollment rosters, cohort attrition rates, exam performance distribution, and financial collection summaries.',
+    description:
+      'Enrollment rosters, cohort attrition rates, exam performance distribution, and financial collection summaries.',
     dependencies: ['students'],
     targetRoutes: ['/reports'],
     requiredCapabilities: ['org.structure.read'],
@@ -103,7 +113,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'school_vault',
     name: 'School Vault (Zero-Access Security)',
     category: 'SECURITY_AI',
-    description: 'Hardware WebAuthn FIDO2 authenticator-protected secret storage with 2-of-3 threshold quorum recovery.',
+    description:
+      'Hardware WebAuthn FIDO2 authenticator-protected secret storage with 2-of-3 threshold quorum recovery.',
     dependencies: [],
     targetRoutes: ['/security-center'],
     requiredCapabilities: ['vault.authority.read', 'vault.device.enroll'],
@@ -112,7 +123,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'consents',
     name: 'Privacy & Guardian Consents',
     category: 'OPERATIONS',
-    description: 'Digital consent management for minor student records, DPDP/GDPR compliant legal guardian authorizations.',
+    description:
+      'Digital consent management for minor student records, DPDP/GDPR compliant legal guardian authorizations.',
     dependencies: ['students'],
     targetRoutes: ['/consents'],
     requiredCapabilities: ['consent.read', 'consent.record'],
@@ -121,7 +133,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'notifications',
     name: 'Multi-Channel Notifications',
     category: 'OPERATIONS',
-    description: 'Institutional template messaging, SMS/email broadcast notifications, and delivery preference management.',
+    description:
+      'Institutional template messaging, SMS/email broadcast notifications, and delivery preference management.',
     dependencies: [],
     targetRoutes: ['/notifications'],
     requiredCapabilities: ['notification.read', 'notification.preference.manage'],
@@ -130,7 +143,8 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
     key: 'ai_assistant',
     name: 'Anesa AI Assistant & Copilot',
     category: 'SECURITY_AI',
-    description: 'Controlled conversational AI copilot for timetable inquiries, assignment hints, and administrative search.',
+    description:
+      'Controlled conversational AI copilot for timetable inquiries, assignment hints, and administrative search.',
     dependencies: [],
     targetRoutes: ['/assistant'],
     requiredCapabilities: ['assistant.use'],
@@ -140,17 +154,29 @@ export const ERP_MODULE_CATALOG: readonly ErpModuleDefinition[] = [
 export const STANDARD_PLAN_BUNDLES = {
   STARTER_CORE: {
     name: 'Starter Core',
-    description: 'Essential student directory, academic cohorts, and document management for small schools.',
+    description:
+      'Essential student directory, academic cohorts, and document management for small schools.',
     modules: ['students', 'academics', 'attendance', 'documents', 'notifications'],
   },
   ACADEMIC_PLUS: {
     name: 'Academic Plus',
-    description: 'Comprehensive academic lifecycle with homework, examinations, attendance, and bulk onboarding.',
-    modules: ['students', 'academics', 'attendance', 'homework', 'examinations', 'documents', 'imports', 'notifications'],
+    description:
+      'Comprehensive academic lifecycle with homework, examinations, attendance, and bulk onboarding.',
+    modules: [
+      'students',
+      'academics',
+      'attendance',
+      'homework',
+      'examinations',
+      'documents',
+      'imports',
+      'notifications',
+    ],
   },
   COMPLETE_ERP: {
     name: 'Complete Institutional ERP',
-    description: 'All-inclusive campus management with fees, parent portal, reporting analytics, and privacy consent.',
+    description:
+      'All-inclusive campus management with fees, parent portal, reporting analytics, and privacy consent.',
     modules: [
       'students',
       'academics',
@@ -168,7 +194,8 @@ export const STANDARD_PLAN_BUNDLES = {
   },
   ENTERPRISE_SUITE: {
     name: 'Enterprise Suite + Zero-Access Vault',
-    description: 'Flagship tier with School Vault hardware cryptography, AI Assistant, and priority SLA support.',
+    description:
+      'Flagship tier with School Vault hardware cryptography, AI Assistant, and priority SLA support.',
     modules: [
       'students',
       'academics',

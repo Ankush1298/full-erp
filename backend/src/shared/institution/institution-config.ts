@@ -54,7 +54,9 @@ export const INSTITUTION_TERMINOLOGY: Record<InstitutionType, InstitutionTermino
 /**
  * Returns the terminology configuration for an institution type.
  */
-export function getInstitutionTerminology(type: InstitutionType = 'SCHOOL'): InstitutionTerminology {
+export function getInstitutionTerminology(
+  type: InstitutionType = 'SCHOOL',
+): InstitutionTerminology {
   return INSTITUTION_TERMINOLOGY[type] || INSTITUTION_TERMINOLOGY.SCHOOL;
 }
 
@@ -109,7 +111,7 @@ export function calculateAcademicStanding(
     totalCredits += credits;
 
     // 10-point scale grade points
-    let gp = 0;
+    let gp: number;
     if (itemPct >= 90) gp = 10;
     else if (itemPct >= 80) gp = 9;
     else if (itemPct >= 70) gp = 8;
@@ -124,7 +126,7 @@ export function calculateAcademicStanding(
   const overallPercentage = totalMax > 0 ? Math.round((totalObtained / totalMax) * 10000) / 100 : 0;
 
   // Grade determination
-  let letterGrade = 'F';
+  let letterGrade: string;
   if (overallPercentage >= 90) letterGrade = 'A+';
   else if (overallPercentage >= 80) letterGrade = 'A';
   else if (overallPercentage >= 70) letterGrade = 'B';
@@ -135,7 +137,8 @@ export function calculateAcademicStanding(
   const passed = overallPercentage >= 40;
 
   if (institutionType === 'UNIVERSITY') {
-    const sgpa = totalCredits > 0 ? Math.round((totalWeightedGradePoints / totalCredits) * 100) / 100 : 0;
+    const sgpa =
+      totalCredits > 0 ? Math.round((totalWeightedGradePoints / totalCredits) * 100) / 100 : 0;
     return {
       scheme: 'GPA_CGPA',
       totalMaxMarks: totalMax,
