@@ -24,6 +24,7 @@ jobs:
         env:
           # Ephemeral service container reachable only from this runner job; no password literal in the repo.
           POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: campusos_ci_test
         ports:
           - 5432:5432
         options: >-
@@ -32,8 +33,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      # Superuser URL to the service container; each test project creates and drops its own database.
-      TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
+      # Use an ephemeral named database on the service container.
+      TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/campusos_ci_test
     steps:
       - uses: actions/checkout@v7.0.1
         with:
