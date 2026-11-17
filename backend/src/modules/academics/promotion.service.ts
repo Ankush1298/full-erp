@@ -80,8 +80,7 @@ export class PromotionService {
       minimumSubjectPercentage:
         val.minimumSubjectPercentage ?? DEFAULT_POLICY.minimumSubjectPercentage,
       maxFailingSubjectsForSupplementary:
-        val.maxFailingSubjectsForSupplementary ??
-        DEFAULT_POLICY.maxFailingSubjectsForSupplementary,
+        val.maxFailingSubjectsForSupplementary ?? DEFAULT_POLICY.maxFailingSubjectsForSupplementary,
       graceMarksPolicy: {
         enabled: val.graceMarksPolicy?.enabled ?? DEFAULT_POLICY.graceMarksPolicy.enabled,
         maxGraceMarksTotal:
@@ -92,8 +91,7 @@ export class PromotionService {
           DEFAULT_POLICY.graceMarksPolicy.maxGraceMarksPerSubject,
       },
       attendanceRequirement: {
-        enabled:
-          val.attendanceRequirement?.enabled ?? DEFAULT_POLICY.attendanceRequirement.enabled,
+        enabled: val.attendanceRequirement?.enabled ?? DEFAULT_POLICY.attendanceRequirement.enabled,
         minimumAttendancePercentage:
           val.attendanceRequirement?.minimumAttendancePercentage ??
           DEFAULT_POLICY.attendanceRequirement.minimumAttendancePercentage,
@@ -123,29 +121,24 @@ export class PromotionService {
       mode: input.mode ?? current.mode,
       minimumAggregatePercentage:
         input.minimumAggregatePercentage ?? current.minimumAggregatePercentage,
-      minimumSubjectPercentage:
-        input.minimumSubjectPercentage ?? current.minimumSubjectPercentage,
+      minimumSubjectPercentage: input.minimumSubjectPercentage ?? current.minimumSubjectPercentage,
       maxFailingSubjectsForSupplementary:
-        input.maxFailingSubjectsForSupplementary ??
-        current.maxFailingSubjectsForSupplementary,
+        input.maxFailingSubjectsForSupplementary ?? current.maxFailingSubjectsForSupplementary,
       graceMarksPolicy: {
         enabled: input.graceMarksPolicy?.enabled ?? current.graceMarksPolicy.enabled,
         maxGraceMarksTotal:
-          input.graceMarksPolicy?.maxGraceMarksTotal ??
-          current.graceMarksPolicy.maxGraceMarksTotal,
+          input.graceMarksPolicy?.maxGraceMarksTotal ?? current.graceMarksPolicy.maxGraceMarksTotal,
         maxGraceMarksPerSubject:
           input.graceMarksPolicy?.maxGraceMarksPerSubject ??
           current.graceMarksPolicy.maxGraceMarksPerSubject,
       },
       attendanceRequirement: {
-        enabled:
-          input.attendanceRequirement?.enabled ?? current.attendanceRequirement.enabled,
+        enabled: input.attendanceRequirement?.enabled ?? current.attendanceRequirement.enabled,
         minimumAttendancePercentage:
           input.attendanceRequirement?.minimumAttendancePercentage ??
           current.attendanceRequirement.minimumAttendancePercentage,
       },
-      streamSelectionPeriodNo:
-        input.streamSelectionPeriodNo ?? current.streamSelectionPeriodNo,
+      streamSelectionPeriodNo: input.streamSelectionPeriodNo ?? current.streamSelectionPeriodNo,
       terminalPeriodNo: input.terminalPeriodNo ?? current.terminalPeriodNo,
       notifyGuardians: input.notifyGuardians ?? current.notifyGuardians,
     };
@@ -219,7 +212,9 @@ export class PromotionService {
     if (!targetTermRow) throw notFound('Target academic term not found.');
 
     if (targetTermRow.status !== 'PLANNED' && targetTermRow.status !== 'ACTIVE') {
-      throw conflict(`Target term must be in PLANNED or ACTIVE status; got ${targetTermRow.status}.`);
+      throw conflict(
+        `Target term must be in PLANNED or ACTIVE status; got ${targetTermRow.status}.`,
+      );
     }
 
     if (targetTermRow.start_date <= sourceTermRow.start_date) {
@@ -401,8 +396,7 @@ export class PromotionService {
 
       // Filter schedules that apply to this student's cohort period
       const studentSchedules = schedules.filter(
-        (sch) =>
-          sch.cohort_period_id === null || sch.cohort_period_id === student.cohort_period_id,
+        (sch) => sch.cohort_period_id === null || sch.cohort_period_id === student.cohort_period_id,
       );
 
       // Check if student has marks for schedules
@@ -417,7 +411,9 @@ export class PromotionService {
         for (const sch of studentSchedules) {
           if (sch.schedule_status !== 'PUBLISHED' && sch.schedule_status !== 'CANCELLED') {
             hasUnpublishedExams = true;
-            notes.push(`Exam schedule ${sch.course_code} is ${sch.schedule_status} (not published).`);
+            notes.push(
+              `Exam schedule ${sch.course_code} is ${sch.schedule_status} (not published).`,
+            );
           }
 
           const mark = studentMarks.find((m) => m.exam_schedule_id === sch.schedule_id);
@@ -477,9 +473,7 @@ export class PromotionService {
       // Aggregate percentage
       let aggregatePercentage: number | null = null;
       if (totalMaxMarks > 0) {
-        aggregatePercentage = parseFloat(
-          ((totalMarksObtained / totalMaxMarks) * 100).toFixed(2),
-        );
+        aggregatePercentage = parseFloat(((totalMarksObtained / totalMaxMarks) * 100).toFixed(2));
       }
 
       // Safety Gates Check
@@ -500,8 +494,7 @@ export class PromotionService {
         }
       } else {
         const isAggregatePassing =
-          aggregatePercentage !== null &&
-          aggregatePercentage >= policy.minimumAggregatePercentage;
+          aggregatePercentage !== null && aggregatePercentage >= policy.minimumAggregatePercentage;
 
         if (failingSubjects === 0 && isAggregatePassing) {
           if (student.period_no >= policy.terminalPeriodNo) {
@@ -516,9 +509,7 @@ export class PromotionService {
           failingSubjects <= policy.maxFailingSubjectsForSupplementary
         ) {
           recommendedOutcome = 'PENDING_REVIEW';
-          notes.push(
-            `Eligible for supplementary examination in ${failingSubjects} subject(s).`,
-          );
+          notes.push(`Eligible for supplementary examination in ${failingSubjects} subject(s).`);
         } else {
           recommendedOutcome = 'RETAINED';
           notes.push(
@@ -1065,10 +1056,7 @@ export class PromotionService {
   /**
    * Lists past and active rollover batches.
    */
-  static async listBatches(
-    tx: TenantTx,
-    ctx: TrustedContext,
-  ): Promise<RolloverBatchSummaryDto[]> {
+  static async listBatches(tx: TenantTx, ctx: TrustedContext): Promise<RolloverBatchSummaryDto[]> {
     ensureTrusted(ctx);
     await AuthorizationEngine.assert(tx, ctx, 'enrollment.term.read');
 

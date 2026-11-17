@@ -3847,8 +3847,13 @@ export function createFakeBackend(
       }
       if (path === '/academics/rollover/preview' && method === 'POST') {
         const batchId = `b-${a.rolloverBatches.length + 1}`;
-        const sourceTerm = a.terms.find((t) => t.id === (reqBody as { sourceTermId: string }).sourceTermId) ?? a.terms[0];
-        const targetTerm = a.terms.find((t) => t.id === (reqBody as { targetTermId: string }).targetTermId) ?? a.terms[1] ?? a.terms[0];
+        const sourceTerm =
+          a.terms.find((t) => t.id === (reqBody as { sourceTermId: string }).sourceTermId) ??
+          a.terms[0];
+        const targetTerm =
+          a.terms.find((t) => t.id === (reqBody as { targetTermId: string }).targetTermId) ??
+          a.terms[1] ??
+          a.terms[0];
         const previewManifest = {
           batchId,
           status: 'PENDING_APPROVAL',
@@ -3922,7 +3927,9 @@ export function createFakeBackend(
         return json(200, { success: true, data: b });
       }
       if (path === '/academics/rollover/execute' && method === 'POST') {
-        const b = a.rolloverBatches.find((x) => x.batchId === (reqBody as { batchId: string }).batchId);
+        const b = a.rolloverBatches.find(
+          (x) => x.batchId === (reqBody as { batchId: string }).batchId,
+        );
         if (!b) return err(404, 'RESOURCE_NOT_FOUND');
         b.status = 'EXECUTED';
         b.executedAt = new Date().toISOString();

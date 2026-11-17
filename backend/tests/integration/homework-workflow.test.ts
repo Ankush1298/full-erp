@@ -28,10 +28,7 @@ interface Session {
   csrf: string;
 }
 
-const s = {} as Record<
-  'teacher' | 'studentOne' | 'studentTwo' | 'parentA' | 'parentB',
-  Session
->;
+const s = {} as Record<'teacher' | 'studentOne' | 'studentTwo' | 'parentA' | 'parentB', Session>;
 
 let courseOfferingId: string;
 let sectionAId: string;
@@ -82,10 +79,12 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
     student2Id = T.students.two;
 
     // Reset passwords for students and faculty
-    await adminQuery(
-      `UPDATE platform.identities SET password_hash = $1 WHERE id IN ($2, $3, $4)`,
-      [HASH, T.users.faculty, T.users.studentOne, T.users.studentTwo],
-    );
+    await adminQuery(`UPDATE platform.identities SET password_hash = $1 WHERE id IN ($2, $3, $4)`, [
+      HASH,
+      T.users.faculty,
+      T.users.studentOne,
+      T.users.studentTwo,
+    ]);
 
     // Create employee record for faculty
     employeeId = await insert('employees', {
@@ -155,10 +154,9 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       registration_policy: 'MANUAL',
       status: 'DRAFT',
     });
-    await adminQuery(
-      `UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`,
-      [courseOfferingId],
-    );
+    await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+      courseOfferingId,
+    ]);
     await insert('faculty_assignments', {
       course_offering_id: courseOfferingId,
       employee_id: employeeId,
@@ -201,10 +199,10 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       period_no: 1,
       status: 'REGISTERED',
     });
-    await adminQuery(
-      `UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`,
-      [te1, te2],
-    );
+    await adminQuery(`UPDATE app.term_enrollments SET status = 'ACTIVE' WHERE id IN ($1, $2)`, [
+      te1,
+      te2,
+    ]);
     await insert('section_memberships', {
       student_id: student1Id,
       term_enrollment_id: te1,
@@ -312,7 +310,10 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       headers: { cookie: `session_token=${s.teacher.cookie}` },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: Array<{ courseOfferingId: string; courseCode: string; courseTitle: string }> }>();
+    const body = res.json<{
+      success: boolean;
+      data: Array<{ courseOfferingId: string; courseCode: string; courseTitle: string }>;
+    }>();
     expect(body.success).toBe(true);
     expect(body.data.length).toBeGreaterThanOrEqual(1);
     const found = body.data.find((c) => c.courseOfferingId === courseOfferingId);
@@ -371,7 +372,10 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: { id: string; status: string; totalRecipients: number } }>();
+    const body = res.json<{
+      success: boolean;
+      data: { id: string; status: string; totalRecipients: number };
+    }>();
     expect(body.success).toBe(true);
     expect(body.data.status).toBe('DRAFT');
     expect(body.data.totalRecipients).toBe(1);

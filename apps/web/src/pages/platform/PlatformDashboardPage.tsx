@@ -408,12 +408,7 @@ export const PlatformDashboardPage: React.FC = () => {
               </div>
               <div className="chart-donut-container">
                 <div className="chart-donut-wrap">
-                  <svg
-                    width="120"
-                    height="120"
-                    viewBox="0 0 120 120"
-                    className="chart-donut-svg"
-                  >
+                  <svg width="120" height="120" viewBox="0 0 120 120" className="chart-donut-svg">
                     <circle cx="60" cy="60" r="46" stroke="#F1EDF8" strokeWidth="14" fill="none" />
                     {/* Ring segment 1: Purple (60%) */}
                     <circle
@@ -632,10 +627,11 @@ export const PlatformDashboardPage: React.FC = () => {
                 <div className="spotlight-metric-row">
                   <span className="spotlight-metric-label">Email Gateway</span>
                   <span
-                    className={`status-tag ${isDevMock(operationalHealth.emailDelivery)
-                      ? 'status-tag--amber'
-                      : 'status-tag--emerald'
-                      }`}
+                    className={`status-tag ${
+                      isDevMock(operationalHealth.emailDelivery)
+                        ? 'status-tag--amber'
+                        : 'status-tag--emerald'
+                    }`}
                     title={
                       isDevMock(operationalHealth.emailDelivery)
                         ? 'Development mock transport active'

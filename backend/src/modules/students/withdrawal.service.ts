@@ -36,7 +36,10 @@ export class WithdrawalService {
     const reason = parseReason(input.reason);
 
     // Verify student exists
-    const exists = await tx.query(`SELECT 1 FROM app.students WHERE organization_id = $1 AND id = $2`, [ctx.tenantId, studentId]);
+    const exists = await tx.query(
+      `SELECT 1 FROM app.students WHERE organization_id = $1 AND id = $2`,
+      [ctx.tenantId, studentId],
+    );
     if (!exists.rows[0]) throw resourceNotFound();
 
     // Log the request in an audit table or a dedicated request table (proposed schema)
@@ -77,14 +80,20 @@ export class WithdrawalService {
 
     // Update enrollment status to WITHDRAWN
     // Re-use TermEnrollmentService.update to maintain audit trail and consistency
-    await TermEnrollmentService.update(tx, ctx, enrollmentId, {
-      status: 'WITHDRAWN',
-      reason: 'Approved school withdrawal request',
-    }, {
-      expected: { type: 'version', version: 0 }, // Simplified for initial phase
-      studentId,
-      meta: meta ?? {},
-    });
+    await TermEnrollmentService.update(
+      tx,
+      ctx,
+      enrollmentId,
+      {
+        status: 'WITHDRAWN',
+        reason: 'Approved school withdrawal request',
+      },
+      {
+        expected: { type: 'version', version: 0 }, // Simplified for initial phase
+        studentId,
+        meta: meta ?? {},
+      },
+    );
 
     // Additional logic to exclude from active class rosters is handled by status query filters
     // in existing roster/attendance services.

@@ -54,7 +54,10 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         },
       });
       expect(res.statusCode).toBe(200);
-      const body = JSON.parse(res.body) as { success: boolean; data: { institutions: { total: number } } };
+      const body = JSON.parse(res.body) as {
+        success: boolean;
+        data: { institutions: { total: number } };
+      };
       expect(body.success).toBe(true);
       expect(body.data.institutions.total).toBeGreaterThanOrEqual(1);
     });
@@ -101,7 +104,10 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
         },
       });
       expect(meRes.statusCode).toBe(200);
-      const meBody = JSON.parse(meRes.body) as { authenticated: boolean; operator: { role: string } };
+      const meBody = JSON.parse(meRes.body) as {
+        authenticated: boolean;
+        operator: { role: string };
+      };
       expect(meBody.authenticated).toBe(true);
       expect(meBody.operator.role).toBe('OPERATOR');
 

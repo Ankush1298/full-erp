@@ -368,7 +368,9 @@ beforeAll(async () => {
     registration_policy: 'MANUAL',
     status: 'DRAFT',
   });
-  await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [SC.offMath]);
+  await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+    SC.offMath,
+  ]);
 
   SC.offSci = await insert('course_offerings', {
     term_id: SC.s26,
@@ -384,7 +386,9 @@ beforeAll(async () => {
     registration_policy: 'MANUAL',
     status: 'DRAFT',
   });
-  await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [SC.offSci]);
+  await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+    SC.offSci,
+  ]);
 
   SC.offEng = await insert('course_offerings', {
     term_id: SC.s26,
@@ -400,7 +404,9 @@ beforeAll(async () => {
     registration_policy: 'MANUAL',
     status: 'DRAFT',
   });
-  await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [SC.offEng]);
+  await adminQuery(`UPDATE app.course_offerings SET status = 'PUBLISHED' WHERE id = $1`, [
+    SC.offEng,
+  ]);
 
   // 7. Examination and Exam Schedules
   SC.exam = await insert('examinations', {
@@ -541,10 +547,11 @@ beforeAll(async () => {
   students.stu5_graduated = { studentId: p5.studentId, spId: p5.spId, enrollmentId: e5 };
 
   // Publish exam schedules now that marks are entered
-  await adminQuery(
-    `UPDATE app.exam_schedules SET status = 'PUBLISHED' WHERE id IN ($1, $2, $3)`,
-    [SC.schMath, SC.schSci, SC.schEng],
-  );
+  await adminQuery(`UPDATE app.exam_schedules SET status = 'PUBLISHED' WHERE id IN ($1, $2, $3)`, [
+    SC.schMath,
+    SC.schSci,
+    SC.schEng,
+  ]);
 }, 180_000);
 
 afterAll(async () => {
@@ -591,7 +598,8 @@ describe('Automatic Academic Year Promotion & Session Rollover System', () => {
     // 1. Get default policy
     const getRes = await call('GET', s.admin, '/academics/promotion-policy');
     expect(getRes.statusCode).toBe(200);
-    const policy = getRes.json<{ data: { mode: string; minimumAggregatePercentage: number } }>().data;
+    const policy = getRes.json<{ data: { mode: string; minimumAggregatePercentage: number } }>()
+      .data;
     expect(policy.mode).toBe('PRINCIPAL_APPROVAL');
     expect(policy.minimumAggregatePercentage).toBe(33.0);
 

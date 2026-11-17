@@ -105,6 +105,8 @@ describe('Academics page: Promotion & Rollover tab', () => {
 
     expect(await screen.findByText('Promotion & Rollover Policy')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit Policy' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Generate Promotion Preview' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Generate Promotion Preview' }),
+    ).not.toBeInTheDocument();
   });
 });

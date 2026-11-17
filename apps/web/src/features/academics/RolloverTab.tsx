@@ -22,13 +22,7 @@ import {
   type Term,
 } from '../../lib/api/academics-api';
 
-export function RolloverTab({
-  client,
-  canManage,
-}: {
-  client: ApiClient;
-  canManage: boolean;
-}) {
+export function RolloverTab({ client, canManage }: { client: ApiClient; canManage: boolean }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -52,7 +46,9 @@ export function RolloverTab({
   const [savingExceptions, setSavingExceptions] = useState(false);
 
   // Filter in student table
-  const [outcomeFilter, setOutcomeFilter] = useState<'ALL' | 'PROMOTED' | 'RETAINED' | 'PENDING_REVIEW' | 'GRADUATED'>('ALL');
+  const [outcomeFilter, setOutcomeFilter] = useState<
+    'ALL' | 'PROMOTED' | 'RETAINED' | 'PENDING_REVIEW' | 'GRADUATED'
+  >('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Load initial data
@@ -61,11 +57,7 @@ export function RolloverTab({
     setLoading(true);
     setError(null);
 
-    Promise.all([
-      fetchPromotionPolicy(client),
-      fetchTerms(client),
-      fetchRolloverBatches(client),
-    ])
+    Promise.all([fetchPromotionPolicy(client), fetchTerms(client), fetchRolloverBatches(client)])
       .then(([pol, termList, batchList]) => {
         if (!active) return;
         setPolicy(pol);
@@ -123,7 +115,9 @@ export function RolloverTab({
         targetTermId,
       });
       setCurrentBatch(batch);
-      setSuccess(`Generated promotion preview with ${batch.summary.totalStudents} student evaluations.`);
+      setSuccess(
+        `Generated promotion preview with ${batch.summary.totalStudents} student evaluations.`,
+      );
       const batchList = await fetchRolloverBatches(client);
       setBatches(batchList);
     } catch (err) {
@@ -170,9 +164,13 @@ export function RolloverTab({
     const modified = currentBatch.students.filter((s) => s.finalOutcome !== s.recommendedOutcome);
 
     // Verify all modified students have reason
-    const invalidReason = modified.find((s) => !s.overrideReason || s.overrideReason.trim().length < 5);
+    const invalidReason = modified.find(
+      (s) => !s.overrideReason || s.overrideReason.trim().length < 5,
+    );
     if (invalidReason) {
-      setError(`Student ${invalidReason.fullName} requires an explicit override reason (minimum 5 characters).`);
+      setError(
+        `Student ${invalidReason.fullName} requires an explicit override reason (minimum 5 characters).`,
+      );
       return;
     }
 
@@ -222,11 +220,11 @@ export function RolloverTab({
 
     const confirmed = window.confirm(
       `Confirm execution of Academic Session Rollover from ${currentBatch.sourceTerm.name} to ${currentBatch.targetTerm.name}?\n\n` +
-      `• ${currentBatch.summary.promoted} student(s) will be PROMOTED\n` +
-      `• ${currentBatch.summary.retained} student(s) will be RETAINED\n` +
-      `• ${currentBatch.summary.graduated} student(s) will GRADUATE\n` +
-      `• ${currentBatch.summary.pendingReview} student(s) in review will be SKIPPED\n\n` +
-      `This action updates academic year enrollment records and cannot be undone.`
+        `• ${currentBatch.summary.promoted} student(s) will be PROMOTED\n` +
+        `• ${currentBatch.summary.retained} student(s) will be RETAINED\n` +
+        `• ${currentBatch.summary.graduated} student(s) will GRADUATE\n` +
+        `• ${currentBatch.summary.pendingReview} student(s) in review will be SKIPPED\n\n` +
+        `This action updates academic year enrollment records and cannot be undone.`,
     );
     if (!confirmed) return;
 
@@ -241,7 +239,7 @@ export function RolloverTab({
 
       setSuccess(
         `Session Rollover successfully executed! Promoted: ${res.promotedCount}, ` +
-        `Retained: ${res.retainedCount}, Graduated: ${res.graduatedCount}, Skipped: ${res.skippedCount}.`
+          `Retained: ${res.retainedCount}, Graduated: ${res.graduatedCount}, Skipped: ${res.skippedCount}.`,
       );
 
       // Refresh current batch
@@ -272,16 +270,17 @@ export function RolloverTab({
     currentBatch?.students.filter((s) => s.finalOutcome !== s.recommendedOutcome).length ?? 0;
 
   // Filter students in current batch
-  const filteredStudents = currentBatch?.students.filter((s) => {
-    if (outcomeFilter !== 'ALL' && s.finalOutcome !== outcomeFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = s.fullName.toLowerCase().includes(q);
-      const matchAdm = s.admissionNumber.toLowerCase().includes(q);
-      return matchName || matchAdm;
-    }
-    return true;
-  }) ?? [];
+  const filteredStudents =
+    currentBatch?.students.filter((s) => {
+      if (outcomeFilter !== 'ALL' && s.finalOutcome !== outcomeFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = s.fullName.toLowerCase().includes(q);
+        const matchAdm = s.admissionNumber.toLowerCase().includes(q);
+        return matchName || matchAdm;
+      }
+      return true;
+    }) ?? [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -289,25 +288,42 @@ export function RolloverTab({
       {success && <Alert tone="success">{success}</Alert>}
 
       {/* Header Cards & Policy Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-4)' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: 'var(--space-4)',
+        }}
+      >
         {/* Policy Configuration Card */}
         <Card title="Promotion & Rollover Policy">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 'var(--space-3)',
+            }}
+          >
             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
               School pass criteria, grace marks, and execution mode
             </p>
             {canManage && (
-              <Button
-                variant="secondary"
-                onClick={() => setPolicyEditing(!policyEditing)}
-              >
+              <Button variant="secondary" onClick={() => setPolicyEditing(!policyEditing)}>
                 {policyEditing ? 'Cancel' : 'Edit Policy'}
               </Button>
             )}
           </div>
 
           {!policyEditing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', fontSize: '0.9rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-2)',
+                fontSize: '0.9rem',
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--color-text-muted)' }}>Execution Mode:</span>
                 <Badge tone={policy?.mode === 'AUTOMATIC' ? 'info' : 'brand'}>
@@ -323,7 +339,9 @@ export function RolloverTab({
                 <strong>{policy?.minimumSubjectPercentage}%</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--color-text-muted)' }}>Max Supplementary Backlogs:</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>
+                  Max Supplementary Backlogs:
+                </span>
                 <strong>{policy?.maxFailingSubjectsForSupplementary} Subject(s)</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -346,41 +364,84 @@ export function RolloverTab({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div>
-                <label htmlFor="executionMode" style={{ display: 'block', fontSize: '0.85rem', marginBottom: 'var(--space-1)' }}>
+                <label
+                  htmlFor="executionMode"
+                  style={{ display: 'block', fontSize: '0.85rem', marginBottom: 'var(--space-1)' }}
+                >
                   Execution Mode
                 </label>
                 <select
                   id="executionMode"
-                  style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)' }}
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-2)',
+                    borderRadius: 'var(--radius-sm)',
+                  }}
                   value={policyForm.mode ?? 'PRINCIPAL_APPROVAL'}
-                  onChange={(e) => setPolicyForm({ ...policyForm, mode: e.target.value as PromotionPolicy['mode'] })}
+                  onChange={(e) =>
+                    setPolicyForm({
+                      ...policyForm,
+                      mode: e.target.value as PromotionPolicy['mode'],
+                    })
+                  }
                 >
-                  <option value="PRINCIPAL_APPROVAL">Principal Approval (Recommended Default)</option>
+                  <option value="PRINCIPAL_APPROVAL">
+                    Principal Approval (Recommended Default)
+                  </option>
                   <option value="MANUAL">Manual Execution</option>
                   <option value="AUTOMATIC">Fully Automatic Rollover</option>
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+              <div
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}
+              >
                 <TextField
                   label="Min. Aggregate (%)"
                   type="number"
-                  value={policyForm.minimumAggregatePercentage !== undefined ? String(policyForm.minimumAggregatePercentage) : '33'}
-                  onChange={(e) => setPolicyForm({ ...policyForm, minimumAggregatePercentage: parseFloat(e.target.value) || 0 })}
+                  value={
+                    policyForm.minimumAggregatePercentage !== undefined
+                      ? String(policyForm.minimumAggregatePercentage)
+                      : '33'
+                  }
+                  onChange={(e) =>
+                    setPolicyForm({
+                      ...policyForm,
+                      minimumAggregatePercentage: parseFloat(e.target.value) || 0,
+                    })
+                  }
                 />
                 <TextField
                   label="Min. Subject (%)"
                   type="number"
-                  value={policyForm.minimumSubjectPercentage !== undefined ? String(policyForm.minimumSubjectPercentage) : '33'}
-                  onChange={(e) => setPolicyForm({ ...policyForm, minimumSubjectPercentage: parseFloat(e.target.value) || 0 })}
+                  value={
+                    policyForm.minimumSubjectPercentage !== undefined
+                      ? String(policyForm.minimumSubjectPercentage)
+                      : '33'
+                  }
+                  onChange={(e) =>
+                    setPolicyForm({
+                      ...policyForm,
+                      minimumSubjectPercentage: parseFloat(e.target.value) || 0,
+                    })
+                  }
                 />
               </div>
 
               <TextField
                 label="Max Failing Subjects for Supplementary"
                 type="number"
-                value={policyForm.maxFailingSubjectsForSupplementary !== undefined ? String(policyForm.maxFailingSubjectsForSupplementary) : '2'}
-                onChange={(e) => setPolicyForm({ ...policyForm, maxFailingSubjectsForSupplementary: parseInt(e.target.value, 10) || 0 })}
+                value={
+                  policyForm.maxFailingSubjectsForSupplementary !== undefined
+                    ? String(policyForm.maxFailingSubjectsForSupplementary)
+                    : '2'
+                }
+                onChange={(e) =>
+                  setPolicyForm({
+                    ...policyForm,
+                    maxFailingSubjectsForSupplementary: parseInt(e.target.value, 10) || 0,
+                  })
+                }
               />
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -388,7 +449,9 @@ export function RolloverTab({
                   type="checkbox"
                   id="notifyGuardians"
                   checked={policyForm.notifyGuardians ?? true}
-                  onChange={(e) => setPolicyForm({ ...policyForm, notifyGuardians: e.target.checked })}
+                  onChange={(e) =>
+                    setPolicyForm({ ...policyForm, notifyGuardians: e.target.checked })
+                  }
                 />
                 <label htmlFor="notifyGuardians" style={{ fontSize: '0.85rem' }}>
                   Notify students and guardians upon rollover confirmation
@@ -396,7 +459,11 @@ export function RolloverTab({
               </div>
 
               <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <Button variant="primary" onClick={() => void handleSavePolicy()} disabled={savingPolicy}>
+                <Button
+                  variant="primary"
+                  onClick={() => void handleSavePolicy()}
+                  disabled={savingPolicy}
+                >
                   {savingPolicy ? 'Saving...' : 'Save Policy'}
                 </Button>
                 <Button variant="secondary" onClick={() => setPolicyEditing(false)}>
@@ -409,18 +476,31 @@ export function RolloverTab({
 
         {/* Rollover Workbench Card */}
         <Card title="Annual Session Rollover Workbench">
-          <p style={{ margin: '0 0 var(--space-3) 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+          <p
+            style={{
+              margin: '0 0 var(--space-3) 0',
+              fontSize: '0.85rem',
+              color: 'var(--color-text-muted)',
+            }}
+          >
             Select consecutive academic terms to evaluate student promotion and rollover
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <div>
-              <label htmlFor="sourceTerm" style={{ display: 'block', fontSize: '0.85rem', marginBottom: 'var(--space-1)' }}>
+              <label
+                htmlFor="sourceTerm"
+                style={{ display: 'block', fontSize: '0.85rem', marginBottom: 'var(--space-1)' }}
+              >
                 Source Academic Session (Current)
               </label>
               <select
                 id="sourceTerm"
-                style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)' }}
+                style={{
+                  width: '100%',
+                  padding: 'var(--space-2)',
+                  borderRadius: 'var(--radius-sm)',
+                }}
                 value={sourceTermId}
                 onChange={(e) => setSourceTermId(e.target.value)}
               >
@@ -434,12 +514,19 @@ export function RolloverTab({
             </div>
 
             <div>
-              <label htmlFor="targetTerm" style={{ display: 'block', fontSize: '0.85rem', marginBottom: 'var(--space-1)' }}>
+              <label
+                htmlFor="targetTerm"
+                style={{ display: 'block', fontSize: '0.85rem', marginBottom: 'var(--space-1)' }}
+              >
                 Target Academic Session (New Intake)
               </label>
               <select
                 id="targetTerm"
-                style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)' }}
+                style={{
+                  width: '100%',
+                  padding: 'var(--space-2)',
+                  borderRadius: 'var(--radius-sm)',
+                }}
                 value={targetTermId}
                 onChange={(e) => setTargetTermId(e.target.value)}
               >
@@ -468,14 +555,32 @@ export function RolloverTab({
 
       {/* Active Batch Summary & KPIs */}
       {currentBatch && (
-        <Card title={`Rollover Batch Preview: ${currentBatch.sourceTerm.name} → ${currentBatch.targetTerm.name}`}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+        <Card
+          title={`Rollover Batch Preview: ${currentBatch.sourceTerm.name} → ${currentBatch.targetTerm.name}`}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <StatusBadge status={currentBatch.status} />
               </div>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                Created: {new Date(currentBatch.createdAt).toLocaleString()} | Session Dates: {currentBatch.targetTerm.startDate} to {currentBatch.targetTerm.endDate}
+              <p
+                style={{
+                  margin: '4px 0 0 0',
+                  fontSize: '0.85rem',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                Created: {new Date(currentBatch.createdAt).toLocaleString()} | Session Dates:{' '}
+                {currentBatch.targetTerm.startDate} to {currentBatch.targetTerm.endDate}
               </p>
             </div>
 
@@ -496,7 +601,11 @@ export function RolloverTab({
                   <Button
                     variant="primary"
                     onClick={() => void handleExecuteRollover()}
-                    disabled={executing || (currentBatch.status !== 'APPROVED' && currentBatch.policy.mode === 'PRINCIPAL_APPROVAL')}
+                    disabled={
+                      executing ||
+                      (currentBatch.status !== 'APPROVED' &&
+                        currentBatch.policy.mode === 'PRINCIPAL_APPROVAL')
+                    }
                   >
                     {executing ? 'Executing Rollover...' : 'Execute Rollover & Advance Students'}
                   </Button>
@@ -506,7 +615,14 @@ export function RolloverTab({
           </div>
 
           {/* 4-Bucket Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 'var(--space-3)',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
             <div
               style={{
                 padding: 'var(--space-3)',
@@ -516,13 +632,22 @@ export function RolloverTab({
                 borderRadius: 'var(--radius-sm)',
               }}
             >
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                }}
+              >
                 Promoted Students
               </span>
               <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#16a34a' }}>
                 {currentBatch.summary.promoted}
               </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Advance to next period</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                Advance to next period
+              </span>
             </div>
 
             <div
@@ -534,13 +659,22 @@ export function RolloverTab({
                 borderRadius: 'var(--radius-sm)',
               }}
             >
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                }}
+              >
                 Retained Students
               </span>
               <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#d97706' }}>
                 {currentBatch.summary.retained}
               </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Repeat in junior cohort</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                Repeat in junior cohort
+              </span>
             </div>
 
             <div
@@ -552,13 +686,22 @@ export function RolloverTab({
                 borderRadius: 'var(--radius-sm)',
               }}
             >
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                }}
+              >
                 Pending Review
               </span>
               <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#dc2626' }}>
                 {currentBatch.summary.pendingReview}
               </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Incomplete marks / holds</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                Incomplete marks / holds
+              </span>
             </div>
 
             <div
@@ -570,28 +713,48 @@ export function RolloverTab({
                 borderRadius: 'var(--radius-sm)',
               }}
             >
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                }}
+              >
                 Graduated (Class 12)
               </span>
               <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#2563eb' }}>
                 {currentBatch.summary.graduated}
               </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Program completed</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                Program completed
+              </span>
             </div>
           </div>
 
           {/* Student Review Table */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-3)',
+            }}
+          >
             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-              {(['ALL', 'PROMOTED', 'RETAINED', 'PENDING_REVIEW', 'GRADUATED'] as const).map((filter) => (
-                <Button
-                  key={filter}
-                  variant={outcomeFilter === filter ? 'primary' : 'secondary'}
-                  onClick={() => setOutcomeFilter(filter)}
-                >
-                  {filter}
-                </Button>
-              ))}
+              {(['ALL', 'PROMOTED', 'RETAINED', 'PENDING_REVIEW', 'GRADUATED'] as const).map(
+                (filter) => (
+                  <Button
+                    key={filter}
+                    variant={outcomeFilter === filter ? 'primary' : 'secondary'}
+                    onClick={() => setOutcomeFilter(filter)}
+                  >
+                    {filter}
+                  </Button>
+                ),
+              )}
             </div>
 
             <div style={{ width: '260px' }}>
@@ -605,9 +768,21 @@ export function RolloverTab({
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+                fontSize: '0.85rem',
+              }}
+            >
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-surface-raised)' }}>
+                <tr
+                  style={{
+                    borderBottom: '2px solid var(--color-border)',
+                    background: 'var(--color-surface-raised)',
+                  }}
+                >
                   <th style={{ padding: 'var(--space-2)' }}>Admission No</th>
                   <th style={{ padding: 'var(--space-2)' }}>Student Name</th>
                   <th style={{ padding: 'var(--space-2)' }}>Current Grade</th>
@@ -621,14 +796,26 @@ export function RolloverTab({
               <tbody>
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    <td
+                      colSpan={8}
+                      style={{
+                        padding: 'var(--space-4)',
+                        textAlign: 'center',
+                        color: 'var(--color-text-muted)',
+                      }}
+                    >
                       No students match the selected filter.
                     </td>
                   </tr>
                 ) : (
                   filteredStudents.map((st) => (
-                    <tr key={st.studentId} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: 'var(--space-2)', fontFamily: 'monospace' }}>{st.admissionNumber}</td>
+                    <tr
+                      key={st.studentId}
+                      style={{ borderBottom: '1px solid var(--color-border)' }}
+                    >
+                      <td style={{ padding: 'var(--space-2)', fontFamily: 'monospace' }}>
+                        {st.admissionNumber}
+                      </td>
                       <td style={{ padding: 'var(--space-2)', fontWeight: 600 }}>{st.fullName}</td>
                       <td style={{ padding: 'var(--space-2)' }}>
                         Grade {st.currentPeriodNo}
@@ -648,7 +835,13 @@ export function RolloverTab({
                           <span style={{ color: 'var(--color-text-muted)' }}>No formal marks</span>
                         )}
                         {st.evaluationDetails.notes.length > 0 && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                          <div
+                            style={{
+                              fontSize: '0.75rem',
+                              color: 'var(--color-text-muted)',
+                              marginTop: '2px',
+                            }}
+                          >
                             {st.evaluationDetails.notes.slice(0, 2).join(' • ')}
                           </div>
                         )}
@@ -659,10 +852,10 @@ export function RolloverTab({
                             st.recommendedOutcome === 'PROMOTED'
                               ? 'positive'
                               : st.recommendedOutcome === 'RETAINED'
-                              ? 'warning'
-                              : st.recommendedOutcome === 'GRADUATED'
-                              ? 'info'
-                              : 'danger'
+                                ? 'warning'
+                                : st.recommendedOutcome === 'GRADUATED'
+                                  ? 'info'
+                                  : 'danger'
                           }
                         >
                           {st.recommendedOutcome}
@@ -671,7 +864,11 @@ export function RolloverTab({
                       <td style={{ padding: 'var(--space-2)' }}>
                         {canManage && currentBatch.status !== 'EXECUTED' ? (
                           <select
-                            style={{ padding: 'var(--space-1)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
+                            style={{
+                              padding: 'var(--space-1)',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '0.8rem',
+                            }}
                             value={st.finalOutcome}
                             onChange={(e) =>
                               handleOverrideStudent(
@@ -720,7 +917,9 @@ export function RolloverTab({
                             <span style={{ fontSize: '0.8rem' }}>{st.overrideReason}</span>
                           )
                         ) : (
-                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Standard</span>
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                            Standard
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -734,7 +933,13 @@ export function RolloverTab({
 
       {/* Batch History */}
       <Card title="Past Rollover Batches">
-        <p style={{ margin: '0 0 var(--space-3) 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+        <p
+          style={{
+            margin: '0 0 var(--space-3) 0',
+            fontSize: '0.85rem',
+            color: 'var(--color-text-muted)',
+          }}
+        >
           Audit records of all previous promotions and academic year rollovers
         </p>
 
@@ -744,9 +949,21 @@ export function RolloverTab({
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+                fontSize: '0.85rem',
+              }}
+            >
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-surface-raised)' }}>
+                <tr
+                  style={{
+                    borderBottom: '2px solid var(--color-border)',
+                    background: 'var(--color-surface-raised)',
+                  }}
+                >
                   <th style={{ padding: 'var(--space-2)' }}>Batch ID</th>
                   <th style={{ padding: 'var(--space-2)' }}>Source Term</th>
                   <th style={{ padding: 'var(--space-2)' }}>Target Term</th>
@@ -759,16 +976,21 @@ export function RolloverTab({
               <tbody>
                 {batches.map((b) => (
                   <tr key={b.batchId} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: 'var(--space-2)', fontFamily: 'monospace' }}>{b.batchId.slice(0, 8)}...</td>
+                    <td style={{ padding: 'var(--space-2)', fontFamily: 'monospace' }}>
+                      {b.batchId.slice(0, 8)}...
+                    </td>
                     <td style={{ padding: 'var(--space-2)' }}>{b.sourceTermName}</td>
                     <td style={{ padding: 'var(--space-2)' }}>{b.targetTermName}</td>
                     <td style={{ padding: 'var(--space-2)' }}>
                       <StatusBadge status={b.status} />
                     </td>
                     <td style={{ padding: 'var(--space-2)' }}>
-                      {b.summary.totalStudents} total (Promoted: {b.summary.promoted}, Retained: {b.summary.retained}, Graduated: {b.summary.graduated})
+                      {b.summary.totalStudents} total (Promoted: {b.summary.promoted}, Retained:{' '}
+                      {b.summary.retained}, Graduated: {b.summary.graduated})
                     </td>
-                    <td style={{ padding: 'var(--space-2)' }}>{new Date(b.createdAt).toLocaleDateString()}</td>
+                    <td style={{ padding: 'var(--space-2)' }}>
+                      {new Date(b.createdAt).toLocaleDateString()}
+                    </td>
                     <td style={{ padding: 'var(--space-2)' }}>
                       {b.executedAt ? new Date(b.executedAt).toLocaleString() : 'Not executed'}
                     </td>

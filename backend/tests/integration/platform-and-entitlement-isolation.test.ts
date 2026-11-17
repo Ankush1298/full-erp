@@ -173,7 +173,7 @@ describe('Platform Owner Isolation, Entitlements & Safety Suite (P0)', () => {
       const errCode = body.error?.code || body.code;
       const errMsg = body.error?.message || body.message;
       expect(errCode).toBe('MODULE_NOT_ENTITLED');
-      expect(errMsg).toContain('not included in the institution\'s current subscription plan');
+      expect(errMsg).toContain("not included in the institution's current subscription plan");
     });
 
     it('restores module access when entitlement is re-enabled', async () => {
@@ -306,7 +306,11 @@ describe('Platform Owner Isolation, Entitlements & Safety Suite (P0)', () => {
       // Standard tables (e.g. app.organizations, app.users, app.course_offerings) rely on
       // PostgreSQL Row-Level Security (FORCE ROW LEVEL SECURITY) and tenant context,
       // NOT client-side zero-access encryption.
-      const rlsCheck = await adminQuery<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      const rlsCheck = await adminQuery<{
+        relname: string;
+        relrowsecurity: boolean;
+        relforcerowsecurity: boolean;
+      }>(
         `SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
            FROM pg_class c
            JOIN pg_namespace n ON n.oid = c.relnamespace

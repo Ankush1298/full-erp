@@ -994,13 +994,17 @@ export const RolloverBatchSummarySchema = z.object({
 export type RolloverBatchSummary = z.infer<typeof RolloverBatchSummarySchema>;
 
 export const fetchPromotionPolicy = (c: ApiClient) =>
-  c.get('/v1/academics/promotion-policy', { schema: One(PromotionPolicySchema) }).then((r) => r.data);
+  c
+    .get('/v1/academics/promotion-policy', { schema: One(PromotionPolicySchema) })
+    .then((r) => r.data);
 
 export const updatePromotionPolicy = (c: ApiClient, policy: Partial<PromotionPolicy>) =>
-  c.put('/v1/academics/promotion-policy', {
-    schema: One(PromotionPolicySchema),
-    body: policy,
-  }).then((r) => r.data);
+  c
+    .put('/v1/academics/promotion-policy', {
+      schema: One(PromotionPolicySchema),
+      body: policy,
+    })
+    .then((r) => r.data);
 
 export const generateRolloverPreview = (
   c: ApiClient,
@@ -1015,10 +1019,12 @@ export const generateRolloverPreview = (
     }>;
   },
 ) =>
-  c.post('/v1/academics/rollover/preview', {
-    schema: One(RolloverBatchSchema),
-    body,
-  }).then((r) => r.data);
+  c
+    .post('/v1/academics/rollover/preview', {
+      schema: One(RolloverBatchSchema),
+      body,
+    })
+    .then((r) => r.data);
 
 export const updateRolloverExceptions = (
   c: ApiClient,
@@ -1031,10 +1037,12 @@ export const updateRolloverExceptions = (
     targetSectionId?: string;
   }>,
 ) =>
-  c.patch(`/v1/academics/rollover/preview/${encodeURIComponent(batchId)}/exceptions`, {
-    schema: One(RolloverBatchSchema),
-    body: { exceptions },
-  }).then((r) => r.data);
+  c
+    .patch(`/v1/academics/rollover/preview/${encodeURIComponent(batchId)}/exceptions`, {
+      schema: One(RolloverBatchSchema),
+      body: { exceptions },
+    })
+    .then((r) => r.data);
 
 export const executeRollover = (
   c: ApiClient,
@@ -1044,24 +1052,30 @@ export const executeRollover = (
     confirmPendingReviewHandling?: 'SKIP' | 'FAIL';
   },
 ) =>
-  c.post('/v1/academics/rollover/execute', {
-    schema: One(
-      z.object({
-        batchId: z.string(),
-        executedAt: z.string(),
-        promotedCount: z.number(),
-        retainedCount: z.number(),
-        graduatedCount: z.number(),
-        skippedCount: z.number(),
-      }),
-    ),
-    body: { batchId, ...options },
-  }).then((r) => r.data);
+  c
+    .post('/v1/academics/rollover/execute', {
+      schema: One(
+        z.object({
+          batchId: z.string(),
+          executedAt: z.string(),
+          promotedCount: z.number(),
+          retainedCount: z.number(),
+          graduatedCount: z.number(),
+          skippedCount: z.number(),
+        }),
+      ),
+      body: { batchId, ...options },
+    })
+    .then((r) => r.data);
 
 export const fetchRolloverBatches = (c: ApiClient) =>
-  c.get('/v1/academics/rollover/batches', { schema: List(RolloverBatchSummarySchema) }).then((r) => r.data);
+  c
+    .get('/v1/academics/rollover/batches', { schema: List(RolloverBatchSummarySchema) })
+    .then((r) => r.data);
 
 export const fetchRolloverBatch = (c: ApiClient, batchId: string) =>
-  c.get(`/v1/academics/rollover/batches/${encodeURIComponent(batchId)}`, {
-    schema: One(RolloverBatchSchema),
-  }).then((r) => r.data);
+  c
+    .get(`/v1/academics/rollover/batches/${encodeURIComponent(batchId)}`, {
+      schema: One(RolloverBatchSchema),
+    })
+    .then((r) => r.data);

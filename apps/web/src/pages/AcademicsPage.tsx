@@ -5047,9 +5047,7 @@ export function AcademicsPage() {
             canAssignProgram={Boolean(identity && can(identity, 'student.program.assign'))}
           />
         )}
-        {tab === 'rollover' && canEnrolRead && (
-          <RolloverTab client={client} canManage={canEnrol} />
-        )}
+        {tab === 'rollover' && canEnrolRead && <RolloverTab client={client} canManage={canEnrol} />}
         {tab === 'electives' && canProgramRead && (
           <ElectivesTab
             client={client}
