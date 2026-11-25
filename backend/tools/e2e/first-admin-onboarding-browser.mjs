@@ -12,7 +12,7 @@ const REPO = resolve(fileURLToPath(import.meta.url), '../../../..');
 const require = createRequire(join(REPO, 'backend/package.json'));
 const pg = require('pg');
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const principalPassphrase = `Principal-${randomBytes(8).toString('hex')}!@#`;
+const demoCred = `Demo-${randomBytes(8).toString('hex')}!@#`;
 
 const freePort = () =>
   new Promise((res, rej) => {
@@ -407,7 +407,7 @@ async function main() {
       const inputs = Array.from(document.querySelectorAll('input[type="password"]'));
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       for (const el of inputs) {
-        setter.call(el, ${JSON.stringify(principalPassphrase)});
+        setter.call(el, ${JSON.stringify(demoCred)});
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
@@ -468,8 +468,8 @@ async function main() {
         el.dispatchEvent(new Event('input', { bubbles: true }));
       };
       const inputs = document.querySelectorAll('input[type="password"]');
-      setVal(inputs[0], ${JSON.stringify(principalPassphrase)});
-      if (inputs[1]) setVal(inputs[1], ${JSON.stringify(principalPassphrase)});
+      setVal(inputs[0], ${JSON.stringify(demoCred)});
+      if (inputs[1]) setVal(inputs[1], ${JSON.stringify(demoCred)});
       document.querySelector('button[type="submit"]').click();
     })()`);
     await waitFor(
@@ -493,7 +493,7 @@ async function main() {
       const inputs = Array.from(document.querySelectorAll('input[type="password"]'));
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       for (const el of inputs) {
-        setter.call(el, ${JSON.stringify(principalPassphrase)});
+        setter.call(el, ${JSON.stringify(demoCred)});
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
@@ -519,7 +519,7 @@ async function main() {
       const inputs = Array.from(document.querySelectorAll('input[type="password"]'));
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       for (const el of inputs) {
-        setter.call(el, ${JSON.stringify(principalPassphrase)});
+        setter.call(el, ${JSON.stringify(demoCred)});
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
@@ -586,7 +586,7 @@ async function main() {
       'Tenant login dialog',
     );
     await setInputValue('[role="dialog"] input[name="email"]', 'principal@syntheticonboard.test');
-    await setInputValue('[role="dialog"] input[name="password"]', principalPassphrase);
+    await setInputValue('[role="dialog"] input[name="password"]', demoCred);
     await cdp.eval(`document.querySelector('[role="dialog"] button[type="submit"]').click()`);
 
     await waitFor(
@@ -622,10 +622,7 @@ async function main() {
       `Boolean(document.querySelector('[role="dialog"] input[autocomplete="current-password"]')) && !document.body.innerText.includes('6-Digit Verification Code')`,
     );
     if (needsStepUp) {
-      await setInputValue(
-        '[role="dialog"] input[autocomplete="current-password"]',
-        principalPassphrase,
-      );
+      await setInputValue('[role="dialog"] input[autocomplete="current-password"]', demoCred);
       await cdp.eval(
         `(() => { const b = Array.from(document.querySelectorAll('[role="dialog"] button[type="submit"]')).pop(); if (b) b.click(); })()`,
       );

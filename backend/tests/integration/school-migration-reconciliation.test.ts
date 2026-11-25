@@ -4,7 +4,10 @@ import { AuthorizationEngine } from '../../src/shared/authorization/engine.js';
 import { Database } from '../../src/shared/database/index.js';
 import { createPool } from '../../src/shared/database/pool.js';
 import { issueTrustedContext } from '../../src/shared/tenancy/issue-trusted-context.js';
-import { adminQuery, runAsMigrator } from '../support/db-harness.js';
+import { contractVersions, migrate } from '../../tools/db/migrate.js';
+import { adminQuery } from '../support/db-harness.js';
+import { ORG_A, seedFixtures, STAFF_A } from '../support/fixtures.js';
+import { dropAll, freshDatabase, sql as freshSql, type FreshDb } from '../support/fresh-db.js';
 import { createIsolatedTenant, type IsolatedTenant } from '../support/isolated-tenant.js';
 import {
   planTenantReconciliation,
@@ -228,10 +231,31 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
     expect(desc.capabilities).toContain('vault.device.enroll');
   });
 
-  it('migration 0054 executes safely on an upgraded 0048-to-0053 tenant, preserves custom scope modes with ON CONFLICT DO NOTHING, and introduces zero critical permissions', async () => {
-    // 1. Simulate an upgraded tenant by deleting newly introduced 0050-0053 permissions
-    await adminQuery(
-      `DELETE FROM app.role_permissions
+  // Isolate schema-locking DDL migrations (0054/0055 execute LOCK TABLE ... ACCESS EXCLUSIVE + NO FORCE RLS)
+  // in a dedicated disposable database so they never deadlock with parallel integration workers.
+  describe('Migration 0054 & 0055 SQL Execution (Isolated Disposable Database)', () => {
+    let migDb!: FreshDb;
+    const migAdminQuery = <R extends Record<string, unknown> = Record<string, unknown>>(
+      text: string,
+      params: unknown[] = [],
+    ) => freshSql<R>(migDb.admin, text, params);
+
+    beforeAll(async () => {
+      migDb = await freshDatabase();
+      await migrate({ connectionString: migDb.migrator, allowContract: contractVersions() });
+      await seedFixtures(migDb.admin);
+      await migAdminQuery(
+        `UPDATE app.organizations SET institution_type = 'SCHOOL' WHERE id = $1`,
+        [ORG_A],
+      );
+    });
+
+    afterAll(dropAll);
+
+    it('migration 0054 executes safely on an upgraded 0048-to-0053 tenant, preserves custom scope modes with ON CONFLICT DO NOTHING, and introduces zero critical permissions', async () => {
+      // 1. Simulate an upgraded tenant by deleting newly introduced 0050-0053 permissions
+      await migAdminQuery(
+        `DELETE FROM app.role_permissions
         WHERE organization_id = $1
           AND (
             permission_code LIKE 'homework.%'
@@ -239,61 +263,61 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
             OR permission_code LIKE 'vault.%'
             OR permission_code = 'fee.refund.initiate'
           )`,
-      [T.orgId],
-    );
+        [ORG_A],
+      );
 
-    // 2. Set an intentional custom restriction: school narrowed Principal's homework.manage to ASSIGNED
-    await adminQuery(
-      `INSERT INTO app.role_permissions (organization_id, role_id, permission_code, scope_mode)
+      // 2. Set an intentional custom restriction: school narrowed Principal's homework.manage to ASSIGNED
+      await migAdminQuery(
+        `INSERT INTO app.role_permissions (organization_id, role_id, permission_code, scope_mode)
        SELECT r.organization_id, r.id, 'homework.manage', 'ASSIGNED'
          FROM app.roles r WHERE r.organization_id = $1 AND r.code = 'COLLEGE_ADMIN'
        ON CONFLICT (organization_id, role_id, permission_code) DO UPDATE SET scope_mode = 'ASSIGNED'`,
-      [T.orgId],
-    );
+        [ORG_A],
+      );
 
-    // 3. Execute Migration 0054 SQL directly as app_migrator
-    const fs = await import('fs');
-    const path = await import('path');
-    const migrationPath = path.resolve(
-      __dirname,
-      '../../../database/migrations/0054_reconcile_institution_role_permissions.sql',
-    );
-    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+      // 3. Execute Migration 0054 SQL directly as app_migrator
+      const fs = await import('fs');
+      const path = await import('path');
+      const migrationPath = path.resolve(
+        __dirname,
+        '../../../database/migrations/0054_reconcile_institution_role_permissions.sql',
+      );
+      const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
-    await adminQuery(migrationSql);
+      await migAdminQuery(migrationSql);
 
-    // 4. Assert: Customization was PRESERVED by ON CONFLICT DO NOTHING (not overwritten to GRANTED)
-    const principalHomeworkManage = await adminQuery<{ scope_mode: string }>(
-      `SELECT rp.scope_mode
+      // 4. Assert: Customization was PRESERVED by ON CONFLICT DO NOTHING (not overwritten to GRANTED)
+      const principalHomeworkManage = await migAdminQuery<{ scope_mode: string }>(
+        `SELECT rp.scope_mode
          FROM app.role_permissions rp
          JOIN app.roles r ON r.id = rp.role_id
         WHERE rp.organization_id = $1 AND r.code = 'COLLEGE_ADMIN' AND rp.permission_code = 'homework.manage'`,
-      [T.orgId],
-    );
-    expect(principalHomeworkManage[0]?.scope_mode).toBe('ASSIGNED');
+        [ORG_A],
+      );
+      expect(principalHomeworkManage[0]?.scope_mode).toBe('ASSIGNED');
 
-    // 5. Assert: Missing baseline permissions were successfully added
-    const principalGatewayRead = await adminQuery<{ scope_mode: string }>(
-      `SELECT rp.scope_mode
+      // 5. Assert: Missing baseline permissions were successfully added
+      const principalGatewayRead = await migAdminQuery<{ scope_mode: string }>(
+        `SELECT rp.scope_mode
          FROM app.role_permissions rp
          JOIN app.roles r ON r.id = rp.role_id
         WHERE rp.organization_id = $1 AND r.code = 'COLLEGE_ADMIN' AND rp.permission_code = 'fee.gateway.read'`,
-      [T.orgId],
-    );
-    expect(principalGatewayRead[0]?.scope_mode).toBe('GRANTED');
+        [ORG_A],
+      );
+      expect(principalGatewayRead[0]?.scope_mode).toBe('GRANTED');
 
-    const teacherHomeworkReview = await adminQuery<{ scope_mode: string }>(
-      `SELECT rp.scope_mode
+      const teacherHomeworkReview = await migAdminQuery<{ scope_mode: string }>(
+        `SELECT rp.scope_mode
          FROM app.role_permissions rp
          JOIN app.roles r ON r.id = rp.role_id
         WHERE rp.organization_id = $1 AND r.code = 'FACULTY' AND rp.permission_code = 'homework.review'`,
-      [T.orgId],
-    );
-    expect(teacherHomeworkReview[0]?.scope_mode).toBe('ASSIGNED');
+        [ORG_A],
+      );
+      expect(teacherHomeworkReview[0]?.scope_mode).toBe('ASSIGNED');
 
-    // 6. Assert: ZERO critical financial or cryptographic permissions were inserted
-    const criticalCheck = await adminQuery<{ count: string }>(
-      `SELECT COUNT(*) as count
+      // 6. Assert: ZERO critical financial or cryptographic permissions were inserted
+      const criticalCheck = await migAdminQuery<{ count: string }>(
+        `SELECT COUNT(*) as count
          FROM app.role_permissions
         WHERE organization_id = $1
           AND permission_code IN (
@@ -304,116 +328,119 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
             'vault.grant.issue',
             'vault.device.manage'
           )`,
-      [T.orgId],
-    );
-    expect(Number(criticalCheck[0]?.count)).toBe(0);
+        [ORG_A],
+      );
+      expect(Number(criticalCheck[0]?.count)).toBe(0);
 
-    // 7. Assert: FORCE ROW LEVEL SECURITY is verified active on roles and role_permissions
-    const rlsCheck = await adminQuery<{ relname: string; relforcerowsecurity: boolean }>(
-      `SELECT c.relname, c.relforcerowsecurity
+      // 7. Assert: FORCE ROW LEVEL SECURITY is verified active on roles and role_permissions
+      const rlsCheck = await migAdminQuery<{ relname: string; relforcerowsecurity: boolean }>(
+        `SELECT c.relname, c.relforcerowsecurity
          FROM pg_class c
         WHERE c.relname IN ('roles', 'role_permissions')
           AND c.relnamespace = 'app'::regnamespace`,
-    );
-    expect(rlsCheck.length).toBe(2);
-    expect(rlsCheck.every((r) => r.relforcerowsecurity)).toBe(true);
+      );
+      expect(rlsCheck.length).toBe(2);
+      expect(rlsCheck.every((r) => r.relforcerowsecurity)).toBe(true);
 
-    // 8. Assert: PARENT role and Parent Portal permissions were populated
-    const parentPortalCheck = await adminQuery<{ scope_mode: string }>(
-      `SELECT rp.scope_mode
+      // 8. Assert: PARENT role and Parent Portal permissions were populated
+      const parentPortalCheck = await migAdminQuery<{ scope_mode: string }>(
+        `SELECT rp.scope_mode
          FROM app.role_permissions rp
          JOIN app.roles r ON r.id = rp.role_id
         WHERE rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'parent.portal.access'`,
-      [T.orgId],
-    );
-    expect(parentPortalCheck[0]?.scope_mode).toBe('SELF');
-  });
+        [ORG_A],
+      );
+      expect(parentPortalCheck[0]?.scope_mode).toBe('SELF');
+    });
 
-  it('migration 0055 safely repairs missing PARENT roles across FORCE RLS barriers and provisions baseline capabilities', async () => {
-    // 1. Simulate the exact production-like defect: PARENT role is missing from app.roles
-    await adminQuery(`DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`, [
-      T.orgId,
-    ]);
+    it('migration 0055 safely repairs missing PARENT roles across FORCE RLS barriers and provisions baseline capabilities', async () => {
+      // 1. Simulate the exact production-like defect: PARENT role is missing from app.roles
+      await migAdminQuery(`DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`, [
+        ORG_A,
+      ]);
 
-    const preRoles = await adminQuery(
-      `SELECT 1 FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`,
-      [T.orgId],
-    );
-    expect(preRoles.length).toBe(0);
+      const preRoles = await migAdminQuery(
+        `SELECT 1 FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`,
+        [ORG_A],
+      );
+      expect(preRoles.length).toBe(0);
 
-    // 2. Prove the root cause barrier: app_migrator SELECT on app.organizations initially returns 0 rows due to FORCE RLS
-    const probe = await runAsMigrator({}, 'SELECT count(*)::int AS n FROM app.organizations');
-    expect(probe.rows[0]?.n).toBe(0);
+      // 2. Prove the root cause barrier: app_migrator SELECT on app.organizations initially returns 0 rows due to FORCE RLS
+      const probe = await freshSql<{ n: number }>(
+        migDb.migrator,
+        'SELECT count(*)::int AS n FROM app.organizations',
+      );
+      expect(probe[0]?.n).toBe(0);
 
-    // 3. Execute Migration 0055 SQL using the actual app_migrator connection
-    const fs = await import('fs');
-    const path = await import('path');
-    const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(
-      __dirname,
-      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
-    );
-    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+      // 3. Execute Migration 0055 SQL using the actual app_migrator connection
+      const fs = await import('fs');
+      const path = await import('path');
+      const pg = (await import('pg')).default;
+      const migrationPath = path.resolve(
+        __dirname,
+        '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+      );
+      const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
-    const migratorClient = new pg.Client({ connectionString: inject('dbMigratorUrl') });
-    await migratorClient.connect();
-    try {
-      await migratorClient.query(migrationSql);
-    } finally {
-      await migratorClient.end();
-    }
+      const migratorClient = new pg.Client({ connectionString: migDb.migrator });
+      await migratorClient.connect();
+      try {
+        await migratorClient.query(migrationSql);
+      } finally {
+        await migratorClient.end();
+      }
 
-    // 4. Assert: PARENT role was successfully created in app.roles
-    const parentRole = await adminQuery<{ id: string; code: string; name: string }>(
-      `SELECT id, code, name FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`,
-      [T.orgId],
-    );
-    expect(parentRole.length).toBe(1);
-    expect(parentRole[0]?.code).toBe('PARENT');
-    expect(parentRole[0]?.name).toBe('Parent / Guardian');
+      // 4. Assert: PARENT role was successfully created in app.roles
+      const parentRole = await migAdminQuery<{ id: string; code: string; name: string }>(
+        `SELECT id, code, name FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`,
+        [ORG_A],
+      );
+      expect(parentRole.length).toBe(1);
+      expect(parentRole[0]?.code).toBe('PARENT');
+      expect(parentRole[0]?.name).toBe('Parent / Guardian');
 
-    // 5. Assert: parent.portal.access was populated with SELF scope
-    const parentPortalCheck = await adminQuery<{ scope_mode: string }>(
-      `SELECT rp.scope_mode
+      // 5. Assert: parent.portal.access was populated with SELF scope
+      const parentPortalCheck = await migAdminQuery<{ scope_mode: string }>(
+        `SELECT rp.scope_mode
          FROM app.role_permissions rp
          JOIN app.roles r ON r.id = rp.role_id
         WHERE rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'parent.portal.access'`,
-      [T.orgId],
-    );
-    expect(parentPortalCheck.length).toBe(1);
-    expect(parentPortalCheck[0]?.scope_mode).toBe('SELF');
+        [ORG_A],
+      );
+      expect(parentPortalCheck.length).toBe(1);
+      expect(parentPortalCheck[0]?.scope_mode).toBe('SELF');
 
-    // 6. Assert: All 13 canonical baseline permissions are present for PARENT
-    const parentPerms = await adminQuery<{ permission_code: string; scope_mode: string }>(
-      `SELECT rp.permission_code, rp.scope_mode
+      // 6. Assert: All 13 canonical baseline permissions are present for PARENT
+      const parentPerms = await migAdminQuery<{ permission_code: string; scope_mode: string }>(
+        `SELECT rp.permission_code, rp.scope_mode
          FROM app.role_permissions rp
          JOIN app.roles r ON r.id = rp.role_id
         WHERE rp.organization_id = $1 AND r.code = 'PARENT'
         ORDER BY rp.permission_code`,
-      [T.orgId],
-    );
-    expect(parentPerms.length).toBe(13);
-    const expectedPerms = [
-      'auth.mfa.manage',
-      'consent.read',
-      'notification.preference.manage',
-      'notification.read',
-      'parent.academics.read',
-      'parent.attendance.read',
-      'parent.exam.read',
-      'parent.fee.pay',
-      'parent.fee.read',
-      'parent.portal.access',
-      'parent.student.read',
-      'session.read',
-      'session.revoke',
-    ];
-    expect(parentPerms.map((p) => p.permission_code)).toEqual(expectedPerms);
-    expect(parentPerms.every((p) => p.scope_mode === 'SELF')).toBe(true);
+        [ORG_A],
+      );
+      expect(parentPerms.length).toBe(13);
+      const expectedPerms = [
+        'auth.mfa.manage',
+        'consent.read',
+        'notification.preference.manage',
+        'notification.read',
+        'parent.academics.read',
+        'parent.attendance.read',
+        'parent.exam.read',
+        'parent.fee.pay',
+        'parent.fee.read',
+        'parent.portal.access',
+        'parent.student.read',
+        'session.read',
+        'session.revoke',
+      ];
+      expect(parentPerms.map((p) => p.permission_code)).toEqual(expectedPerms);
+      expect(parentPerms.every((p) => p.scope_mode === 'SELF')).toBe(true);
 
-    // 7. Assert: ZERO critical permissions exist on PARENT role
-    const criticalCheck = await adminQuery<{ count: string }>(
-      `SELECT COUNT(*) as count
+      // 7. Assert: ZERO critical permissions exist on PARENT role
+      const criticalCheck = await migAdminQuery<{ count: string }>(
+        `SELECT COUNT(*) as count
          FROM app.role_permissions rp
          JOIN app.roles r ON r.id = rp.role_id
         WHERE rp.organization_id = $1
@@ -426,171 +453,172 @@ describe('School Tenant Migration & Reconciliation Regression', () => {
             'vault.grant.issue',
             'vault.device.manage'
           )`,
-      [T.orgId],
-    );
-    expect(Number(criticalCheck[0]?.count)).toBe(0);
+        [ORG_A],
+      );
+      expect(Number(criticalCheck[0]?.count)).toBe(0);
 
-    // 8. Assert: FORCE ROW LEVEL SECURITY is verified restored on organizations, organization_settings, roles, and role_permissions
-    const rlsCheck = await adminQuery<{ relname: string; relforcerowsecurity: boolean }>(
-      `SELECT c.relname, c.relforcerowsecurity
+      // 8. Assert: FORCE ROW LEVEL SECURITY is verified restored on organizations, organization_settings, roles, and role_permissions
+      const rlsCheck = await migAdminQuery<{ relname: string; relforcerowsecurity: boolean }>(
+        `SELECT c.relname, c.relforcerowsecurity
          FROM pg_class c
         WHERE c.relname IN ('organizations', 'organization_settings', 'roles', 'role_permissions')
           AND c.relnamespace = 'app'::regnamespace`,
-    );
-    expect(rlsCheck.length).toBe(4);
-    expect(rlsCheck.every((r) => r.relforcerowsecurity)).toBe(true);
+      );
+      expect(rlsCheck.length).toBe(4);
+      expect(rlsCheck.every((r) => r.relforcerowsecurity)).toBe(true);
 
-    // 9. Assert idempotency: executing Migration 0055 a second time succeeds with no errors
-    const migratorClient2 = new pg.Client({ connectionString: inject('dbMigratorUrl') });
-    await migratorClient2.connect();
-    try {
-      await migratorClient2.query(migrationSql);
-    } finally {
-      await migratorClient2.end();
-    }
-  });
+      // 9. Assert idempotency: executing Migration 0055 a second time succeeds with no errors
+      const migratorClient2 = new pg.Client({ connectionString: migDb.migrator });
+      await migratorClient2.connect();
+      try {
+        await migratorClient2.query(migrationSql);
+      } finally {
+        await migratorClient2.end();
+      }
+    });
 
-  it('migration 0055 respects institutional explicit denials in organization_settings and does not insert denied permissions', async () => {
-    // 1. Configure institution explicit denial: Anesa Demo School denies parent.fee.pay for PARENT role
-    await adminQuery(
-      `INSERT INTO app.organization_settings (organization_id, key, value, updated_by)
+    it('migration 0055 respects institutional explicit denials in organization_settings and does not insert denied permissions', async () => {
+      // 1. Configure institution explicit denial: Anesa Demo School denies parent.fee.pay for PARENT role
+      await migAdminQuery(
+        `INSERT INTO app.organization_settings (organization_id, key, value, updated_by)
        VALUES ($1, 'authorization.denied_permissions', $2::jsonb, $3)
        ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value`,
-      [T.orgId, JSON.stringify({ PARENT: ['parent.fee.pay'] }), T.users.admin],
-    );
+        [ORG_A, JSON.stringify({ PARENT: ['parent.fee.pay'] }), STAFF_A],
+      );
 
-    // 2. Remove PARENT role so migration 0055 reconciles from scratch for this institution
-    await adminQuery(`DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`, [
-      T.orgId,
-    ]);
+      // 2. Remove PARENT role so migration 0055 reconciles from scratch for this institution
+      await migAdminQuery(`DELETE FROM app.roles WHERE organization_id = $1 AND code = 'PARENT'`, [
+        ORG_A,
+      ]);
 
-    // 3. Execute Migration 0055 SQL as app_migrator
-    const fs = await import('fs');
-    const path = await import('path');
-    const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(
-      __dirname,
-      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
-    );
-    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+      // 3. Execute Migration 0055 SQL as app_migrator
+      const fs = await import('fs');
+      const path = await import('path');
+      const pg = (await import('pg')).default;
+      const migrationPath = path.resolve(
+        __dirname,
+        '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+      );
+      const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
-    const migratorClient = new pg.Client({ connectionString: inject('dbMigratorUrl') });
-    await migratorClient.connect();
-    try {
-      await migratorClient.query(migrationSql);
-    } finally {
-      await migratorClient.end();
-    }
+      const migratorClient = new pg.Client({ connectionString: migDb.migrator });
+      await migratorClient.connect();
+      try {
+        await migratorClient.query(migrationSql);
+      } finally {
+        await migratorClient.end();
+      }
 
-    // 4. Assert: parent.fee.pay was NOT inserted into app.role_permissions
-    const feePayCheck = await adminQuery(
-      `SELECT 1 FROM app.role_permissions rp
+      // 4. Assert: parent.fee.pay was NOT inserted into app.role_permissions
+      const feePayCheck = await migAdminQuery(
+        `SELECT 1 FROM app.role_permissions rp
        JOIN app.roles r ON r.id = rp.role_id
       WHERE rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'parent.fee.pay'`,
-      [T.orgId],
-    );
-    expect(feePayCheck.length).toBe(0);
+        [ORG_A],
+      );
+      expect(feePayCheck.length).toBe(0);
 
-    // 5. Assert: The other 12 canonical permissions WERE successfully inserted
-    const perms = await adminQuery<{ permission_code: string }>(
-      `SELECT rp.permission_code FROM app.role_permissions rp
+      // 5. Assert: The other 12 canonical permissions WERE successfully inserted
+      const perms = await migAdminQuery<{ permission_code: string }>(
+        `SELECT rp.permission_code FROM app.role_permissions rp
        JOIN app.roles r ON r.id = rp.role_id
       WHERE rp.organization_id = $1 AND r.code = 'PARENT'`,
-      [T.orgId],
-    );
-    expect(perms.length).toBe(12);
-    expect(perms.map((p) => p.permission_code)).not.toContain('parent.fee.pay');
-    expect(perms.map((p) => p.permission_code)).toContain('parent.portal.access');
-    expect(perms.map((p) => p.permission_code)).toContain('parent.fee.read');
+        [ORG_A],
+      );
+      expect(perms.length).toBe(12);
+      expect(perms.map((p) => p.permission_code)).not.toContain('parent.fee.pay');
+      expect(perms.map((p) => p.permission_code)).toContain('parent.portal.access');
+      expect(perms.map((p) => p.permission_code)).toContain('parent.fee.read');
 
-    // Clean up setting
-    await adminQuery(
-      `DELETE FROM app.organization_settings WHERE organization_id = $1 AND key = 'authorization.denied_permissions'`,
-      [T.orgId],
-    );
-  });
+      // Clean up setting
+      await migAdminQuery(
+        `DELETE FROM app.organization_settings WHERE organization_id = $1 AND key = 'authorization.denied_permissions'`,
+        [ORG_A],
+      );
+    });
 
-  it('migration 0055 preserves existing custom scope modes on PARENT permissions via ON CONFLICT DO NOTHING', async () => {
-    // 1. Establish custom scope on consent.read for PARENT: school widened it or customized it to GRANTED
-    await adminQuery(
-      `UPDATE app.role_permissions rp
+    it('migration 0055 preserves existing custom scope modes on PARENT permissions via ON CONFLICT DO NOTHING', async () => {
+      // 1. Establish custom scope on consent.read for PARENT: school widened it or customized it to GRANTED
+      await migAdminQuery(
+        `UPDATE app.role_permissions rp
           SET scope_mode = 'GRANTED'
          FROM app.roles r
         WHERE rp.role_id = r.id AND rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'consent.read'`,
-      [T.orgId],
-    );
-
-    const preScope = await adminQuery<{ scope_mode: string }>(
-      `SELECT rp.scope_mode FROM app.role_permissions rp
-       JOIN app.roles r ON r.id = rp.role_id
-      WHERE rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'consent.read'`,
-      [T.orgId],
-    );
-    expect(preScope[0]?.scope_mode).toBe('GRANTED');
-
-    // 2. Re-execute Migration 0055 SQL as app_migrator
-    const fs = await import('fs');
-    const path = await import('path');
-    const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(
-      __dirname,
-      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
-    );
-    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
-
-    const migratorClient = new pg.Client({ connectionString: inject('dbMigratorUrl') });
-    await migratorClient.connect();
-    try {
-      await migratorClient.query(migrationSql);
-    } finally {
-      await migratorClient.end();
-    }
-
-    // 3. Assert: Existing custom scope mode GRANTED was preserved and NOT overwritten to SELF
-    const postScope = await adminQuery<{ scope_mode: string }>(
-      `SELECT rp.scope_mode FROM app.role_permissions rp
-       JOIN app.roles r ON r.id = rp.role_id
-      WHERE rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'consent.read'`,
-      [T.orgId],
-    );
-    expect(postScope[0]?.scope_mode).toBe('GRANTED');
-  });
-
-  it('migration 0055 fails safely and rolls back if platform.permissions lacks a required canonical permission', async () => {
-    const fs = await import('fs');
-    const path = await import('path');
-    const pg = (await import('pg')).default;
-    const migrationPath = path.resolve(
-      __dirname,
-      '../../../database/migrations/0055_repair_missing_parent_roles.sql',
-    );
-    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
-
-    // Simulate missing canonical permission in platform.permissions inside an isolated transaction
-    const migratorClient = new pg.Client({ connectionString: inject('dbMigratorUrl') });
-    await migratorClient.connect();
-    try {
-      await migratorClient.query('BEGIN');
-      // Delete parent.exam.read temporarily from platform.permissions
-      await migratorClient.query(
-        `DELETE FROM platform.permissions WHERE code = 'parent.exam.read'`,
+        [ORG_A],
       );
 
-      // Attempting to execute Migration 0055 must fail with postcondition error
-      await expect(migratorClient.query(migrationSql)).rejects.toThrow(
-        /Migration 0055 Postcondition Failed: Platform permission catalog is missing required canonical permission/,
+      const preScope = await migAdminQuery<{ scope_mode: string }>(
+        `SELECT rp.scope_mode FROM app.role_permissions rp
+       JOIN app.roles r ON r.id = rp.role_id
+      WHERE rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'consent.read'`,
+        [ORG_A],
       );
-      await migratorClient.query('ROLLBACK');
-    } catch {
-      await migratorClient.query('ROLLBACK');
-    } finally {
-      await migratorClient.end();
-    }
+      expect(preScope[0]?.scope_mode).toBe('GRANTED');
 
-    // Verify platform.permissions is intact
-    const catalogCheck = await adminQuery(
-      `SELECT 1 FROM platform.permissions WHERE code = 'parent.exam.read'`,
-    );
-    expect(catalogCheck.length).toBe(1);
+      // 2. Re-execute Migration 0055 SQL as app_migrator
+      const fs = await import('fs');
+      const path = await import('path');
+      const pg = (await import('pg')).default;
+      const migrationPath = path.resolve(
+        __dirname,
+        '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+      );
+      const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+
+      const migratorClient = new pg.Client({ connectionString: migDb.migrator });
+      await migratorClient.connect();
+      try {
+        await migratorClient.query(migrationSql);
+      } finally {
+        await migratorClient.end();
+      }
+
+      // 3. Assert: Existing custom scope mode GRANTED was preserved and NOT overwritten to SELF
+      const postScope = await migAdminQuery<{ scope_mode: string }>(
+        `SELECT rp.scope_mode FROM app.role_permissions rp
+       JOIN app.roles r ON r.id = rp.role_id
+      WHERE rp.organization_id = $1 AND r.code = 'PARENT' AND rp.permission_code = 'consent.read'`,
+        [ORG_A],
+      );
+      expect(postScope[0]?.scope_mode).toBe('GRANTED');
+    });
+
+    it('migration 0055 fails safely and rolls back if platform.permissions lacks a required canonical permission', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const pg = (await import('pg')).default;
+      const migrationPath = path.resolve(
+        __dirname,
+        '../../../database/migrations/0055_repair_missing_parent_roles.sql',
+      );
+      const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+
+      // Simulate missing canonical permission in platform.permissions inside an isolated transaction
+      const migratorClient = new pg.Client({ connectionString: migDb.migrator });
+      await migratorClient.connect();
+      try {
+        await migratorClient.query('BEGIN');
+        // Delete parent.exam.read temporarily from platform.permissions
+        await migratorClient.query(
+          `DELETE FROM platform.permissions WHERE code = 'parent.exam.read'`,
+        );
+
+        // Attempting to execute Migration 0055 must fail with postcondition error
+        await expect(migratorClient.query(migrationSql)).rejects.toThrow(
+          /Migration 0055 Postcondition Failed: Platform permission catalog is missing required canonical permission/,
+        );
+        await migratorClient.query('ROLLBACK');
+      } catch {
+        await migratorClient.query('ROLLBACK');
+      } finally {
+        await migratorClient.end();
+      }
+
+      // Verify platform.permissions is intact
+      const catalogCheck = await migAdminQuery(
+        `SELECT 1 FROM platform.permissions WHERE code = 'parent.exam.read'`,
+      );
+      expect(catalogCheck.length).toBe(1);
+    });
   });
 });

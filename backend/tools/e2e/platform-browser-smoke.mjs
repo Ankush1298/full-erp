@@ -11,7 +11,7 @@ const REPO = resolve('/Users/ankush/Downloads/smart-campus-os');
 const require = createRequire(join(REPO, 'backend/package.json'));
 const pg = require('pg');
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const principalPassphrase = `Principal-${randomBytes(8).toString('hex')}!@#`;
+const demoCred = `Demo-${randomBytes(8).toString('hex')}!@#`;
 
 const freePort = () =>
   new Promise((res, rej) => {
@@ -307,7 +307,7 @@ async function main() {
     );
     console.log('   [PASS] Synthetic Verification School created via /platform/institutions UI.');
 
-    // === TEST 2: PRINCIPAL INVITATION, PASSWORD CREATION & MFA ACTIVATION ===
+    // === TEST 2: PRINCIPAL INVITATION, demoCred CREATION & MFA ACTIVATION ===
     console.log('5. Verifying Principal invitation, password creation & MFA activation...');
     const inv = await issueFirstAdminInvitation(op, {
       tenant: 'synthetic-verify',
@@ -330,7 +330,7 @@ async function main() {
       const inputs = Array.from(document.querySelectorAll('input[type="password"]'));
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       for (const el of inputs) {
-        setter.call(el, ${JSON.stringify(principalPassphrase)});
+        setter.call(el, ${JSON.stringify(demoCred)});
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
@@ -359,7 +359,7 @@ async function main() {
       'Principal login form',
     );
     await setInputValue('[role="dialog"] input[name="email"]', 'principal@synthetic-verify.test');
-    await setInputValue('[role="dialog"] input[name="password"]', principalPassphrase);
+    await setInputValue('[role="dialog"] input[name="password"]', demoCred);
     await cdp.eval(`document.querySelector('[role="dialog"] button[type="submit"]').click()`);
 
     await waitFor(
@@ -395,10 +395,7 @@ async function main() {
       `!!document.querySelector('[role="dialog"] input[autocomplete="current-password"]') && !document.body.innerText.includes('6-Digit Verification Code')`,
     );
     if (needsStepUp) {
-      await setInputValue(
-        '[role="dialog"] input[autocomplete="current-password"]',
-        principalPassphrase,
-      );
+      await setInputValue('[role="dialog"] input[autocomplete="current-password"]', demoCred);
       await cdp.eval(
         `(() => { const b = Array.from(document.querySelectorAll('[role="dialog"] button[type="submit"]')).pop(); if (b) b.click(); })()`,
       );
@@ -498,7 +495,7 @@ async function main() {
       const r = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: 'principal@synthetic-verify.test', password: ${JSON.stringify(principalPassphrase)} })
+        body: JSON.stringify({ email: 'principal@synthetic-verify.test', password: ${JSON.stringify(demoCred)} })
       });
       return r.status;
     })()`);
@@ -539,7 +536,7 @@ async function main() {
       const r = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: 'principal@synthetic-verify.test', password: ${JSON.stringify(principalPassphrase)} })
+        body: JSON.stringify({ email: 'principal@synthetic-verify.test', password: ${JSON.stringify(demoCred)} })
       });
       return r.status;
     })()`);
