@@ -3750,8 +3750,41 @@ export function createFakeBackend(
     }
     if (path.startsWith('/documents')) {
       if (!state.session) return err(401, 'UNAUTHORIZED');
-      if (path === '/documents' && method === 'GET') {
+      if ((path === '/documents' || path.startsWith('/documents?')) && method === 'GET') {
         return json(200, { success: true, data: state.documents.items });
+      }
+      if (path === '/documents/requirements' && method === 'GET') {
+        return json(200, {
+          success: true,
+          data: [
+            {
+              code: 'REQ_STUDENT_ID',
+              title: 'Government Identity / Birth Verification',
+              description: 'Government-issued ID or birth certificate.',
+              workflow: 'ADMISSION',
+              targetRole: 'STUDENT',
+              isMandatory: true,
+              allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+              maxSizeBytes: 10485760,
+              classification: 'CONFIDENTIAL',
+              storageClass: 'SENSITIVE',
+              defaultPurpose: 'id_proof',
+            },
+            {
+              code: 'REQ_COMPLIANCE_FIRE_SAFETY',
+              title: 'Annual Fire Safety Certificate',
+              description: 'Municipal fire department clearance certificate.',
+              workflow: 'COMPLIANCE',
+              targetRole: 'INSTITUTION',
+              isMandatory: true,
+              allowedMimeTypes: ['application/pdf'],
+              maxSizeBytes: 20971520,
+              classification: 'INTERNAL',
+              storageClass: 'GENERAL',
+              defaultPurpose: 'compliance_fire_safety',
+            },
+          ],
+        });
       }
       const dlMatch = path.match(/^\/documents\/([^/?]+)\/download-url$/);
       if (dlMatch && method === 'GET') {

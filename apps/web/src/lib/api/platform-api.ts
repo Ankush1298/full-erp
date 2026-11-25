@@ -144,6 +144,21 @@ export interface InstitutionDetail {
       }
     | undefined;
   authorities?: Array<unknown> | undefined;
+  firstAdminOnboarding?: FirstAdminOnboardingInfo | null | undefined;
+}
+
+export interface FirstAdminOnboardingInfo {
+  userId: string;
+  email: string;
+  designation: string;
+  accountStatus: string;
+  activationStatus: 'ACTIVATED' | 'PENDING_ACTIVATION';
+  invitationStatus: 'NONE' | 'PENDING' | 'EXPIRED' | 'REVOKED' | 'ACCEPTED';
+  invitationExpiresAt?: string | undefined;
+  mfaEnrolled: boolean;
+  mfaBootstrapEligible: boolean;
+  canIssueInvitation: boolean;
+  canRevokeInvitation: boolean;
 }
 
 export interface PlatformModuleDefinition {
@@ -197,7 +212,9 @@ async function request<T>(path: string, options: RequestInit = {}, raw = false):
   if (token) {
     headers.set('x-platform-token', token);
   }
-  headers.set('Content-Type', 'application/json');
+  if (options.body !== undefined && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   const base = ['', 'api'].join('/');
   const fullPath = `${base}${path}`;
@@ -480,6 +497,9 @@ export function normalizeInstitutionDetail(input: unknown): InstitutionDetail {
     ...(isObject(target['metrics'])
       ? { metrics: target['metrics'] as unknown as InstitutionDetail['metrics'] }
       : {}),
+    firstAdminOnboarding: isObject(target['firstAdminOnboarding'])
+      ? (target['firstAdminOnboarding'] as unknown as FirstAdminOnboardingInfo)
+      : null,
   };
 }
 
@@ -747,5 +767,48 @@ export const platformApi = {
     }>(`/v1/platform/institutions/${id}/authorities/grant`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  issueFirstAdminInvitation: (
+    id: string,
+    data?: {
+      ttlHours?: number | undefined;
+      reason?: string | undefined;
+      sendEmail?: boolean | undefined;
+    },
+  ) =>
+    request<{
+      tenantId: string;
+      userId: string;
+      invitationId: string;
+      expiresAt: string;
+      reissued: boolean;
+      token: string;
+      acceptUrl: string;
+      emailDelivery: 'SENT' | 'NOT_CONFIGURED' | 'FAILED' | 'SKIPPED';
+    }>(`/v1/platform/institutions/${id}/first-admin/invite`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+
+  revokeFirstAdminInvitation: (id: string, data?: { reason?: string | undefined }) =>
+    request<{ tenantId: string; revoked: number }>(
+      `/v1/platform/institutions/${id}/first-admin/invite/revoke`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+      },
+    ),
+
+  issueFirstAdminMfaTicket: (id: string, data?: { reason?: string | undefined }) =>
+    request<{
+      tenantId: string;
+      userId: string;
+      ticketId: string;
+      ticket: string;
+      expiresAt: string;
+    }>(`/v1/platform/institutions/${id}/first-admin/mfa-ticket`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
     }),
 };

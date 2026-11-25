@@ -132,3 +132,7 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
 ];
 
 export const PERMISSION_CODES: ReadonlySet<string> = new Set(PERMISSION_CATALOG.map((p) => p.code));
+
+export const CRITICAL_PERMISSIONS: ReadonlySet<string> = new Set(
+  PERMISSION_CATALOG.filter((p) => p.sensitivity === 'CRITICAL').map((p) => p.code),
+);

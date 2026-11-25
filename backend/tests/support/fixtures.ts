@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { seedTenantRoles } from '../../src/shared/authorization/seed.js';
+import { seedMfaPermissions, seedTenantRoles } from '../../src/shared/authorization/seed.js';
 
 /**
  * Deterministic security fixtures (all UUIDv7-shaped). Relationships:
@@ -191,7 +191,10 @@ export async function seedFixtures(
     const exec = {
       query: (text: string, values?: readonly unknown[]) => c.query(text, [...(values ?? [])]),
     };
-    for (const org of [ORG_A, ORG_B, ORG_C]) await seedTenantRoles(exec, org);
+    for (const org of [ORG_A, ORG_B, ORG_C]) {
+      await seedTenantRoles(exec, org, { allowCriticalGrants: true });
+      await seedMfaPermissions(exec, org, { allowCriticalGrants: true });
+    }
 
     // Academic structure first: scoped role assignments below reference these rows (typed FKs, 0008/0009).
     await c.query(

@@ -3,6 +3,7 @@ import type { TenantTx } from '../../shared/database/index.js';
 import { AppError, resourceNotFound } from '../../shared/errors/http-errors.js';
 import { isTrustedContext, type TrustedContext } from '../../shared/tenancy/trusted-context.js';
 import { AuthorizationEngine } from '../../shared/authorization/engine.js';
+import { acquireDenialPolicyLock } from '../../shared/authorization/reconcile.js';
 import { normaliseReason } from '../../shared/authorization/assignments.js';
 import { recordAudit, type AuditRequestMeta } from '../../shared/audit/index.js';
 import {
@@ -177,6 +178,10 @@ export class SettingsService {
       } else {
         meta = options as AuditRequestMeta;
       }
+    }
+
+    if (key === 'authorization.denied_permissions') {
+      await acquireDenialPolicyLock(tx, ctx.tenantId);
     }
 
     // A first write races with another first write of the same key: the loser of the INSERT finds the row on the

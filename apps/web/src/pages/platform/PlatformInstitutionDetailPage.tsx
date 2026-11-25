@@ -21,12 +21,33 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
   const [selectedBundle, setSelectedBundle] = useState<string>('COMPLETE_ERP');
   const [savingEntitlements, setSavingEntitlements] = useState(false);
   const [entitlementsSaved, setEntitlementsSaved] = useState(false);
+  const [entitlementsError, setEntitlementsError] = useState<string | null>(null);
   const [entitlementDiff, setEntitlementDiff] = useState<string[]>([]);
+
+  // First Administrator Onboarding State (raw tokens live only in ephemeral React state)
+  const [onboardingBusy, setOnboardingBusy] = useState<
+    'invite' | 'email' | 'revoke' | 'mfa' | null
+  >(null);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [onboardingSuccess, setOnboardingSuccess] = useState<string | null>(null);
+  const [issuedInvite, setIssuedInvite] = useState<{
+    token: string;
+    acceptUrl: string;
+    expiresAt: string;
+    reissued: boolean;
+    emailDelivery: 'SENT' | 'NOT_CONFIGURED' | 'FAILED' | 'SKIPPED';
+  } | null>(null);
+  const [issuedMfaTicket, setIssuedMfaTicket] = useState<{
+    ticket: string;
+    expiresAt: string;
+  } | null>(null);
+  const [copiedKey, setCopiedKey] = useState<'link' | 'token' | 'mfa' | null>(null);
 
   // Subscription Editor State
   const [subForm, setSubForm] = useState<Partial<SubscriptionConfig>>({});
   const [savingSub, setSavingSub] = useState(false);
   const [subSaved, setSubSaved] = useState(false);
+  const [subError, setSubError] = useState<string | null>(null);
 
   // Authority Delegation State
   const [authorityType, setAuthorityType] = useState('SECURITY_AUTHORITY');
@@ -35,10 +56,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
   const [approvedBy, setApprovedBy] = useState('Anesa Platform Ops');
   const [grantingAuth, setGrantingAuth] = useState(false);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Reconciliation State
   const [reconciling, setReconciling] = useState(false);
   const [reconcileModalOpen, setReconcileModalOpen] = useState(false);
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
   const [roleSearchQuery, setRoleSearchQuery] = useState('');
   const [roleScopeFilter, setRoleScopeFilter] = useState('ALL');
   const [reconcileResult, setReconcileResult] = useState<{
@@ -250,6 +273,7 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
   const handleSaveEntitlements = async () => {
     if (!id) return;
     setSavingEntitlements(true);
+    setEntitlementsError(null);
     try {
       await platformApi.setEntitlements(id, {
         planBundle: selectedBundle,
@@ -265,7 +289,7 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
       setTimeout(() => setEntitlementsSaved(false), 3000);
       fetchDetail();
     } catch (err) {
-      alert((err as Error).message);
+      setEntitlementsError((err as Error).message || 'Failed to save entitlements.');
     } finally {
       setSavingEntitlements(false);
     }
@@ -276,13 +300,14 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
     e.preventDefault();
     if (!id) return;
     setSavingSub(true);
+    setSubError(null);
     try {
       await platformApi.setSubscription(id, subForm);
       setSubSaved(true);
       setTimeout(() => setSubSaved(false), 3000);
       fetchDetail();
     } catch (err) {
-      alert((err as Error).message);
+      setSubError((err as Error).message || 'Failed to save subscription.');
     } finally {
       setSavingSub(false);
     }
@@ -290,19 +315,21 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
 
   // Reconcile Roles (Opens Guarded Confirmation Dialog)
   const handleOpenReconcileModal = () => {
+    setReconcileError(null);
     setReconcileModalOpen(true);
   };
 
   const handleConfirmReconcileRoles = async () => {
     if (!id) return;
     setReconciling(true);
+    setReconcileError(null);
     setReconcileModalOpen(false);
     try {
       const res = await platformApi.reconcileRoles(id, { force: false });
       setReconcileResult(res);
       fetchDetail();
     } catch (err) {
-      alert((err as Error).message);
+      setReconcileError((err as Error).message || 'Failed to reconcile roles.');
     } finally {
       setReconciling(false);
     }
@@ -314,6 +341,7 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
     if (!id) return;
     setGrantingAuth(true);
     setAuthSuccess(null);
+    setAuthError(null);
     try {
       const res = await platformApi.grantCriticalAuthority(id, {
         authority: authorityType,
@@ -328,7 +356,7 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
       setJustification('');
       fetchDetail();
     } catch (err) {
-      alert((err as Error).message);
+      setAuthError((err as Error).message || 'Failed to grant critical authority.');
     } finally {
       setGrantingAuth(false);
     }
@@ -438,6 +466,389 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
       {/* TAB CONTENT: Overview */}
       {activeTab === 'overview' && (
         <div className="tab-pane">
+          {/* First Administrator Onboarding */}
+          <div className="platform-card" style={{ marginBottom: '1.5rem' }}>
+            <div className="entitlements-header-row">
+              <div>
+                <h3 className="card-title">First Administrator Onboarding</h3>
+                <p className="card-subtitle">
+                  Issue, reissue, or revoke the initial institutional administrator activation
+                  invitation and one-time MFA bootstrap ticket.
+                </p>
+              </div>
+            </div>
+
+            {onboardingError && (
+              <div
+                className="platform-callout error-callout"
+                role="alert"
+                style={{ marginTop: '1rem' }}
+              >
+                {onboardingError}
+              </div>
+            )}
+            {onboardingSuccess && (
+              <div className="success-banner" role="status" style={{ marginTop: '1rem' }}>
+                {onboardingSuccess}
+              </div>
+            )}
+
+            {detail.firstAdminOnboarding ? (
+              <>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '1rem',
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    borderRadius: '0.5rem',
+                    background: 'var(--bg-subtle, #f8fafc)',
+                    border: '1px solid var(--border-subtle, #e2e8f0)',
+                  }}
+                >
+                  <div>
+                    <div className="text-sm text-muted">Administrator Email</div>
+                    <div className="font-semibold" style={{ wordBreak: 'break-word' }}>
+                      {detail.firstAdminOnboarding.email}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted">Designation</div>
+                    <div className="font-semibold">{detail.firstAdminOnboarding.designation}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted">Account Activation</div>
+                    <div>
+                      <span
+                        className={`status-badge ${
+                          detail.firstAdminOnboarding.activationStatus === 'ACTIVATED'
+                            ? 'status-active'
+                            : 'status-pending'
+                        }`}
+                      >
+                        {detail.firstAdminOnboarding.activationStatus === 'ACTIVATED'
+                          ? 'Activated'
+                          : 'Pending Activation'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted">Invitation Status</div>
+                    <div>
+                      <span className="status-badge">
+                        {detail.firstAdminOnboarding.invitationStatus}
+                      </span>
+                      {detail.firstAdminOnboarding.invitationExpiresAt && (
+                        <div className="text-sm text-muted" style={{ marginTop: '0.25rem' }}>
+                          Expires:{' '}
+                          {new Date(
+                            detail.firstAdminOnboarding.invitationExpiresAt,
+                          ).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted">MFA Enrollment</div>
+                    <div>
+                      <span
+                        className={`status-badge ${
+                          detail.firstAdminOnboarding.mfaEnrolled
+                            ? 'status-active'
+                            : 'status-pending'
+                        }`}
+                      >
+                        {detail.firstAdminOnboarding.mfaEnrolled ? 'MFA Enrolled' : 'Not Enrolled'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem',
+                    marginTop: '1rem',
+                  }}
+                >
+                  {detail.firstAdminOnboarding.canIssueInvitation && (
+                    <>
+                      <button
+                        type="button"
+                        className="platform-btn platform-btn-primary"
+                        disabled={onboardingBusy !== null}
+                        onClick={() => {
+                          void (async () => {
+                            setOnboardingBusy('invite');
+                            setOnboardingError(null);
+                            setOnboardingSuccess(null);
+                            setCopiedKey(null);
+                            try {
+                              const res = await platformApi.issueFirstAdminInvitation(detail.id, {
+                                sendEmail: false,
+                              });
+                              setIssuedInvite({
+                                token: res.token,
+                                acceptUrl: res.acceptUrl,
+                                expiresAt: res.expiresAt,
+                                reissued: res.reissued,
+                                emailDelivery: res.emailDelivery,
+                              });
+                              setOnboardingSuccess(
+                                res.reissued
+                                  ? 'First-administrator invitation reissued. Copy the one-time activation link below.'
+                                  : 'First-administrator invitation generated. Copy the one-time activation link below.',
+                              );
+                              fetchDetail();
+                            } catch (err) {
+                              setOnboardingError(
+                                err instanceof Error
+                                  ? err.message
+                                  : 'Failed to issue first-administrator invitation',
+                              );
+                            } finally {
+                              setOnboardingBusy(null);
+                            }
+                          })();
+                        }}
+                      >
+                        {onboardingBusy === 'invite'
+                          ? 'Generating...'
+                          : detail.firstAdminOnboarding.invitationStatus === 'NONE'
+                            ? 'Generate Invitation'
+                            : 'Reissue Invitation'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="platform-btn platform-btn-secondary"
+                        disabled={onboardingBusy !== null}
+                        onClick={() => {
+                          void (async () => {
+                            setOnboardingBusy('email');
+                            setOnboardingError(null);
+                            setOnboardingSuccess(null);
+                            setCopiedKey(null);
+                            try {
+                              const res = await platformApi.issueFirstAdminInvitation(detail.id, {
+                                sendEmail: true,
+                              });
+                              setIssuedInvite({
+                                token: res.token,
+                                acceptUrl: res.acceptUrl,
+                                expiresAt: res.expiresAt,
+                                reissued: res.reissued,
+                                emailDelivery: res.emailDelivery,
+                              });
+                              if (res.emailDelivery === 'SENT') {
+                                setOnboardingSuccess(
+                                  `Invitation email sent to ${detail.firstAdminOnboarding?.email}. One-time activation link is also available below.`,
+                                );
+                              } else if (res.emailDelivery === 'NOT_CONFIGURED') {
+                                setOnboardingSuccess(
+                                  'Invitation generated, but SMTP email delivery is not configured on this server. Use the copy-link fallback below.',
+                                );
+                              } else {
+                                setOnboardingSuccess(
+                                  'Invitation generated, but email delivery failed. Use the copy-link fallback below.',
+                                );
+                              }
+                              fetchDetail();
+                            } catch (err) {
+                              setOnboardingError(
+                                err instanceof Error
+                                  ? err.message
+                                  : 'Failed to send first-administrator invitation',
+                              );
+                            } finally {
+                              setOnboardingBusy(null);
+                            }
+                          })();
+                        }}
+                      >
+                        {onboardingBusy === 'email'
+                          ? 'Sending...'
+                          : detail.firstAdminOnboarding.invitationStatus === 'NONE'
+                            ? 'Send Invitation'
+                            : 'Resend Invitation'}
+                      </button>
+                    </>
+                  )}
+
+                  {detail.firstAdminOnboarding.canRevokeInvitation && (
+                    <button
+                      type="button"
+                      className="platform-btn platform-btn-danger"
+                      disabled={onboardingBusy !== null}
+                      onClick={() => {
+                        void (async () => {
+                          setOnboardingBusy('revoke');
+                          setOnboardingError(null);
+                          setOnboardingSuccess(null);
+                          try {
+                            const res = await platformApi.revokeFirstAdminInvitation(detail.id, {
+                              reason: 'Revoked by platform operator via Control Center',
+                            });
+                            setIssuedInvite(null);
+                            setOnboardingSuccess(
+                              `Revoked ${res.revoked} unused invitation${res.revoked === 1 ? '' : 's'}.`,
+                            );
+                            fetchDetail();
+                          } catch (err) {
+                            setOnboardingError(
+                              err instanceof Error
+                                ? err.message
+                                : 'Failed to revoke first-administrator invitation',
+                            );
+                          } finally {
+                            setOnboardingBusy(null);
+                          }
+                        })();
+                      }}
+                    >
+                      {onboardingBusy === 'revoke' ? 'Revoking...' : 'Revoke Invitation'}
+                    </button>
+                  )}
+
+                  {detail.firstAdminOnboarding.mfaBootstrapEligible && (
+                    <button
+                      type="button"
+                      className="platform-btn platform-btn-secondary"
+                      disabled={onboardingBusy !== null}
+                      onClick={() => {
+                        void (async () => {
+                          setOnboardingBusy('mfa');
+                          setOnboardingError(null);
+                          setOnboardingSuccess(null);
+                          setCopiedKey(null);
+                          try {
+                            const res = await platformApi.issueFirstAdminMfaTicket(detail.id, {
+                              reason: 'First-admin MFA bootstrap via Platform Control Center',
+                            });
+                            setIssuedMfaTicket({
+                              ticket: res.ticket,
+                              expiresAt: res.expiresAt,
+                            });
+                            setOnboardingSuccess(
+                              'One-time MFA bootstrap ticket issued. Share it securely with the administrator.',
+                            );
+                            fetchDetail();
+                          } catch (err) {
+                            setOnboardingError(
+                              err instanceof Error
+                                ? err.message
+                                : 'Failed to issue MFA bootstrap ticket',
+                            );
+                          } finally {
+                            setOnboardingBusy(null);
+                          }
+                        })();
+                      }}
+                    >
+                      {onboardingBusy === 'mfa'
+                        ? 'Issuing Ticket...'
+                        : 'Issue MFA Bootstrap Ticket'}
+                    </button>
+                  )}
+                </div>
+
+                {issuedInvite && (
+                  <div
+                    className="platform-callout info-callout"
+                    style={{ marginTop: '1rem', display: 'grid', gap: '0.5rem' }}
+                  >
+                    <div>
+                      <strong>One-Time Activation Link</strong> (shown only once in this session;
+                      expires {new Date(issuedInvite.expiresAt).toLocaleString()}):
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <code
+                        style={{
+                          flex: '1 1 320px',
+                          padding: '0.45rem 0.6rem',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '0.375rem',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {issuedInvite.acceptUrl}
+                      </code>
+                      <button
+                        type="button"
+                        className="platform-btn platform-btn-secondary"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(issuedInvite.acceptUrl).then(() => {
+                            setCopiedKey('link');
+                          });
+                        }}
+                      >
+                        {copiedKey === 'link' ? 'Copied Link' : 'Copy Activation Link'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {issuedMfaTicket && (
+                  <div
+                    className="platform-callout info-callout"
+                    style={{ marginTop: '1rem', display: 'grid', gap: '0.5rem' }}
+                  >
+                    <div>
+                      <strong>One-Time MFA Bootstrap Ticket</strong> (shown only once; expires{' '}
+                      {new Date(issuedMfaTicket.expiresAt).toLocaleString()}):
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <code
+                        style={{
+                          flex: '1 1 240px',
+                          padding: '0.45rem 0.6rem',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '0.375rem',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {issuedMfaTicket.ticket}
+                      </code>
+                      <button
+                        type="button"
+                        className="platform-btn platform-btn-secondary"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(issuedMfaTicket.ticket).then(() => {
+                            setCopiedKey('mfa');
+                          });
+                        }}
+                      >
+                        {copiedKey === 'mfa' ? 'Copied Ticket' : 'Copy MFA Ticket'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-muted" style={{ marginTop: '1rem' }}>
+                No designated first-administrator account was found for this institution.
+              </p>
+            )}
+          </div>
+
           <div className="platform-grid-2">
             <div className="platform-card">
               <h3 className="card-title">Campus & Physical Locations</h3>
@@ -537,6 +948,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
               </div>
             )}
 
+            {entitlementsError && (
+              <div className="form-error-alert" role="alert">
+                {entitlementsError}
+              </div>
+            )}
+
             {entitlementsSaved && (
               <div className="success-banner" role="status">
                 Entitlements successfully updated and committed to{' '}
@@ -607,6 +1024,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
             <p className="card-subtitle">
               SaaS contract billing terms, annual pricing (INR), and institutional capacity limits.
             </p>
+
+            {subError && (
+              <div className="form-error-alert mt-4" role="alert">
+                {subError}
+              </div>
+            )}
 
             {subSaved && (
               <div className="success-banner mt-4" role="status">
@@ -784,6 +1207,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
               </button>
             </div>
 
+            {reconcileError && (
+              <div className="form-error-alert mt-4" role="alert">
+                {reconcileError}
+              </div>
+            )}
+
             {/* Reconciliation Success Summary */}
             {reconcileResult && (
               <div className="info-callout mt-4">
@@ -941,6 +1370,12 @@ export const PlatformInstitutionDetailPage: React.FC = () => {
               Device Authority) requires strict verification, two-person authorization, and
               immutable audit logs.
             </p>
+
+            {authError && (
+              <div className="form-error-alert mt-4" role="alert">
+                {authError}
+              </div>
+            )}
 
             {authSuccess && (
               <div className="success-banner mt-4" role="status">

@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '../../src/shared/errors/http-errors.js';
+import type { InvitationMailer } from '../../src/shared/email/invitation-mailer.js';
+import { OnboardingError } from './first-admin.js';
 import { PlatformService, type PlatformDb } from './platform.service.js';
 import { ERP_MODULE_CATALOG, STANDARD_PLAN_BUNDLES } from './module-registry.js';
 import type {
@@ -15,6 +17,21 @@ import type {
 
 export interface PlatformRoutesOptions {
   db: PlatformDb;
+  appOrigin?: string | undefined;
+  invitationMailer?: InvitationMailer | undefined;
+}
+
+function mapOnboardingError(err: unknown): never {
+  if (err instanceof OnboardingError) {
+    const status =
+      err.code === 'TENANT_NOT_FOUND'
+        ? 404
+        : err.code === 'INVALID_TTL' || err.code === 'TENANT_REQUIRED'
+          ? 400
+          : 409;
+    throw new AppError(status, err.code, err.message);
+  }
+  throw err;
 }
 
 const DEFAULT_PLATFORM_KEY = 'change_me_platform_dev_token';
@@ -115,7 +132,10 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
   opts: PlatformRoutesOptions,
 ) => {
   await Promise.resolve();
-  const platformService = new PlatformService(opts.db);
+  const platformService = new PlatformService(opts.db, {
+    appOrigin: opts.appOrigin,
+    invitationMailer: opts.invitationMailer,
+  });
 
   // Guard all non-auth /platform routes with platform operator verification
   app.addHook('preHandler', async (req) => {
@@ -393,6 +413,74 @@ export const registerPlatformRoutes: FastifyPluginAsync<PlatformRoutesOptions> =
     async (req) => {
       const result = await platformService.grantCriticalAuthority(req.params.id, req.body);
       return { success: true, data: result };
+    },
+  );
+
+  // 16. Issue or Reissue First-Administrator Invitation
+  app.post<{
+    Params: { id: string };
+    Body?: { ttlHours?: number; reason?: string; sendEmail?: boolean };
+  }>(
+    '/institutions/:id/first-admin/invite',
+    {
+      config: { public: true },
+    },
+    async (req, reply) => {
+      try {
+        const result = await platformService.issueFirstAdminInvite(req.params.id, {
+          ...(req.body?.ttlHours !== undefined ? { ttlHours: req.body.ttlHours } : {}),
+          ...(req.body?.reason ? { reason: req.body.reason } : {}),
+          ...(req.body?.sendEmail !== undefined ? { sendEmail: req.body.sendEmail } : {}),
+          requestOrigin: typeof req.headers.origin === 'string' ? req.headers.origin : undefined,
+        });
+        reply.status(201);
+        return { success: true, data: result };
+      } catch (err) {
+        mapOnboardingError(err);
+      }
+    },
+  );
+
+  // 17. Revoke Unused First-Administrator Invitation
+  app.post<{
+    Params: { id: string };
+    Body?: { reason?: string };
+  }>(
+    '/institutions/:id/first-admin/invite/revoke',
+    {
+      config: { public: true },
+    },
+    async (req) => {
+      try {
+        const result = await platformService.revokeFirstAdminInvite(req.params.id, {
+          ...(req.body?.reason ? { reason: req.body.reason } : {}),
+        });
+        return { success: true, data: result };
+      } catch (err) {
+        mapOnboardingError(err);
+      }
+    },
+  );
+
+  // 18. Issue First-Administrator MFA Bootstrap Ticket
+  app.post<{
+    Params: { id: string };
+    Body?: { reason?: string };
+  }>(
+    '/institutions/:id/first-admin/mfa-ticket',
+    {
+      config: { public: true },
+    },
+    async (req, reply) => {
+      try {
+        const result = await platformService.issueFirstAdminMfaBootstrapTicket(req.params.id, {
+          ...(req.body?.reason ? { reason: req.body.reason } : {}),
+        });
+        reply.status(201);
+        return { success: true, data: result };
+      } catch (err) {
+        mapOnboardingError(err);
+      }
     },
   );
 };

@@ -15,6 +15,9 @@ import {
   LinkDocumentBodySchema,
   type LinkDocumentBody,
   LinkDocumentResponseSchema,
+  ListDocumentRequirementsResponseSchema,
+  ListDocumentsQuerySchema,
+  type ListDocumentsQuery,
   ListDocumentsResponseSchema,
   StudentIdParamSchema,
   type StudentIdParam,
@@ -37,7 +40,7 @@ interface DocumentRouteDeps {
 
 /**
  * doc 11 §5.4: POST /documents/uploads, POST /documents/uploads/{id}/complete, GET /documents/{id}/download-url.
- * Mounted at /api/v1/documents. GET /documents/{id} and DELETE /documents/{id} are later phases.
+ * Mounted at /api/v1/documents.
  */
 export const registerDocumentRoutes: FastifyPluginAsync<DocumentRouteDeps> = async (app, opts) => {
   await Promise.resolve();
@@ -101,17 +104,66 @@ export const registerDocumentRoutes: FastifyPluginAsync<DocumentRouteDeps> = asy
     },
   );
 
-  app.get(
+  app.get<{ Querystring: ListDocumentsQuery }>(
     '/',
     {
       config: { permission: 'document.read' },
-      schema: { response: { 200: ListDocumentsResponseSchema } },
+      schema: {
+        querystring: ListDocumentsQuerySchema,
+        response: { 200: ListDocumentsResponseSchema },
+      },
     },
     async (req, reply) => {
       const ctx = req.tenantContext;
       if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
-      const data = await opts.db.withTenant(ctx, (tx) => service.listDocuments(tx, ctx));
+      const data = await opts.db.withTenant(ctx, (tx) => service.listDocuments(tx, ctx, req.query));
       return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // Requirements configuration endpoint (role-aware document requirements)
+  app.get(
+    '/requirements',
+    {
+      config: { permission: 'document.read' },
+      schema: { response: { 200: ListDocumentRequirementsResponseSchema } },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const data = await opts.db.withTenant(ctx, (tx) => service.getRequirements(tx, ctx));
+      return reply.status(200).send({ success: true, data });
+    },
+  );
+
+  // Generic document link endpoint for verified entities (student, employee, institution)
+  app.post<{
+    Body: LinkDocumentBody & {
+      entityType: 'student' | 'employee' | 'institution';
+      entityId: string;
+    };
+  }>(
+    '/links',
+    {
+      config: { permission: 'document.upload' },
+      schema: {
+        body: LinkDocumentBodySchema,
+        response: { 201: LinkDocumentResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      const ctx = req.tenantContext;
+      if (!ctx) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required.');
+      const { entityType = 'institution', entityId = ctx.tenantId, ...rest } = req.body;
+      const data = await opts.db.withTenant(ctx, (tx) =>
+        service.linkDocument(
+          tx,
+          ctx,
+          { ...rest, entityType, entityId },
+          { meta: extractAuditMeta(req) },
+        ),
+      );
+      return reply.status(201).send({ success: true, data });
     },
   );
 };

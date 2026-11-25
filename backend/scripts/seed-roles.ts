@@ -22,7 +22,7 @@ import crypto from 'node:crypto';
 import pg from 'pg';
 import * as argon2 from 'argon2';
 import { uuidv7 } from '../src/shared/ids/uuidv7.js';
-import { seedTenantRoles } from '../src/shared/authorization/seed.js';
+import { seedMfaPermissions, seedTenantRoles } from '../src/shared/authorization/seed.js';
 import { verifyLocalDevDatabaseUrl, probeLocalDevDatabase } from './dev-seed-core.js';
 import {
   MfaSecretBox,
@@ -141,6 +141,8 @@ export async function seedAllRoles(): Promise<SeededAccountResult[]> {
   try {
     await probeLocalDevDatabase(client);
 
+    await client.query('BEGIN');
+
     // 1. Resolve / Ensure Organization
     const orgRes = await client.query<{ id: string }>(
       `SELECT id FROM app.organizations WHERE slug = 'dev-campus'`,
@@ -162,7 +164,8 @@ export async function seedAllRoles(): Promise<SeededAccountResult[]> {
       query: (text: string, values?: readonly unknown[]) =>
         client.query(text, values ? [...values] : undefined),
     };
-    await seedTenantRoles(exec, organizationId);
+    await seedTenantRoles(exec, organizationId, { allowCriticalGrants: true });
+    await seedMfaPermissions(exec, organizationId, { allowCriticalGrants: true });
 
     // 2. Ensure Campus "Main Campus"
     let campusId: string;
@@ -479,9 +482,13 @@ export async function seedAllRoles(): Promise<SeededAccountResult[]> {
       });
     }
 
+    await client.query('COMMIT');
     return results;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
   } finally {
-    await client.end();
+    await client.end().catch(() => {});
   }
 }
 

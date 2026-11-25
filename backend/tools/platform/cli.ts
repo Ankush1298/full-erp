@@ -65,13 +65,17 @@ async function main(argv: readonly string[]): Promise<void> {
         process.exit(1);
       }
 
-      const res = await createTenant(client, {
-        name,
-        slug,
-        adminEmail,
-        ...(rawType ? { institutionType: rawType.toUpperCase() as InstitutionType } : {}),
-        ...(adminTitle ? { adminTitle } : {}),
-      });
+      const res = await createTenant(
+        client,
+        {
+          name,
+          slug,
+          adminEmail,
+          ...(rawType ? { institutionType: rawType.toUpperCase() as InstitutionType } : {}),
+          ...(adminTitle ? { adminTitle } : {}),
+        },
+        { manageTransaction: true },
+      );
       console.log('Tenant provisioned successfully:');
       console.log(`  ID:     ${res.id}`);
       console.log(`  Name:   ${res.name}`);

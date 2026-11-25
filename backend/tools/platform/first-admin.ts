@@ -36,7 +36,22 @@ interface Tenant {
   name: string;
 }
 
-async function inTransaction<T>(db: SqlExecutor, fn: () => Promise<T>): Promise<T> {
+async function inTransaction<T>(
+  db: SqlExecutor,
+  fn: () => Promise<T>,
+  manageTransaction?: boolean,
+): Promise<T> {
+  const clientWithTx = db as { getTransactionStatus?: () => string };
+  const isManagedTx =
+    (typeof clientWithTx.getTransactionStatus === 'function'
+      ? clientWithTx.getTransactionStatus() === 'T'
+      : false) || db.constructor.name === 'TenantTx';
+  const shouldManage = manageTransaction ?? !isManagedTx;
+
+  if (!shouldManage) {
+    return fn();
+  }
+
   await db.query('BEGIN');
   try {
     const r = await fn();
@@ -90,7 +105,13 @@ export interface FirstAdminInvitation {
 
 export async function issueFirstAdminInvitation(
   db: SqlExecutor,
-  input: { tenant: string; adminEmail?: string; ttlHours?: number; reason?: string },
+  input: {
+    tenant: string;
+    adminEmail?: string;
+    ttlHours?: number;
+    reason?: string;
+    manageTransaction?: boolean;
+  },
 ): Promise<FirstAdminInvitation> {
   const ttl = input.ttlHours ?? FIRST_ADMIN_INVITE_DEFAULT_HOURS;
   if (!Number.isInteger(ttl) || ttl < 1 || ttl > FIRST_ADMIN_INVITE_MAX_HOURS)
@@ -100,103 +121,111 @@ export async function issueFirstAdminInvitation(
     );
   const email = input.adminEmail?.trim().toLowerCase();
 
-  return inTransaction(db, async () => {
-    const tenant = await lockActiveTenant(db, input.tenant);
+  return inTransaction(
+    db,
+    async () => {
+      const tenant = await lockActiveTenant(db, input.tenant);
 
-    // No second initial administrator: once any organization-scope administrator is ACTIVE, this path is closed.
-    const active = await db.query(
-      `SELECT 1 FROM app.users u WHERE u.organization_id = $1 AND u.status = 'ACTIVE' AND ${ORG_ADMIN_ASSIGNMENT} LIMIT 1`,
-      [tenant.id],
-    );
-    if (active.rows.length > 0)
-      throw new OnboardingError(
-        'ADMIN_ALREADY_ACTIVE',
-        'The first administrator is already active; this path is closed for the tenant.',
+      // No second initial administrator: once any organization-scope administrator is ACTIVE, this path is closed.
+      const active = await db.query(
+        `SELECT 1 FROM app.users u WHERE u.organization_id = $1 AND u.status = 'ACTIVE' AND ${ORG_ADMIN_ASSIGNMENT} LIMIT 1`,
+        [tenant.id],
       );
+      if (active.rows.length > 0)
+        throw new OnboardingError(
+          'ADMIN_ALREADY_ACTIVE',
+          'The first administrator is already active; this path is closed for the tenant.',
+        );
 
-    const candidates = await db.query(
-      `SELECT u.id FROM app.users u
+      const candidates = await db.query(
+        `SELECT u.id FROM app.users u
         WHERE u.organization_id = $1 AND u.status = 'INVITED' AND u.identity_id IS NULL
           AND ${ORG_ADMIN_ASSIGNMENT} AND ($2::text IS NULL OR u.email = $2)
         ORDER BY u.created_at`,
-      [tenant.id, email ?? null],
-    );
-    if (candidates.rows.length === 0)
-      throw new OnboardingError(
-        'NO_DESIGNATED_ADMIN',
-        'No invited, not yet activated COLLEGE_ADMIN matches. Create the tenant with --admin-email first.',
+        [tenant.id, email ?? null],
       );
-    if (candidates.rows.length > 1)
-      throw new OnboardingError(
-        'AMBIGUOUS_ADMIN',
-        'More than one invited COLLEGE_ADMIN exists; pass --admin-email to choose the designated one.',
-      );
-    const userId = (candidates.rows[0] as { id: string }).id;
+      if (candidates.rows.length === 0)
+        throw new OnboardingError(
+          'NO_DESIGNATED_ADMIN',
+          'No invited, not yet activated COLLEGE_ADMIN matches. Create the tenant with --admin-email first.',
+        );
+      if (candidates.rows.length > 1)
+        throw new OnboardingError(
+          'AMBIGUOUS_ADMIN',
+          'More than one invited COLLEGE_ADMIN exists; pass --admin-email to choose the designated one.',
+        );
+      const userId = (candidates.rows[0] as { id: string }).id;
 
-    // Safe retries: a new issue withdraws every unused earlier token of this membership (at most one live token).
-    const revoked = await db.query(
-      `UPDATE app.invite_tokens SET revoked_at = now()
+      // Safe retries: a new issue withdraws every unused earlier token of this membership (at most one live token).
+      const revoked = await db.query(
+        `UPDATE app.invite_tokens SET revoked_at = now()
         WHERE organization_id = $1 AND user_id = $2 AND used_at IS NULL AND revoked_at IS NULL
         RETURNING id`,
-      [tenant.id, userId],
-    );
+        [tenant.id, userId],
+      );
 
-    const token = randomBytes(32).toString('base64url'); // 43 characters, 256 bits: INVITE_TOKEN_PATTERN
-    const invitationId = uuidv7();
-    const inserted = await db.query(
-      `INSERT INTO app.invite_tokens (id, organization_id, user_id, purpose, token_hash, created_by, expires_at)
+      const token = randomBytes(32).toString('base64url'); // 43 characters, 256 bits: INVITE_TOKEN_PATTERN
+      const invitationId = uuidv7();
+      const inserted = await db.query(
+        `INSERT INTO app.invite_tokens (id, organization_id, user_id, purpose, token_hash, created_by, expires_at)
        VALUES ($1, $2, $3, 'ACCOUNT_INVITE', $4, $3, now() + make_interval(hours => $5::int))
        RETURNING expires_at`,
-      [invitationId, tenant.id, userId, createHash('sha256').update(token).digest('hex'), ttl],
-    );
-    const expiresAt = (inserted.rows[0] as { expires_at: Date }).expires_at.toISOString();
+        [invitationId, tenant.id, userId, createHash('sha256').update(token).digest('hex'), ttl],
+      );
+      const expiresAt = (inserted.rows[0] as { expires_at: Date }).expires_at.toISOString();
 
-    await recordOperationalAudit(db, {
-      organizationId: tenant.id,
-      action: 'platform.first_admin.invite_issue',
-      resourceType: 'user',
-      resourceId: userId,
-      riskTier: 3,
-      reasonText: input.reason ?? 'First-administrator invitation',
-      metadata: { invitationId, expiresAt, reissued: revoked.rows.length > 0 },
-    });
-    return {
-      tenantId: tenant.id,
-      userId,
-      invitationId,
-      expiresAt,
-      token,
-      reissued: revoked.rows.length > 0,
-    };
-  });
+      await recordOperationalAudit(db, {
+        organizationId: tenant.id,
+        action: 'platform.first_admin.invite_issue',
+        resourceType: 'user',
+        resourceId: userId,
+        riskTier: 3,
+        reasonText: input.reason ?? 'First-administrator invitation',
+        metadata: { invitationId, expiresAt, reissued: revoked.rows.length > 0 },
+      });
+      return {
+        tenantId: tenant.id,
+        userId,
+        invitationId,
+        expiresAt,
+        token,
+        reissued: revoked.rows.length > 0,
+      };
+    },
+    input.manageTransaction,
+  );
 }
 
 /** Withdraws the unused first-administrator invitation(s) of a tenant. Returns how many were withdrawn. */
 export async function revokeFirstAdminInvitation(
   db: SqlExecutor,
-  input: { tenant: string; reason?: string },
+  input: { tenant: string; reason?: string; manageTransaction?: boolean },
 ): Promise<{ tenantId: string; revoked: number }> {
-  return inTransaction(db, async () => {
-    const tenant = await lockActiveTenant(db, input.tenant);
-    const res = await db.query(
-      `UPDATE app.invite_tokens it SET revoked_at = now()
+  return inTransaction(
+    db,
+    async () => {
+      const tenant = await lockActiveTenant(db, input.tenant);
+      const res = await db.query(
+        `UPDATE app.invite_tokens it SET revoked_at = now()
         FROM app.users u
         WHERE it.organization_id = $1 AND u.organization_id = it.organization_id AND u.id = it.user_id
           AND it.used_at IS NULL AND it.revoked_at IS NULL AND u.status = 'INVITED' AND ${ORG_ADMIN_ASSIGNMENT}
         RETURNING it.id`,
-      [tenant.id],
-    );
-    await recordOperationalAudit(db, {
-      organizationId: tenant.id,
-      action: 'platform.first_admin.invite_revoke',
-      resourceType: 'organization',
-      resourceId: tenant.id,
-      riskTier: 3,
-      reasonText: input.reason ?? 'First-administrator invitation withdrawn',
-      metadata: { revoked: res.rows.length },
-    });
-    return { tenantId: tenant.id, revoked: res.rows.length };
-  });
+        [tenant.id],
+      );
+      await recordOperationalAudit(db, {
+        organizationId: tenant.id,
+        action: 'platform.first_admin.invite_revoke',
+        resourceType: 'organization',
+        resourceId: tenant.id,
+        riskTier: 3,
+        reasonText: input.reason ?? 'First-administrator invitation withdrawn',
+        metadata: { revoked: res.rows.length },
+      });
+      return { tenantId: tenant.id, revoked: res.rows.length };
+    },
+    input.manageTransaction,
+  );
 }
 
 /**
@@ -206,7 +235,7 @@ export async function revokeFirstAdminInvitation(
  */
 export async function issueFirstAdminMfaTicket(
   db: SqlExecutor,
-  input: { tenant: string; adminEmail?: string; reason?: string },
+  input: { tenant: string; adminEmail?: string; reason?: string; manageTransaction?: boolean },
 ): Promise<{
   tenantId: string;
   userId: string;
@@ -215,34 +244,38 @@ export async function issueFirstAdminMfaTicket(
   expiresAt: string;
 }> {
   const email = input.adminEmail?.trim().toLowerCase();
-  return inTransaction(db, async () => {
-    const tenant = await lockActiveTenant(db, input.tenant);
-    const admins = await db.query(
-      `SELECT u.id FROM app.users u
+  return inTransaction(
+    db,
+    async () => {
+      const tenant = await lockActiveTenant(db, input.tenant);
+      const admins = await db.query(
+        `SELECT u.id FROM app.users u
         WHERE u.organization_id = $1 AND u.status = 'ACTIVE' AND ${ORG_ADMIN_ASSIGNMENT}
           AND ($2::text IS NULL OR u.email = $2) ORDER BY u.created_at`,
-      [tenant.id, email ?? null],
-    );
-    if (admins.rows.length === 0)
-      throw new OnboardingError(
-        'NO_ACTIVE_ADMIN',
-        'No activated COLLEGE_ADMIN yet: the administrator must accept the invitation first.',
+        [tenant.id, email ?? null],
       );
-    if (admins.rows.length > 1)
-      throw new OnboardingError(
-        'AMBIGUOUS_ADMIN',
-        'More than one active administrator; pass --admin-email.',
-      );
-    const userId = (admins.rows[0] as { id: string }).id;
-    // A plain executor: the library function would open its own connection on a client that has one.
-    const exec: SqlExecutor = { query: (t, v) => db.query(t, v) };
-    const t = await issueFirstAdminBootstrapTicket(exec, {
-      organizationId: tenant.id,
-      userId,
-      ...(input.reason ? { reason: input.reason } : {}),
-    });
-    return { tenantId: tenant.id, userId, ...t };
-  });
+      if (admins.rows.length === 0)
+        throw new OnboardingError(
+          'NO_ACTIVE_ADMIN',
+          'No activated COLLEGE_ADMIN yet: the administrator must accept the invitation first.',
+        );
+      if (admins.rows.length > 1)
+        throw new OnboardingError(
+          'AMBIGUOUS_ADMIN',
+          'More than one active administrator; pass --admin-email.',
+        );
+      const userId = (admins.rows[0] as { id: string }).id;
+      // A plain executor: the library function would open its own connection on a client that has one.
+      const exec: SqlExecutor = { query: (t, v) => db.query(t, v) };
+      const t = await issueFirstAdminBootstrapTicket(exec, {
+        organizationId: tenant.id,
+        userId,
+        ...(input.reason ? { reason: input.reason } : {}),
+      });
+      return { tenantId: tenant.id, userId, ...t };
+    },
+    input.manageTransaction,
+  );
 }
 
 /**

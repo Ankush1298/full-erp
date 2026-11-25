@@ -98,6 +98,45 @@ describe('Document Center: navigation and access', () => {
     expect(await screen.findByRole('button', { name: /\+ Upload Document/i })).toBeInTheDocument();
   });
 
+  it('allows switching between Institutional Documents and My Documents workspace', async () => {
+    const adminMe = {
+      ...ACADEMIC_ADMIN,
+      capabilities: [...ACADEMIC_ADMIN.capabilities, 'document.upload', 'document.read'],
+    };
+    const b = createFakeBackend({ session: true, me: adminMe });
+    renderApp(b, '/documents');
+
+    expect(
+      await screen.findByRole('button', { name: 'Institutional Documents' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'My Documents' })).toBeInTheDocument();
+    expect(await screen.findByText(/Institutional Document Requirements/i)).toBeInTheDocument();
+
+    const myDocsBtn = screen.getByRole('button', { name: 'My Documents' });
+    await userEvent.click(myDocsBtn);
+    expect(myDocsBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('opens role-aware upload modal with accessible controls and passes axe audit', async () => {
+    const adminMe = {
+      ...ACADEMIC_ADMIN,
+      capabilities: [...ACADEMIC_ADMIN.capabilities, 'document.upload', 'document.read'],
+    };
+    const b = createFakeBackend({ session: true, me: adminMe });
+    const view = renderApp(b, '/documents');
+
+    const uploadBtn = await screen.findByRole('button', { name: /\+ Upload Document/i });
+    await userEvent.click(uploadBtn);
+
+    expect(await screen.findByText('Upload Institutional Document')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Target Entity Context/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Document Purpose/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Reason for Upload/i)).toBeInTheDocument();
+
+    const results = await axe(view.container);
+    expect(results.violations).toEqual([]);
+  });
+
   it('has no detectable axe accessibility violations on Document Center', async () => {
     const b = createFakeBackend({ session: true, me: studentWithDocs });
     const view = renderApp(b, '/documents');

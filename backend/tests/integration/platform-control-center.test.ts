@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, inject, it } from 'vitest';
+import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import { createPlatformDb, buildPlatformServer } from '../../tools/platform/platform-server.js';
 import { PlatformService } from '../../tools/platform/platform.service.js';
 import { assertDisposableTestDatabase } from '../../src/shared/database/test-guard.js';
@@ -322,6 +323,136 @@ describe('Anesa Platform Owner Control Center - Comprehensive Integration Suite'
       expect(res.statusCode).toBe(200);
       const json = JSON.parse(res.body) as { data: { applied: boolean } };
       expect(json.data.applied).toBe(true);
+    });
+
+    it('manages first-administrator onboarding lifecycle (issue, reissue, revoke, and MFA bootstrap ticket)', async () => {
+      // 1. Initial onboarding status is PENDING_ACTIVATION / NONE
+      const initialDetail = await server.inject({
+        method: 'GET',
+        url: `/api/v1/platform/institutions/${createdOrgId}`,
+        headers: { 'x-platform-token': VALID_TOKEN },
+      });
+      expect(initialDetail.statusCode).toBe(200);
+      const initialJson = JSON.parse(initialDetail.body) as {
+        data: {
+          firstAdminOnboarding: {
+            userId: string;
+            email: string;
+            activationStatus: string;
+            invitationStatus: string;
+            mfaEnrolled: boolean;
+            mfaBootstrapEligible: boolean;
+            canIssueInvitation: boolean;
+            canRevokeInvitation: boolean;
+          };
+        };
+      };
+      expect(initialJson.data.firstAdminOnboarding.activationStatus).toBe('PENDING_ACTIVATION');
+      expect(initialJson.data.firstAdminOnboarding.invitationStatus).toBe('NONE');
+      expect(initialJson.data.firstAdminOnboarding.canIssueInvitation).toBe(true);
+      expect(initialJson.data.firstAdminOnboarding.canRevokeInvitation).toBe(false);
+      expect(initialJson.data.firstAdminOnboarding.mfaBootstrapEligible).toBe(false);
+
+      // 2. Issuing MFA bootstrap ticket before activation is refused (409)
+      const prematureMfaRes = await server.inject({
+        method: 'POST',
+        url: `/api/v1/platform/institutions/${createdOrgId}/first-admin/mfa-ticket`,
+        headers: { 'x-platform-token': VALID_TOKEN },
+        payload: { reason: 'Premature check' },
+      });
+      expect(prematureMfaRes.statusCode).toBe(409);
+
+      // 3. Issue first-admin invitation
+      const issueRes = await server.inject({
+        method: 'POST',
+        url: `/api/v1/platform/institutions/${createdOrgId}/first-admin/invite`,
+        headers: { 'x-platform-token': VALID_TOKEN },
+        payload: { sendEmail: false },
+      });
+      expect(issueRes.statusCode).toBe(201);
+      const issueJson = JSON.parse(issueRes.body) as {
+        data: {
+          invitationId: string;
+          token: string;
+          acceptUrl: string;
+          reissued: boolean;
+          emailDelivery: string;
+        };
+      };
+      expect(issueJson.data.reissued).toBe(false);
+      expect(issueJson.data.token.length).toBeGreaterThan(20);
+      const parsedAcceptUrl = new URL(issueJson.data.acceptUrl);
+      expect(parsedAcceptUrl.pathname).toBe('/accept-invite');
+      expect(parsedAcceptUrl.searchParams.get('token')).toBe(issueJson.data.token);
+      expect(issueJson.data.emailDelivery).toBe('SKIPPED');
+
+      // 4. Reissue revokes previous token and creates a fresh invitation
+      const reissueRes = await server.inject({
+        method: 'POST',
+        url: `/api/v1/platform/institutions/${createdOrgId}/first-admin/invite`,
+        headers: { 'x-platform-token': VALID_TOKEN },
+        payload: { sendEmail: true },
+      });
+      expect(reissueRes.statusCode).toBe(201);
+      const reissueJson = JSON.parse(reissueRes.body) as {
+        data: {
+          invitationId: string;
+          token: string;
+          reissued: boolean;
+          emailDelivery: string;
+        };
+      };
+      expect(reissueJson.data.reissued).toBe(true);
+      expect(reissueJson.data.invitationId).not.toBe(issueJson.data.invitationId);
+      expect(reissueJson.data.token).not.toBe(issueJson.data.token);
+      expect(reissueJson.data.emailDelivery).toBe('NOT_CONFIGURED');
+
+      // 5. Revoke unused invitation
+      const revokeRes = await server.inject({
+        method: 'POST',
+        url: `/api/v1/platform/institutions/${createdOrgId}/first-admin/invite/revoke`,
+        headers: { 'x-platform-token': VALID_TOKEN },
+        payload: { reason: 'Operator revoked' },
+      });
+      expect(revokeRes.statusCode).toBe(200);
+      const revokeJson = JSON.parse(revokeRes.body) as { data: { revoked: number } };
+      expect(revokeJson.data.revoked).toBe(1);
+
+      const afterRevoke = await platformService.getInstitutionDetail(createdOrgId);
+      expect(afterRevoke.firstAdminOnboarding?.invitationStatus).toBe('REVOKED');
+      expect(afterRevoke.firstAdminOnboarding?.canRevokeInvitation).toBe(false);
+
+      // 6. Activate first-admin account in DB, then issue MFA bootstrap ticket
+      const adminUserId = initialJson.data.firstAdminOnboarding.userId;
+      const adminEmail = initialJson.data.firstAdminOnboarding.email;
+      const identityId = uuidv7();
+      await db.withSystem(async (tx) => {
+        await tx.query(
+          `INSERT INTO platform.identities (id, email, password_hash, status)
+           VALUES ($1, lower($2), 'scrypt:test-hash', 'ACTIVE')`,
+          [identityId, adminEmail],
+        );
+        await tx.query(
+          `UPDATE app.users SET status = 'ACTIVE', identity_id = $1 WHERE id = $2 AND organization_id = $3`,
+          [identityId, adminUserId, createdOrgId],
+        );
+      });
+
+      const afterActivate = await platformService.getInstitutionDetail(createdOrgId);
+      expect(afterActivate.firstAdminOnboarding?.activationStatus).toBe('ACTIVATED');
+      expect(afterActivate.firstAdminOnboarding?.mfaBootstrapEligible).toBe(true);
+
+      const mfaRes = await server.inject({
+        method: 'POST',
+        url: `/api/v1/platform/institutions/${createdOrgId}/first-admin/mfa-ticket`,
+        headers: { 'x-platform-token': VALID_TOKEN },
+        payload: { reason: 'Onboarding MFA setup' },
+      });
+      expect(mfaRes.statusCode).toBe(201);
+      const mfaJson = JSON.parse(mfaRes.body) as {
+        data: { ticketId: string; ticket: string; expiresAt: string };
+      };
+      expect(mfaJson.data.ticket.length).toBeGreaterThan(8);
     });
   });
 

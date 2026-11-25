@@ -6,7 +6,7 @@
 import type pg from 'pg';
 import * as argon2 from 'argon2';
 import { uuidv7 } from '../src/shared/ids/uuidv7.js';
-import { seedTenantRoles } from '../src/shared/authorization/seed.js';
+import { seedMfaPermissions, seedTenantRoles } from '../src/shared/authorization/seed.js';
 import {
   issueFirstAdminBootstrapTicket,
   type BootstrapTicketResult,
@@ -372,7 +372,8 @@ export async function seedDevAdmin(
       query: (text: string, values?: readonly unknown[]) =>
         client.query(text, values ? [...values] : undefined),
     };
-    await seedTenantRoles(exec, organizationId);
+    await seedTenantRoles(exec, organizationId, { allowCriticalGrants: true });
+    await seedMfaPermissions(exec, organizationId, { allowCriticalGrants: true });
 
     // 3. Identity (platform.identities)
     let identityId: string;

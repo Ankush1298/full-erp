@@ -39,6 +39,31 @@ let student1Id: string;
 let student2Id: string;
 let homeworkId: string;
 let submissionId: string;
+let futureDueDate: string;
+let currentYear: number;
+
+function getLocalCampusDate(ms: number, timeZone: string): { dateStr: string; year: number } {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour12: false,
+    })
+      .formatToParts(new Date(ms))
+      .map((p) => [p.type, p.value]),
+  );
+  return {
+    dateStr: `${parts.year}-${parts.month}-${parts.day}`,
+    year: Number(parts.year),
+  };
+}
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(Date.parse(`${dateStr}T12:00:00Z`) + days * 86_400_000);
+  return d.toISOString().slice(0, 10);
+}
 
 async function insert(table: string, row: Record<string, unknown>): Promise<string> {
   const id = (row['id'] as string | undefined) ?? uuidv7();
@@ -78,6 +103,26 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
     student1Id = T.students.one;
     student2Id = T.students.two;
 
+    const campusTz =
+      (
+        await adminQuery<{ timezone: string }>('SELECT timezone FROM app.campuses WHERE id = $1', [
+          T.campusId,
+        ])
+      )[0]?.timezone ?? 'Asia/Kolkata';
+
+    const localToday = getLocalCampusDate(Date.now(), campusTz);
+    currentYear = localToday.year;
+    const today = localToday.dateStr;
+
+    futureDueDate = addDays(today, 7);
+
+    const termStart = addDays(today, -90);
+    const termEnd = addDays(today, 90);
+    const academicYearStart = addDays(today, -180);
+    const academicYearEnd = addDays(today, 185);
+    const validFrom = addDays(today, -60);
+    const joiningDate = addDays(today, -365);
+
     // Reset passwords for students and faculty
     await adminQuery(`UPDATE platform.identities SET password_hash = $1 WHERE id IN ($2, $3, $4)`, [
       HASH,
@@ -92,13 +137,13 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       employee_code: `EMP-${RUN}`,
       employee_type: 'FACULTY',
       status: 'ACTIVE',
-      joining_date: '2025-06-01',
+      joining_date: joiningDate,
     });
 
     const year = await insert('academic_years', {
       label: `AY${RUN}`,
-      start_date: '2026-06-01',
-      end_date: '2027-05-31',
+      start_date: academicYearStart,
+      end_date: academicYearEnd,
     });
     const sem = await insert('period_types', {
       code: `S_${RUN}`.slice(0, 10),
@@ -115,16 +160,16 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
     });
     const cohort = await insert('cohorts', {
       program_id: program,
-      admission_year: 2026,
-      name: 'Class of 2026',
+      admission_year: currentYear,
+      name: `Class of ${currentYear}`,
     });
     termId = await insert('terms', {
       campus_id: T.campusId,
       academic_year_id: year,
       code: 'T1',
       name: 'Term 1',
-      start_date: '2026-06-01',
-      end_date: '2026-11-30',
+      start_date: termStart,
+      end_date: termEnd,
     });
     const cp = await insert('cohort_periods', {
       cohort_id: cohort,
@@ -161,7 +206,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       course_offering_id: courseOfferingId,
       employee_id: employeeId,
       role: 'PRIMARY',
-      valid_from: '2026-06-01',
+      valid_from: validFrom,
     });
 
     const sp1 = await insert('student_programs', {
@@ -170,7 +215,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       cohort_id: cohort,
       campus_id: T.campusId,
       department_id: T.departmentId,
-      start_date: '2026-06-01',
+      start_date: validFrom,
       status: 'ACTIVE',
     });
     const sp2 = await insert('student_programs', {
@@ -179,7 +224,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       cohort_id: cohort,
       campus_id: T.campusId,
       department_id: T.departmentId,
-      start_date: '2026-06-01',
+      start_date: validFrom,
       status: 'ACTIVE',
     });
 
@@ -208,7 +253,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       term_enrollment_id: te1,
       cohort_period_id: cp,
       section_id: sectionAId,
-      valid_from: '2026-06-01',
+      valid_from: validFrom,
       changed_by: T.users.admin,
     });
     await insert('section_memberships', {
@@ -216,7 +261,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       term_enrollment_id: te2,
       cohort_period_id: cp,
       section_id: sectionBId,
-      valid_from: '2026-06-01',
+      valid_from: validFrom,
       changed_by: T.users.admin,
     });
     await insert('course_registrations', {
@@ -225,7 +270,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       course_offering_id: courseOfferingId,
       status: 'REGISTERED',
       source: 'MANUAL',
-      valid_from: '2026-06-01',
+      valid_from: validFrom,
     });
     await insert('course_registrations', {
       term_enrollment_id: te2,
@@ -233,7 +278,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       course_offering_id: courseOfferingId,
       status: 'REGISTERED',
       source: 'MANUAL',
-      valid_from: '2026-06-01',
+      valid_from: validFrom,
     });
 
     // Create Parent Users and Guardians
@@ -278,7 +323,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       is_primary: true,
       can_view_academics: true,
       can_receive_notifications: true,
-      valid_from: '2026-06-01',
+      valid_from: validFrom,
     });
     await insert('student_guardians', {
       student_id: student2Id,
@@ -287,7 +332,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       is_primary: true,
       can_view_academics: true,
       can_receive_notifications: true,
-      valid_from: '2026-06-01',
+      valid_from: validFrom,
     });
 
     // Log in all sessions
@@ -364,7 +409,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
         title: 'Math Homework: Algebra Chapter 3',
         instructions: 'Complete exercises 1 through 15 on page 42. Show all working clearly.',
         submissionType: 'ONLINE',
-        dueDate: '2026-11-20',
+        dueDate: futureDueDate,
         dueTime: '17:00',
         maxMarks: 100,
         allowResubmission: true,
@@ -458,7 +503,7 @@ describe('Homework, Assignments & Secure Student Submissions Workflow', () => {
       id: fileId,
       uploaded_by: T.users.studentOne,
       storage_class: 'GENERAL',
-      storage_key: `${T.orgId}/GENERAL/2026/${fileId}`,
+      storage_key: `${T.orgId}/GENERAL/${currentYear}/${fileId}`,
       original_name: 'algebra_exercises_sol.pdf',
       declared_mime: 'application/pdf',
       detected_mime: 'application/pdf',

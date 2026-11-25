@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { inject } from 'vitest';
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
-import { seedTenantRoles } from '../../src/shared/authorization/seed.js';
+import { seedMfaPermissions, seedTenantRoles } from '../../src/shared/authorization/seed.js';
 
 /**
  * A brand-new tenant for tests that COMMIT rows (students, users, role assignments, audit events). Other integration
@@ -77,7 +77,11 @@ export async function createIsolatedTenant(passwordHash: string): Promise<Isolat
         [users[n], orgId, emails[n], n],
       );
     }
-    await seedTenantRoles({ query: (text, values) => c.query(text, [...(values ?? [])]) }, orgId);
+    const exec = {
+      query: (text: string, values?: readonly unknown[]) => c.query(text, [...(values ?? [])]),
+    };
+    await seedTenantRoles(exec, orgId, { allowCriticalGrants: true });
+    await seedMfaPermissions(exec, orgId, { allowCriticalGrants: true });
     await c.query(
       `INSERT INTO app.campuses (id, organization_id, name, code, timezone)
        VALUES ($1, $2, 'Isolated campus', 'IC', 'Asia/Kolkata')`,

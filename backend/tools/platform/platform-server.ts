@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import pg from 'pg';
 import { registerPlatformRoutes } from './platform.routes.js';
 import type { PlatformDb } from './platform.service.js';
+import type { InvitationMailer } from '../../src/shared/email/invitation-mailer.js';
 
 export function createPlatformDb(
   connectionString: string,
@@ -48,7 +49,11 @@ export function createPlatformDb(
   };
 }
 
-export function buildPlatformServer(opts: { db: PlatformDb }) {
+export function buildPlatformServer(opts: {
+  db: PlatformDb;
+  appOrigin?: string | undefined;
+  invitationMailer?: InvitationMailer | undefined;
+}) {
   const app = Fastify({
     logger: false,
   });
@@ -58,6 +63,8 @@ export function buildPlatformServer(opts: { db: PlatformDb }) {
   app.register(registerPlatformRoutes, {
     prefix: '/api/v1/platform',
     db: opts.db,
+    appOrigin: opts.appOrigin,
+    invitationMailer: opts.invitationMailer,
   });
 
   return app;

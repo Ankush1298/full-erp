@@ -25,11 +25,17 @@ export const PlatformInstitutionsPage: React.FC = () => {
   const [initialPlan, setInitialPlan] = useState('COMPLETE_ERP');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [recentCreated, setRecentCreated] = useState<{
+    id: string;
+    name: string;
+    adminEmail?: string | undefined;
+  } | null>(null);
 
   // Status Action Modal (Suspend/Reactivate)
   const [actionTarget, setActionTarget] = useState<InstitutionItem | null>(null);
   const [actionType, setActionType] = useState<'SUSPEND' | 'REACTIVATE' | null>(null);
   const [processingAction, setProcessingAction] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchInstitutions = useCallback(() => {
     setLoading(true);
@@ -64,13 +70,18 @@ export const PlatformInstitutionsPage: React.FC = () => {
     setCreateError(null);
 
     try {
-      await platformApi.createInstitution({
+      const created = await platformApi.createInstitution({
         name: name.trim(),
         slug: slug.trim().toLowerCase(),
         institutionType,
         adminEmail: adminEmail.trim() || undefined,
         adminTitle: adminTitle.trim() || undefined,
         initialPlan,
+      });
+      setRecentCreated({
+        id: created.id,
+        name: created.name,
+        adminEmail: adminEmail.trim() || undefined,
       });
       setShowModal(false);
       setName('');
@@ -87,6 +98,7 @@ export const PlatformInstitutionsPage: React.FC = () => {
   const handleStatusChange = async () => {
     if (!actionTarget || !actionType) return;
     setProcessingAction(true);
+    setActionError(null);
 
     try {
       if (actionType === 'SUSPEND') {
@@ -98,7 +110,7 @@ export const PlatformInstitutionsPage: React.FC = () => {
       setActionType(null);
       fetchInstitutions();
     } catch (err) {
-      alert((err as Error).message);
+      setActionError((err as Error).message || 'Failed to update institution status.');
     } finally {
       setProcessingAction(false);
     }
@@ -147,6 +159,50 @@ export const PlatformInstitutionsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {recentCreated && (
+        <div
+          className="platform-callout info-callout"
+          role="status"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            marginBottom: '1rem',
+          }}
+        >
+          <div>
+            <strong>{recentCreated.name} provisioned.</strong>{' '}
+            {recentCreated.adminEmail ? (
+              <span>
+                Next step: issue the first-administrator activation invitation for{' '}
+                <code>{recentCreated.adminEmail}</code>.
+              </span>
+            ) : (
+              <span>
+                Next step: open the institution detail page to onboard the first administrator.
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <Link
+              to={`/platform/institutions/${recentCreated.id}`}
+              className="platform-btn platform-btn-primary"
+            >
+              Manage Administrator Onboarding →
+            </Link>
+            <button
+              type="button"
+              className="platform-btn platform-btn-secondary"
+              onClick={() => setRecentCreated(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="platform-filter-bar">
@@ -290,6 +346,7 @@ export const PlatformInstitutionsPage: React.FC = () => {
                             type="button"
                             className="action-btn action-suspend"
                             onClick={() => {
+                              setActionError(null);
                               setActionTarget(inst);
                               setActionType('SUSPEND');
                             }}
@@ -302,6 +359,7 @@ export const PlatformInstitutionsPage: React.FC = () => {
                             type="button"
                             className="action-btn action-reactivate"
                             onClick={() => {
+                              setActionError(null);
                               setActionTarget(inst);
                               setActionType('REACTIVATE');
                             }}
@@ -529,6 +587,11 @@ export const PlatformInstitutionsPage: React.FC = () => {
                 <div className="info-callout">
                   Reactivating will immediately restore full portal access according to their active
                   entitlements.
+                </div>
+              )}
+              {actionError && (
+                <div className="form-error-alert" role="alert">
+                  {actionError}
                 </div>
               )}
               <div className="platform-modal-actions">

@@ -446,7 +446,7 @@ describe('MFA: operator ticket, step-up, enrolment, then normal administrative a
     );
     // Assign FACULTY role
     const facultyRole = await op.query<{ id: string }>(
-      `SELECT id FROM app.roles WHERE organization_id = $1 AND name = 'FACULTY'`,
+      `SELECT id FROM app.roles WHERE organization_id = $1 AND code = 'FACULTY'`,
       [s.id],
     );
     if (facultyRole.rows[0]) {

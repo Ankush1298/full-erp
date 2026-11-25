@@ -11,6 +11,7 @@ import {
 import { Database } from '../../src/shared/database/index.js';
 import { createPool } from '../../src/shared/database/pool.js';
 import { AppError } from '../../src/shared/errors/http-errors.js';
+import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import { MemoryStorageDriver, deriveStorageKey } from '../../src/shared/storage/index.js';
 import { issueTrustedContext } from '../../src/shared/tenancy/issue-trusted-context.js';
 import type { TrustedContext } from '../../src/shared/tenancy/trusted-context.js';
@@ -41,6 +42,7 @@ const newKey = (): string => randomBytes(16).toString('hex');
 let T!: IsolatedTenant;
 let OTHER!: IsolatedTenant;
 let WORKER_T!: IsolatedTenant;
+let facultyEmployeeId: string;
 
 const ctxFor = (user: string, kind: 'STAFF' | 'STUDENT' = 'STAFF', tenant = T): TrustedContext =>
   issueTrustedContext({ tenantId: tenant.orgId, userId: user, actorKind: kind });
@@ -52,6 +54,13 @@ beforeAll(async () => {
     createIsolatedTenant(hash),
     createIsolatedTenant(hash),
   ]);
+
+  facultyEmployeeId = uuidv7();
+  await adminQuery(
+    `INSERT INTO app.employees (id, organization_id, user_id, employee_code, employee_type, joining_date)
+     VALUES ($1, $2, $3, $4, 'FACULTY', '2024-01-01')`,
+    [facultyEmployeeId, T.orgId, T.users.faculty, `EMP-${newKey().slice(0, 8)}`],
+  );
 }, 60_000);
 
 afterAll(async () => {
@@ -92,6 +101,51 @@ async function initiateAndComplete(
         ...(opts.classification ? { classification: opts.classification } : {}),
         link: { entityType: 'student', entityId: studentId, purpose: 'id_proof' },
         ...(storageClass === 'SENSITIVE' ? { reason: 'Uploading identity document' } : {}),
+      },
+      { idempotencyKey: newKey() },
+    ),
+  );
+  const fileId = (init.body as { data: { fileId: string } }).data.fileId;
+  const key = deriveStorageKey(
+    (opts.tenant ?? T).orgId,
+    storageClass,
+    fileId,
+    new Date().getUTCFullYear(),
+  );
+  storage.putObject(storageClass, key, opts.putBytes ?? bytes, opts.putContentType ?? contentType);
+  const complete = await db.withTenant(ctx, (tx) => svc.completeUpload(tx, ctx, fileId, {}));
+  return { fileId, complete };
+}
+
+async function initiateAndCompleteGeneric(
+  ctx: TrustedContext,
+  linkTarget: {
+    entityType: 'student' | 'employee' | 'institution';
+    entityId: string;
+    purpose?: string;
+  },
+  opts: UploadOpts = {},
+): Promise<{ fileId: string; complete: { status: string; scanResult: string | null } }> {
+  const storageClass = opts.storageClass ?? 'GENERAL';
+  const contentType = opts.contentType ?? 'application/pdf';
+  const bytes = opts.bytes ?? PDF;
+  const init = await db.withTenant(ctx, (tx) =>
+    svc.initiateUpload(
+      tx,
+      ctx,
+      {
+        storageClass,
+        originalName: 'report.pdf',
+        contentType,
+        sizeBytes: bytes.length,
+        sha256: sha(bytes),
+        ...(opts.classification ? { classification: opts.classification } : {}),
+        link: {
+          entityType: linkTarget.entityType,
+          entityId: linkTarget.entityId,
+          purpose: linkTarget.purpose ?? 'id_proof',
+        },
+        ...(storageClass === 'SENSITIVE' ? { reason: 'Uploading document' } : {}),
       },
       { idempotencyKey: newKey() },
     ),
@@ -334,6 +388,117 @@ describe('authorization and isolation (service)', () => {
       404,
     );
   });
+
+  it('an employee uploads or downloads their OWN employee document (SELF)', async () => {
+    const admin = ctxFor(T.users.admin);
+    const faculty = ctxFor(T.users.faculty, 'STAFF');
+    const { fileId } = await initiateAndCompleteGeneric(admin, {
+      entityType: 'employee',
+      entityId: facultyEmployeeId,
+      purpose: 'contract',
+    });
+    await finalize(admin, fileId, 'CLEAN');
+    await db.withTenant(admin, (tx) =>
+      svc.linkDocument(
+        tx,
+        admin,
+        {
+          fileId,
+          entityType: 'employee',
+          entityId: facultyEmployeeId,
+          purpose: 'contract',
+          visibility: 'OWNER_VISIBLE',
+          reason: 'Attach employment contract',
+        },
+        {},
+      ),
+    );
+
+    const dl = await download(faculty, fileId);
+    expect(dl.url).toContain('memory://download');
+  });
+
+  it('an employee document linked as STAFF_ONLY cannot be downloaded by the employee', async () => {
+    const admin = ctxFor(T.users.admin);
+    const faculty = ctxFor(T.users.faculty, 'STAFF');
+    const { fileId } = await initiateAndCompleteGeneric(admin, {
+      entityType: 'employee',
+      entityId: facultyEmployeeId,
+      purpose: 'appraisal',
+    });
+    await finalize(admin, fileId, 'CLEAN');
+    await db.withTenant(admin, (tx) =>
+      svc.linkDocument(
+        tx,
+        admin,
+        {
+          fileId,
+          entityType: 'employee',
+          entityId: facultyEmployeeId,
+          purpose: 'appraisal',
+          visibility: 'STAFF_ONLY',
+          reason: 'Confidential performance review',
+        },
+        {},
+      ),
+    );
+
+    await expectStatus(download(faculty, fileId), 404);
+    expect((await download(admin, fileId)).url).toContain('memory://download');
+  });
+
+  it('an institution-level document can be linked to the tenant and retrieved by admins', async () => {
+    const admin = ctxFor(T.users.admin);
+    const { fileId } = await initiateAndCompleteGeneric(admin, {
+      entityType: 'institution',
+      entityId: T.orgId,
+      purpose: 'accreditation',
+    });
+    await finalize(admin, fileId, 'CLEAN');
+    await db.withTenant(admin, (tx) =>
+      svc.linkDocument(
+        tx,
+        admin,
+        {
+          fileId,
+          entityType: 'institution',
+          entityId: T.orgId,
+          purpose: 'accreditation',
+          reason: 'NAAC certification 2026',
+        },
+        {},
+      ),
+    );
+
+    expect((await download(admin, fileId)).url).toContain('memory://download');
+
+    const otherAdmin = ctxFor(OTHER.users.admin, 'STAFF', OTHER);
+    await expectStatus(download(otherAdmin, fileId), 404);
+  });
+
+  it('linking an institution document to a mismatched entity ID is rejected', async () => {
+    const admin = ctxFor(T.users.admin);
+    const { fileId } = await initiateAndComplete(admin, T.students.one);
+    await finalize(admin, fileId, 'CLEAN');
+
+    await expectStatus(
+      db.withTenant(admin, (tx) =>
+        svc.linkDocument(
+          tx,
+          admin,
+          {
+            fileId,
+            entityType: 'institution',
+            entityId: OTHER.orgId,
+            purpose: 'compliance',
+            reason: 'Attempt invalid link',
+          },
+          {},
+        ),
+      ),
+      400,
+    );
+  });
 });
 
 async function restrictedReads(fileId: string): Promise<number> {
@@ -468,6 +633,64 @@ describe('HTTP: /api/v1/documents and /api/v1/students/:id/documents', () => {
         )
       ).statusCode,
     ).toBe(400);
+  });
+
+  it('GET /api/v1/documents/requirements returns default institutional requirements', async () => {
+    const res = await call('GET', 'admin', '/api/v1/documents/requirements');
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{
+      data: Array<{
+        code: string;
+        title: string;
+        isMandatory: boolean;
+        allowedMimeTypes: string[];
+      }>;
+    }>();
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThanOrEqual(5);
+    const idProof = body.data.find((r) => r.code === 'REQ_STUDENT_ID');
+    expect(idProof).toBeDefined();
+    expect(idProof?.isMandatory).toBe(true);
+  });
+
+  it('POST /api/v1/documents/links links files to institution targets and lists them', async () => {
+    const payload = {
+      storageClass: 'GENERAL',
+      originalName: 'policy.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: PDF.length,
+      sha256: sha(PDF),
+      link: { entityType: 'institution', entityId: T.orgId, purpose: 'compliance' },
+    };
+    const init = await call('POST', 'admin', '/api/v1/documents/uploads', payload, {
+      'idempotency-key': newKey(),
+    });
+    expect(init.statusCode).toBe(201);
+    const fileId = init.json<{ data: { fileId: string } }>().data.fileId;
+    storage.putObject(
+      'GENERAL',
+      deriveStorageKey(T.orgId, 'GENERAL', fileId, new Date().getUTCFullYear()),
+      PDF,
+      'application/pdf',
+    );
+    const comp = await call('POST', 'admin', `/api/v1/documents/uploads/${fileId}/complete`);
+    expect(comp.statusCode).toBe(200);
+    await finalize(ctxFor(T.users.admin), fileId, 'CLEAN');
+
+    const linkRes = await call('POST', 'admin', '/api/v1/documents/links', {
+      fileId,
+      entityType: 'institution',
+      entityId: T.orgId,
+      purpose: 'compliance',
+      reason: 'Publish institutional safety policy',
+    });
+    expect(linkRes.statusCode).toBe(201);
+    expect(linkRes.json<{ data: { id: string } }>().data.id).toBeDefined();
+
+    const instDocs = await call('GET', 'admin', '/api/v1/documents?view=institutional');
+    expect(instDocs.statusCode).toBe(200);
+    const instList = instDocs.json<{ data: Array<{ id: string }> }>().data;
+    expect(instList.some((d) => d.id === fileId)).toBe(true);
   });
 });
 

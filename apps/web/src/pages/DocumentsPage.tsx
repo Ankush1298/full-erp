@@ -17,14 +17,17 @@ import {
 import {
   completeUpload,
   fetchDocumentDownloadUrl,
+  fetchDocumentRequirements,
   fetchDocuments,
   initiateUpload,
   type DocumentItem,
+  type DocumentRequirement,
 } from '../lib/api/documents-api';
 import { fetchFeeReceipts } from '../lib/api/finance-api';
 import { fetchChildFees, fetchParentChildren, type ParentChild } from '../lib/api/parent-api';
 
-type DocumentCategory = 'academic' | 'personal' | 'employee' | 'financial';
+type MainViewMode = 'my' | 'institutional';
+type DocumentCategory = 'academic' | 'personal' | 'employee' | 'financial' | 'compliance';
 
 interface FeeReceiptView {
   id: string;
@@ -63,13 +66,28 @@ export function DocumentsPage() {
 
   const isParent = identity?.roles.includes('PARENT') ?? false;
   const isStudent = identity?.roles.includes('STUDENT') ?? false;
+  const isFaculty = identity?.roles.includes('FACULTY') ?? false;
+  const isStaff = identity?.roles.includes('STAFF') ?? false;
+  const isCollegeAdmin = identity?.roles.includes('COLLEGE_ADMIN') ?? false;
+  const isCampusAdmin = identity?.roles.includes('CAMPUS_ADMIN') ?? false;
+  const isRegistrar = identity?.roles.includes('REGISTRAR') ?? false;
+  const isHod = identity?.roles.includes('HOD') ?? false;
+  const isDeptAdmin = identity?.roles.includes('DEPARTMENT_ADMIN') ?? false;
+
+  const isInstitutionalUser =
+    isCollegeAdmin || isCampusAdmin || isRegistrar || isHod || isDeptAdmin;
   const hasFeeReceiptRead = identity ? can(identity, 'fee.receipt.read') : false;
   const canUpload = identity ? can(identity, 'document.upload') : false;
 
-  usePageTitle(isStudent ? 'My Documents' : 'Document Center');
+  // Default view mode: Institutional users start on Institutional Documents; Students/Parents start on My Documents
+  const [viewMode, setViewMode] = useState<MainViewMode>(
+    isInstitutionalUser ? 'institutional' : 'my',
+  );
+  usePageTitle(viewMode === 'my' ? 'My Documents' : 'Document Center');
 
   const [category, setCategory] = useState<DocumentCategory>('academic');
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [requirements, setRequirements] = useState<DocumentRequirement[]>([]);
   const [receipts, setReceipts] = useState<FeeReceiptView[]>([]);
   const [children, setChildren] = useState<ParentChild[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string>('');
@@ -81,6 +99,9 @@ export function DocumentsPage() {
   // Upload modal state
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadEntityType, setUploadEntityType] = useState<'student' | 'employee' | 'institution'>(
+    'student',
+  );
   const [uploadStorageClass, setUploadStorageClass] = useState<'GENERAL' | 'SENSITIVE'>('GENERAL');
   const [uploadClassification, setUploadClassification] = useState<
     'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED'
@@ -108,7 +129,34 @@ export function DocumentsPage() {
       .catch(() => setChildren([]));
   }, [isParent, client]);
 
-  // Load documents or receipts based on active category
+  // Load document requirements
+  useEffect(() => {
+    if (!client) return;
+    void fetchDocumentRequirements(client)
+      .then((reqs) => setRequirements(reqs))
+      .catch(() => setRequirements([]));
+  }, [client]);
+
+  // Set default purpose when upload modal opens or role changes
+  useEffect(() => {
+    if (isStudent || isParent) {
+      setUploadEntityType('student');
+      setUploadPurpose('id_proof');
+    } else if (isFaculty || isStaff) {
+      if (viewMode === 'institutional') {
+        setUploadEntityType('institution');
+        setUploadPurpose('compliance_record');
+      } else {
+        setUploadEntityType('employee');
+        setUploadPurpose('qualification');
+      }
+    } else if (isInstitutionalUser) {
+      setUploadEntityType(viewMode === 'my' ? 'employee' : 'institution');
+      setUploadPurpose(viewMode === 'my' ? 'employment_contract' : 'compliance_record');
+    }
+  }, [isStudent, isParent, isFaculty, isStaff, isInstitutionalUser, viewMode]);
+
+  // Load documents or receipts based on active viewMode and category
   const loadData = useCallback(async () => {
     if (!client) return;
     setLoading(true);
@@ -118,7 +166,6 @@ export function DocumentsPage() {
       if (category === 'financial') {
         if (isParent && selectedChildId) {
           const feesData = await fetchChildFees(client, selectedChildId);
-          // Map child fees receipts to standard receipt shape
           const childReceipts: FeeReceiptView[] = (feesData.receipts ?? []).map((r, idx) => ({
             id: `child-rec-${idx}`,
             receipt_number: r.receiptNumber,
@@ -148,7 +195,9 @@ export function DocumentsPage() {
           setReceipts([]);
         }
       } else {
-        const docs = await fetchDocuments(client);
+        const docs = await fetchDocuments(client, {
+          view: viewMode,
+        });
         setDocuments(docs);
       }
     } catch (err: unknown) {
@@ -168,7 +217,7 @@ export function DocumentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [client, category, isParent, selectedChildId, hasFeeReceiptRead, isStudent]);
+  }, [client, viewMode, category, isParent, selectedChildId, hasFeeReceiptRead, isStudent]);
 
   useEffect(() => {
     void loadData();
@@ -176,12 +225,15 @@ export function DocumentsPage() {
 
   if (!identity) return null;
 
-  // Filter available categories based on role and capability
+  // Available categories based on viewMode, role and capabilities
   const availableCategories: SegmentedNavItem<DocumentCategory>[] = [
     { id: 'academic', label: 'Academic Documents' },
     { id: 'personal', label: 'Personal & Identity' },
     ...(!isStudent && !isParent
       ? [{ id: 'employee' as DocumentCategory, label: 'Employee Records' }]
+      : []),
+    ...(isInstitutionalUser || viewMode === 'institutional'
+      ? [{ id: 'compliance' as DocumentCategory, label: 'Institutional Compliance' }]
       : []),
     ...(hasFeeReceiptRead || isStudent || isParent
       ? [{ id: 'financial' as DocumentCategory, label: 'Fee Receipts & Dues' }]
@@ -199,7 +251,8 @@ export function DocumentsPage() {
         doc.purpose === 'general_document' ||
         doc.purpose === 'syllabus' ||
         doc.purpose === 'grade_card' ||
-        doc.purpose === 'certificate'
+        doc.purpose === 'certificate' ||
+        doc.purpose === 'transfer_certificate'
       );
     }
     if (category === 'personal') {
@@ -214,7 +267,16 @@ export function DocumentsPage() {
       return (
         doc.purpose === 'employee_record' ||
         doc.purpose === 'qualification' ||
-        doc.purpose === 'employment_contract'
+        doc.purpose === 'employment_contract' ||
+        doc.purpose === 'resume'
+      );
+    }
+    if (category === 'compliance') {
+      return (
+        doc.purpose === 'compliance_record' ||
+        doc.purpose === 'safety_clearance' ||
+        doc.purpose === 'audit_report' ||
+        doc.purpose === 'board_approval'
       );
     }
     return true;
@@ -311,8 +373,15 @@ export function DocumentsPage() {
       const hashArray = Array.from(new Uint8Array(digestBuffer));
       const sha256 = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
-      const targetEntityId =
-        isParent && selectedChildId ? selectedChildId : identity ? identity.userId : '';
+      let targetEntityId = '';
+      if (uploadEntityType === 'student') {
+        targetEntityId =
+          isParent && selectedChildId ? selectedChildId : identity ? identity.userId : '';
+      } else if (uploadEntityType === 'institution') {
+        targetEntityId = identity?.tenantId ?? '';
+      } else {
+        targetEntityId = identity?.userId ?? '';
+      }
 
       const init = await initiateUpload(client, {
         storageClass: uploadStorageClass,
@@ -322,12 +391,30 @@ export function DocumentsPage() {
         sha256,
         classification: uploadClassification,
         link: {
-          entityType: 'student',
+          entityType: uploadEntityType,
           entityId: targetEntityId,
           purpose: uploadPurpose,
         },
         reason: uploadReason,
       });
+
+      // Upload file bytes to presigned object-storage URL when using HTTP(S) storage driver
+      if (
+        init.data.upload.url.startsWith('http://') ||
+        init.data.upload.url.startsWith('https://')
+      ) {
+        const putRes = await fetch(init.data.upload.url, {
+          method: init.data.upload.method || 'PUT',
+          headers: {
+            ...init.data.upload.headers,
+            'Content-Type': uploadFile.type || 'application/pdf',
+          },
+          body: uploadFile,
+        });
+        if (!putRes.ok) {
+          throw new Error(`Object storage upload failed (${putRes.status})`);
+        }
+      }
 
       // Complete upload lifecycle
       await completeUpload(client, init.data.fileId);
@@ -348,11 +435,27 @@ export function DocumentsPage() {
     }
   };
 
+  // Workflow checklist requirements for current view
+  const activeRequirements = requirements.filter((req) => {
+    if (viewMode === 'my') {
+      if (isStudent) return req.targetRole === 'STUDENT';
+      if (isParent) return req.targetRole === 'PARENT' || req.targetRole === 'STUDENT';
+      if (isFaculty) return req.targetRole === 'FACULTY';
+      if (isStaff) return req.targetRole === 'STAFF';
+      return req.targetRole === 'STAFF';
+    }
+    return (
+      req.targetRole === 'INSTITUTION' ||
+      req.workflow === 'COMPLIANCE' ||
+      req.workflow === 'ADMISSION'
+    );
+  });
+
   return (
     <>
       <PageHeader
         title="Document Center"
-        subtitle="My Documents • Role-governed repository for verified institutional records, certificates, fee receipts, and academic submissions."
+        subtitle="Role-governed repository for verified institutional records, certificates, fee receipts, and compliance submissions."
         actions={
           !isNotEntitled && !isSuspended && canUpload ? (
             <Button variant="primary" onClick={() => setUploadOpen(true)}>
@@ -368,6 +471,24 @@ export function DocumentsPage() {
         <InstitutionSuspendedState />
       ) : (
         <>
+          {/* Main Workspace Navigation: My Documents vs Institutional Documents */}
+          {isInstitutionalUser && (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <SegmentedNav<MainViewMode>
+                items={[
+                  { id: 'institutional', label: 'Institutional Documents' },
+                  { id: 'my', label: 'My Documents' },
+                ]}
+                activeId={viewMode}
+                onChange={(mode) => {
+                  setViewMode(mode);
+                  setCategory('academic');
+                }}
+                ariaLabel="Document repository workspace selector"
+              />
+            </div>
+          )}
+
           {/* Purpose & Security Architecture Guide Banner */}
           <section
             className="doc-intro-banner"
@@ -395,7 +516,7 @@ export function DocumentsPage() {
               All institutional records are tenant-isolated and cryptographically verified. Uploaded
               files undergo automatic virus inspection (ClamAV) and SHA-256 integrity verification
               before becoming available. Access permissions are dynamically derived from linked
-              student and employee records.
+              student, employee, and institutional compliance records.
             </p>
             <div className="doc-security-grid">
               <div className="doc-security-pill">
@@ -423,60 +544,130 @@ export function DocumentsPage() {
                 <strong>Zero-Access Distinction</strong>
                 <p>
                   Standard documents are encrypted at rest with server keys; Zero-Access records
-                  (Vault) require client passkey custody.
+                  remain client-side encrypted.
                 </p>
               </div>
             </div>
           </section>
 
-          {/* Guardian Verified Child Selector */}
+          {/* Verified Guardian Linkage Child Selector */}
           {isParent && children.length > 0 && (
             <div className="doc-child-selector">
-              <label htmlFor="child-select">Viewing Records For Linked Child:</label>
+              <label htmlFor="guardian-child-select">Viewing Records For Linked Child:</label>
               <select
-                id="child-select"
+                id="guardian-child-select"
                 className="doc-child-select"
                 value={selectedChildId}
                 onChange={(e) => setSelectedChildId(e.target.value)}
               >
                 {children.map((c) => (
                   <option key={c.studentId} value={c.studentId}>
-                    {c.displayName || c.admissionNumber} ({c.admissionNumber})
+                    {c.displayName} ({c.admissionNumber || 'Admitted Student'})
                   </option>
                 ))}
               </select>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
-                ✓ Verified Legal Guardianship Linkage
-              </span>
+              <span className="doc-child-badge">✓ Verified Legal Guardianship Linkage</span>
             </div>
           )}
 
-          {isParent && children.length === 0 && (
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <Alert tone="info">
-                No verified children are currently linked to your guardian account. Document access
-                for parents requires documented and verified student linkage.
-              </Alert>
-            </div>
-          )}
+          {/* Category Tabs */}
+          <div style={{ margin: 'var(--space-4) 0' }}>
+            <SegmentedNav<DocumentCategory>
+              items={availableCategories}
+              activeId={category}
+              onChange={(c) => setCategory(c)}
+              ariaLabel="Document Category Tabs"
+            />
+          </div>
 
-          {/* Category Segmented Navigation */}
-          <SegmentedNav
-            items={availableCategories}
-            activeId={category}
-            onChange={(cat) => setCategory(cat)}
-            ariaLabel="Document Categories"
-          />
+          {/* Institutional Requirements Checklist Checklist Widget (When in Institutional or Admission context) */}
+          {activeRequirements.length > 0 && category !== 'financial' && (
+            <section
+              style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-card)',
+                padding: 'var(--space-4)',
+                marginBottom: 'var(--space-4)',
+              }}
+              aria-label="Workflow Document Requirements Checklist"
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 'var(--space-3)',
+                }}
+              >
+                <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, margin: 0 }}>
+                  Institutional Document Requirements (
+                  {viewMode === 'my' ? 'Your Checklist' : 'Workflow Standards'})
+                </h3>
+                <Badge tone="brand">{activeRequirements.length} Configured Standards</Badge>
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 'var(--space-3)',
+                }}
+              >
+                {activeRequirements.map((req) => (
+                  <div
+                    key={req.code}
+                    style={{
+                      padding: 'var(--space-3)',
+                      background: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '0.25rem',
+                      }}
+                    >
+                      <strong style={{ color: 'var(--color-text)' }}>{req.title}</strong>
+                      <Badge tone={req.isMandatory ? 'warning' : 'neutral'}>
+                        {req.isMandatory ? 'Mandatory' : 'Optional'}
+                      </Badge>
+                    </div>
+                    <div style={{ color: 'var(--color-muted)', marginBottom: '0.25rem' }}>
+                      {req.description}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 'var(--space-2)',
+                        fontSize: '0.6875rem',
+                        color: 'var(--color-fg-muted)',
+                      }}
+                    >
+                      <span>Workflow: {req.workflow}</span>
+                      <span>•</span>
+                      <span>Class: {req.classification}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {error && <Alert tone="error">{error}</Alert>}
 
-          {/* Main Content Area */}
           {loading ? (
-            <div style={{ padding: 'var(--space-6)', textAlign: 'center' }}>
-              <Spinner label="Loading authorized documents…" />
+            <div style={{ padding: 'var(--space-8) 0', textAlign: 'center' }}>
+              <Spinner />
+              <p style={{ marginTop: 'var(--space-2)', color: 'var(--color-fg-muted)' }}>
+                Loading verified documents and cryptographically signed certificates...
+              </p>
             </div>
           ) : category === 'financial' ? (
-            /* Financial Receipts View */
             receipts.length === 0 ? (
               <div className="doc-empty-box">
                 <div className="doc-empty-icon" aria-hidden="true">
@@ -494,8 +685,8 @@ export function DocumentsPage() {
                 </div>
                 <h3 className="doc-empty-title">No Fee Receipts Available</h3>
                 <p className="doc-empty-desc">
-                  Official payment receipts and fee challans appear here immediately when fee
-                  transactions are recorded or processed through the Fees & Finance module.
+                  Official fee payment receipts and financial clearances will appear here once
+                  transactions are posted by the Finance Department or online gateway.
                 </p>
               </div>
             ) : (
@@ -550,7 +741,7 @@ export function DocumentsPage() {
                 ))}
               </div>
             )
-          ) : /* Academic / Personal / Employee Document Cards */
+          ) : /* Academic / Personal / Employee / Compliance Document Cards */
           filteredDocs.length === 0 ? (
             <div className="doc-empty-box">
               <div className="doc-empty-icon" aria-hidden="true">
@@ -582,6 +773,8 @@ export function DocumentsPage() {
                   'Identity verification documents (government ID, birth certificate, transfer certificates) uploaded during onboarding or admissions appear here after security clearance.'}
                 {category === 'employee' &&
                   'Official service letters, employment contracts, and professional credentials appear here once catalogued by the HR department.'}
+                {category === 'compliance' &&
+                  'Statutory affiliations, fire safety clearances, building fitness, and regulatory inspection reports appear here for institutional compliance.'}
               </p>
               {canUpload && (
                 <Button variant="secondary" onClick={() => setUploadOpen(true)}>
@@ -618,7 +811,7 @@ export function DocumentsPage() {
                             {doc.original_name || 'Document'}
                           </h3>
                           <span className="doc-card-sub">
-                            {formatDate(doc.created_at)} · {formatBytes(doc.size_bytes)}
+                            {formatBytes(doc.size_bytes)} • {formatDate(doc.created_at)}
                           </span>
                         </div>
                       </div>
@@ -633,7 +826,7 @@ export function DocumentsPage() {
                         <span className="doc-badge-classification">{doc.classification}</span>
                         {doc.purpose && (
                           <span className="doc-badge-classification">
-                            {doc.purpose.replace(/_/g, ' ')}
+                            Purpose: {doc.purpose.replace(/_/g, ' ')}
                           </span>
                         )}
                       </div>
@@ -644,10 +837,13 @@ export function DocumentsPage() {
                       </Button>
                       <Button
                         variant="primary"
+                        onClick={() => void handleDownload(doc)}
                         disabled={!isAvailable}
-                        onClick={() => {
-                          void handleDownload(doc);
-                        }}
+                        title={
+                          isAvailable
+                            ? 'Download verified document via presigned URL'
+                            : 'Download disabled pending security clearance'
+                        }
                       >
                         Download
                       </Button>
@@ -658,15 +854,13 @@ export function DocumentsPage() {
             </div>
           )}
 
-          {/* Upload Document Modal */}
+          {/* Upload Modal with Role-Aware & Responsive Controls */}
           {uploadOpen && (
             <Dialog
               title="Upload Institutional Document"
               open={uploadOpen}
               onClose={() => {
-                setUploadOpen(false);
-                setUploadError(null);
-                setUploadSuccess(null);
+                if (!uploadBusy) setUploadOpen(false);
               }}
             >
               <form
@@ -692,6 +886,28 @@ export function DocumentsPage() {
                   />
                 </div>
 
+                {/* Target Entity Scope (if user has institutional scope) */}
+                {isInstitutionalUser && (
+                  <div className="field">
+                    <label htmlFor="upload-entity-select">Target Entity Context</label>
+                    <select
+                      id="upload-entity-select"
+                      value={uploadEntityType}
+                      onChange={(e) => {
+                        const nextType = e.target.value as 'student' | 'employee' | 'institution';
+                        setUploadEntityType(nextType);
+                        if (nextType === 'institution') setUploadPurpose('compliance_record');
+                        else if (nextType === 'employee') setUploadPurpose('qualification');
+                        else setUploadPurpose('id_proof');
+                      }}
+                    >
+                      <option value="student">Student Record</option>
+                      <option value="employee">Employee / Faculty Record</option>
+                      <option value="institution">Institutional Statutory Compliance</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="field">
                   <label htmlFor="upload-purpose-select">Document Purpose</label>
                   <select
@@ -699,11 +915,34 @@ export function DocumentsPage() {
                     value={uploadPurpose}
                     onChange={(e) => setUploadPurpose(e.target.value)}
                   >
-                    <option value="id_proof">Government ID / Birth Proof</option>
-                    <option value="academic_transcript">Academic Record / Transcript</option>
-                    <option value="general_document">General Institutional Document</option>
-                    {!isStudent && !isParent && (
-                      <option value="employee_record">Employee Record / Credential</option>
+                    {uploadEntityType === 'student' && (
+                      <>
+                        <option value="id_proof">Government ID / Birth Proof</option>
+                        <option value="transcript">Academic Record / Transcript</option>
+                        <option value="transfer_certificate">Transfer Certificate (TC)</option>
+                        <option value="guardian_affidavit">Guardian Relationship Affidavit</option>
+                        <option value="general_document">General Student Submission</option>
+                      </>
+                    )}
+                    {uploadEntityType === 'employee' && (
+                      <>
+                        <option value="qualification">Academic Qualification / Degree</option>
+                        <option value="employment_contract">
+                          Signed Employment Contract / Offer
+                        </option>
+                        <option value="employee_record">Service Record / Joining Dossier</option>
+                        <option value="resume">Curriculum Vitae / Resume</option>
+                      </>
+                    )}
+                    {uploadEntityType === 'institution' && (
+                      <>
+                        <option value="compliance_record">
+                          Statutory Affiliation & Board Approval
+                        </option>
+                        <option value="safety_clearance">Fire / Structural Safety NOC</option>
+                        <option value="audit_report">Annual Institutional Audit Report</option>
+                        <option value="general_document">General Institutional Document</option>
+                      </>
                     )}
                   </select>
                 </div>

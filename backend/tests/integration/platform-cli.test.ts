@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import pg from 'pg';
+import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import {
   SupportGrantsNotImplementedError,
   createSupportGrant,
@@ -149,19 +150,45 @@ describe('Platform CLI (Integration, ADR-002 & Doc 05/11)', () => {
     const drifted = await grants();
     expect(drifted).not.toEqual(matrix);
 
-    // A failure part-way (the third role's grant insert) rolls the whole re-sync back: the drift is still there.
-    let inserts = 0;
+    const rolesBefore = (
+      await client.query<{ id: string; code: string; version: number }>(
+        'SELECT id, code, version FROM app.roles WHERE organization_id = $1 ORDER BY code',
+        [tenant.id],
+      )
+    ).rows;
+
+    // A failure part-way (after a meaningful reconciliation mutation has executed) rolls the whole re-sync back: the drift is still there.
+    let mutationExecuted = false;
     const failing = {
-      query: (text: string, values?: readonly unknown[]) => {
-        if (text.includes('INSERT INTO app.role_permissions') && ++inserts === 40) {
-          return Promise.reject(new Error('simulated failure'));
+      query: async (text: string, values?: readonly unknown[]) => {
+        if (
+          text.includes('UPDATE app.role_permissions') ||
+          text.includes('INSERT INTO app.role_permissions')
+        ) {
+          const res = await client.query(text, values as unknown[]);
+          if (res.rowCount && res.rowCount > 0) {
+            mutationExecuted = true;
+          }
+          return res;
+        }
+        if (mutationExecuted && text.includes('COMMIT')) {
+          throw new Error('simulated failure');
         }
         return client.query(text, values as unknown[]);
       },
     };
     await expect(seedTenant(failing, slug)).rejects.toThrow('simulated failure');
+    expect(mutationExecuted).toBe(true);
     expect(await grants()).toEqual(drifted);
     expect(await assignments()).toEqual(assigned);
+
+    const rolesAfterRollback = (
+      await client.query<{ id: string; code: string; version: number }>(
+        'SELECT id, code, version FROM app.roles WHERE organization_id = $1 ORDER BY code',
+        [tenant.id],
+      )
+    ).rows;
+    expect(rolesAfterRollback).toEqual(rolesBefore);
 
     // Safe reconciliation preserves custom grants, resets scope mode drift, and leaves every assignment as it was.
     await seedTenant(client, slug);
@@ -215,5 +242,101 @@ describe('Platform CLI (Integration, ADR-002 & Doc 05/11)', () => {
       [tenant.id],
     );
     expect(after.rows[0]).toEqual(before.rows[0]);
+  });
+
+  it('standalone tenant provisioning rolls back after real database mutation followed by injected failure', async () => {
+    const slug = `rollback-${Date.now().toString(36)}`;
+    const adminEmail = `admin@${slug}.test`;
+
+    let orgInserted = false;
+    let rolesInserted = false;
+    const failingDb = {
+      query: async (text: string, values?: readonly unknown[]) => {
+        if (text.includes('INSERT INTO app.organizations')) {
+          const res = await client.query(text, values as unknown[]);
+          orgInserted = true;
+          return res;
+        }
+        if (
+          text.includes('INSERT INTO app.roles') ||
+          text.includes('INSERT INTO app.role_permissions')
+        ) {
+          const res = await client.query(text, values as unknown[]);
+          rolesInserted = true;
+          return res;
+        }
+        if (
+          orgInserted &&
+          (text.includes('INSERT INTO app.users') || text.includes('COLLEGE_ADMIN'))
+        ) {
+          throw new Error('injected failure during admin user provisioning');
+        }
+        return client.query(text, values as unknown[]);
+      },
+    };
+
+    await expect(
+      createTenant(
+        failingDb,
+        { name: 'Rollback College', slug, adminEmail },
+        { manageTransaction: true },
+      ),
+    ).rejects.toThrow('injected failure during admin user provisioning');
+
+    expect(orgInserted).toBe(true);
+    expect(rolesInserted).toBe(true);
+
+    // Verify database was completely rolled back: no organization, no roles
+    const orgCheck = await client.query('SELECT id FROM app.organizations WHERE slug = $1', [slug]);
+    expect(orgCheck.rows.length).toBe(0);
+
+    const rolesCheck = await client.query(
+      `SELECT r.id FROM app.roles r JOIN app.organizations o ON o.id = r.organization_id WHERE o.slug = $1`,
+      [slug],
+    );
+    expect(rolesCheck.rows.length).toBe(0);
+  });
+
+  it('preserves existing externally managed transactions without premature commit or conflict', async () => {
+    const slug = `tx-intact-${Date.now().toString(36)}`;
+    const adminEmail = `admin@${slug}.test`;
+
+    // Caller manages outer transaction
+    await client.query('BEGIN');
+    try {
+      // createTenant without manageTransaction: true runs inside caller's transaction
+      const tenant = await createTenant(client, {
+        name: 'Tx Intact University',
+        slug,
+        adminEmail,
+      });
+
+      expect(tenant.id).toBeDefined();
+
+      // Transaction is still active and uncommitted; insert a campus in the same transaction
+      const campusId = uuidv7();
+      await client.query(
+        `INSERT INTO app.campuses (id, organization_id, name, code, status, timezone)
+         VALUES ($1, $2, 'North Campus', 'NORTH', 'ACTIVE', 'Asia/Kolkata')`,
+        [campusId, tenant.id],
+      );
+
+      // Successfully commit outer transaction
+      await client.query('COMMIT');
+
+      // Verify both tenant and subsequent transaction writes are committed
+      const orgCheck = await client.query('SELECT id FROM app.organizations WHERE id = $1', [
+        tenant.id,
+      ]);
+      expect(orgCheck.rows.length).toBe(1);
+
+      const campusCheck = await client.query('SELECT id FROM app.campuses WHERE id = $1', [
+        campusId,
+      ]);
+      expect(campusCheck.rows.length).toBe(1);
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    }
   });
 });

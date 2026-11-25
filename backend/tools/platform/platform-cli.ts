@@ -62,6 +62,14 @@ export function parseArgs(argv: readonly string[]): {
   return { command, flags };
 }
 
+export interface CreateTenantOptions {
+  /**
+   * If true, wraps the provisioning sequence in an atomic transaction (BEGIN ... COMMIT / ROLLBACK).
+   * Standalone CLI commands set this to true. Services managing their own outer transaction (e.g. withSystem) leave this false.
+   */
+  manageTransaction?: boolean;
+}
+
 /**
  * Validates and provisions a new tenant organization with canonical multi-tier role matrix.
  * Supports SCHOOL, COLLEGE, and UNIVERSITY institution types.
@@ -74,124 +82,147 @@ export function parseArgs(argv: readonly string[]): {
 export async function createTenant(
   db: SqlExecutor,
   input: CreateTenantInput,
+  options?: CreateTenantOptions,
 ): Promise<TenantRecord> {
-  const name = input.name?.trim();
-  if (!name || name.length < 1 || name.length > 255) {
-    throw new Error('Tenant name must be between 1 and 255 characters.');
+  const shouldManageTx = options?.manageTransaction === true;
+  if (shouldManageTx) {
+    await db.query('BEGIN');
   }
 
-  const slug = input.slug?.trim().toLowerCase();
-  if (!slug || !SLUG_REGEX.test(slug)) {
-    throw new Error(
-      'Tenant slug must consist of 3-63 lowercase alphanumeric characters or hyphens.',
-    );
-  }
-
-  const adminEmail = input.adminEmail?.trim().toLowerCase();
-  if (adminEmail && !EMAIL_REGEX.test(adminEmail)) {
-    throw new Error('Invalid administrator email format.');
-  }
-
-  const rawType = input.institutionType ? input.institutionType.toUpperCase() : undefined;
-  if (rawType && rawType !== 'SCHOOL' && rawType !== 'COLLEGE' && rawType !== 'UNIVERSITY') {
-    throw new Error(
-      `Invalid institution type: "${input.institutionType}". Allowed: SCHOOL, COLLEGE, UNIVERSITY.`,
-    );
-  }
-  const institutionType: InstitutionType = (rawType as InstitutionType) || 'SCHOOL';
-
-  // Check slug uniqueness
-  const existing = await db.query('SELECT id FROM app.organizations WHERE slug = $1', [slug]);
-  if (existing.rows.length > 0) {
-    throw new Error(`An organization with slug "${slug}" already exists.`);
-  }
-
-  const tenantId = uuidv7();
-
-  // 1. Insert organization (checking if institution_type column exists)
-  let hasTypeCol: boolean;
   try {
-    const colCheck = await db.query(
-      `SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'app' AND table_name = 'organizations' AND column_name = 'institution_type'`,
-    );
-    hasTypeCol = colCheck.rows.length > 0;
-  } catch {
-    hasTypeCol = false;
-  }
-
-  if (hasTypeCol) {
-    await db.query(
-      `INSERT INTO app.organizations (id, name, slug, status, institution_type)
-       VALUES ($1, $2, $3, 'ACTIVE', $4)`,
-      [tenantId, name, slug, institutionType],
-    );
-  } else {
-    await db.query(
-      `INSERT INTO app.organizations (id, name, slug, status)
-       VALUES ($1, $2, $3, 'ACTIVE')`,
-      [tenantId, name, slug],
-    );
-  }
-
-  // 2. Seed system roles & permissions with canonical display titles for institution type
-  const roleDisplayTitles = institutionType ? roleLabelsFor(institutionType) : undefined;
-  await seedTenantRoles(db, tenantId, { roleDisplayTitles, allowCriticalGrants: true });
-  await seedMfaPermissions(db, tenantId);
-
-  let adminUserId: string | undefined;
-  let finalAdminTitle: string | undefined;
-
-  // 3. Provision initial administrator if email provided
-  if (adminEmail) {
-    adminUserId = uuidv7();
-    if (input.adminTitle?.trim()) {
-      finalAdminTitle = input.adminTitle.trim();
-    } else if (input.institutionType) {
-      const roleMapping = getInstitutionRoleMapping(institutionType, 'COLLEGE_ADMIN');
-      finalAdminTitle = roleMapping.displayTitle;
-    } else {
-      finalAdminTitle = 'Administrator';
+    const name = input.name?.trim();
+    if (!name || name.length < 1 || name.length > 255) {
+      throw new Error('Tenant name must be between 1 and 255 characters.');
     }
-    const displayName = `${name} ${finalAdminTitle}`;
 
-    await db.query(
-      `INSERT INTO app.users (id, organization_id, email, display_name, status)
-       VALUES ($1, $2, $3, $4, 'INVITED')`,
-      [adminUserId, tenantId, adminEmail, displayName],
-    );
-
-    const roleRes = await db.query(
-      `SELECT id FROM app.roles WHERE organization_id = $1 AND code = 'COLLEGE_ADMIN'`,
-      [tenantId],
-    );
-    const collegeAdminRoleId = roleRes.rows[0]?.['id'] as string | undefined;
-
-    if (collegeAdminRoleId) {
-      await db.query(
-        `INSERT INTO app.role_assignments
-           (id, organization_id, user_id, role_id, scope_type, scope_id, status)
-         VALUES ($1, $2, $3, $4, 'ORGANIZATION', NULL, 'ACTIVE')`,
-        [uuidv7(), tenantId, adminUserId, collegeAdminRoleId],
+    const slug = input.slug?.trim().toLowerCase();
+    if (!slug || !SLUG_REGEX.test(slug)) {
+      throw new Error(
+        'Tenant slug must consist of 3-63 lowercase alphanumeric characters or hyphens.',
       );
     }
-  }
 
-  return {
-    id: tenantId,
-    name,
-    slug,
-    status: 'ACTIVE',
-    institutionType,
-    ...(adminUserId ? { adminUserId } : {}),
-    ...(finalAdminTitle ? { adminTitle: finalAdminTitle } : {}),
-  };
+    const adminEmail = input.adminEmail?.trim().toLowerCase();
+    if (adminEmail && !EMAIL_REGEX.test(adminEmail)) {
+      throw new Error('Invalid administrator email format.');
+    }
+
+    const rawType = input.institutionType ? input.institutionType.toUpperCase() : undefined;
+    if (rawType && rawType !== 'SCHOOL' && rawType !== 'COLLEGE' && rawType !== 'UNIVERSITY') {
+      throw new Error(
+        `Invalid institution type: "${input.institutionType}". Allowed: SCHOOL, COLLEGE, UNIVERSITY.`,
+      );
+    }
+    const institutionType: InstitutionType = (rawType as InstitutionType) || 'SCHOOL';
+
+    // Check slug uniqueness
+    const existing = await db.query('SELECT id FROM app.organizations WHERE slug = $1', [slug]);
+    if (existing.rows.length > 0) {
+      throw new Error(`An organization with slug "${slug}" already exists.`);
+    }
+
+    const tenantId = uuidv7();
+
+    // 1. Insert organization (checking if institution_type column exists)
+    let hasTypeCol: boolean;
+    try {
+      const colCheck = await db.query(
+        `SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'app' AND table_name = 'organizations' AND column_name = 'institution_type'`,
+      );
+      hasTypeCol = colCheck.rows.length > 0;
+    } catch {
+      hasTypeCol = false;
+    }
+
+    if (hasTypeCol) {
+      await db.query(
+        `INSERT INTO app.organizations (id, name, slug, status, institution_type)
+         VALUES ($1, $2, $3, 'ACTIVE', $4)`,
+        [tenantId, name, slug, institutionType],
+      );
+    } else {
+      await db.query(
+        `INSERT INTO app.organizations (id, name, slug, status)
+         VALUES ($1, $2, $3, 'ACTIVE')`,
+        [tenantId, name, slug],
+      );
+    }
+
+    // 2. Seed system roles & permissions with canonical display titles for institution type
+    const roleDisplayTitles = institutionType ? roleLabelsFor(institutionType) : undefined;
+    await seedTenantRoles(db, tenantId, { roleDisplayTitles, allowCriticalGrants: true });
+    await seedMfaPermissions(db, tenantId, { allowCriticalGrants: true });
+
+    let adminUserId: string | undefined;
+    let finalAdminTitle: string | undefined;
+
+    // 3. Provision initial administrator if email provided
+    if (adminEmail) {
+      adminUserId = uuidv7();
+      if (input.adminTitle?.trim()) {
+        finalAdminTitle = input.adminTitle.trim();
+      } else if (input.institutionType) {
+        const roleMapping = getInstitutionRoleMapping(institutionType, 'COLLEGE_ADMIN');
+        finalAdminTitle = roleMapping.displayTitle;
+      } else {
+        finalAdminTitle = 'Administrator';
+      }
+      const displayName = `${name} ${finalAdminTitle}`;
+
+      await db.query(
+        `INSERT INTO app.users (id, organization_id, email, display_name, status)
+         VALUES ($1, $2, $3, $4, 'INVITED')`,
+        [adminUserId, tenantId, adminEmail, displayName],
+      );
+
+      const roleRes = await db.query(
+        `SELECT id FROM app.roles WHERE organization_id = $1 AND code = 'COLLEGE_ADMIN'`,
+        [tenantId],
+      );
+      const collegeAdminRoleId = roleRes.rows[0]?.['id'] as string | undefined;
+
+      if (collegeAdminRoleId) {
+        await db.query(
+          `INSERT INTO app.role_assignments
+             (id, organization_id, user_id, role_id, scope_type, scope_id, status)
+           VALUES ($1, $2, $3, $4, 'ORGANIZATION', NULL, 'ACTIVE')`,
+          [uuidv7(), tenantId, adminUserId, collegeAdminRoleId],
+        );
+      }
+    }
+
+    if (shouldManageTx) {
+      await db.query('COMMIT');
+    }
+
+    return {
+      id: tenantId,
+      name,
+      slug,
+      status: 'ACTIVE',
+      institutionType,
+      ...(adminUserId ? { adminUserId } : {}),
+      ...(finalAdminTitle ? { adminTitle: finalAdminTitle } : {}),
+    };
+  } catch (err) {
+    if (shouldManageTx) {
+      await db.query('ROLLBACK').catch(() => {});
+    }
+    throw err;
+  }
 }
 
 export interface SeedTenantOptions {
   dryRun?: boolean;
   allowCritical?: boolean;
   purgeOrphanGrants?: boolean;
+  resetCanonicalScopes?: boolean;
+  /**
+   * If false, does NOT issue BEGIN/COMMIT/ROLLBACK, leaving transaction ownership to the caller
+   * (e.g. PlatformService running inside withSystem). Defaults to true when db is not already in an active transaction.
+   */
+  manageTransaction?: boolean;
 }
 
 export interface SeedTenantOutput {
@@ -225,10 +256,17 @@ export async function seedTenant(
   }
 
   const org = res.rows[0] as { id: string; name: string; slug: string };
+  const allowCritical = options.allowCritical === true;
+  const purgeOrphans = options.purgeOrphanGrants ?? false;
+  // Operator CLI defaults to true to restore canonical scope drift
+  const resetScopes = options.resetCanonicalScopes ?? true;
 
   if (options.dryRun) {
     const plan = await planTenantReconciliation(db, org.id, {
-      allowCriticalGrants: options.allowCritical === true,
+      allowCriticalGrants: allowCritical,
+      purgeOrphanGrants: purgeOrphans,
+      resetCanonicalScopes: resetScopes,
+      preserveCustomizations: !purgeOrphans,
     });
     return {
       id: org.id,
@@ -239,16 +277,40 @@ export async function seedTenant(
     };
   }
 
-  // One transaction for all-or-nothing execution
-  await db.query('BEGIN');
+  // Transaction management: if caller manages tx (e.g. TenantTx or withSystem), do not issue nested BEGIN/COMMIT
+  const clientWithTx = db as { getTransactionStatus?: () => string };
+  const isManagedTx =
+    typeof clientWithTx.getTransactionStatus === 'function'
+      ? clientWithTx.getTransactionStatus() === 'T'
+      : db.constructor.name === 'TenantTx';
+  const shouldManageTx = options.manageTransaction ?? !isManagedTx;
+
+  if (shouldManageTx) {
+    await db.query('BEGIN');
+  }
   try {
     const reconciliation = await seedTenantRoles(db, org.id, {
-      allowCriticalGrants: options.allowCritical === true,
-      preserveCustomizations: !options.purgeOrphanGrants,
-      purgeOrphanGrants: options.purgeOrphanGrants ?? false,
+      allowCriticalGrants: allowCritical,
+      preserveCustomizations: !purgeOrphans,
+      purgeOrphanGrants: purgeOrphans,
+      resetCanonicalScopes: resetScopes,
     });
-    await seedMfaPermissions(db, org.id);
-    await db.query('COMMIT');
+    const mfaRes = await seedMfaPermissions(db, org.id, { allowCriticalGrants: allowCritical });
+    for (const grant of mfaRes.addedMfaGrants) {
+      const alreadyReported = reconciliation.addedGrants.some(
+        (g) => g.roleCode === grant.roleCode && g.permissionCode === grant.permissionCode,
+      );
+      if (!alreadyReported) {
+        reconciliation.addedGrants.push({
+          roleCode: grant.roleCode,
+          permissionCode: grant.permissionCode,
+          scopeMode: grant.scopeMode,
+        });
+      }
+    }
+    if (shouldManageTx) {
+      await db.query('COMMIT');
+    }
     return {
       id: org.id,
       name: org.name,
@@ -256,7 +318,9 @@ export async function seedTenant(
       reconciliation,
     };
   } catch (err) {
-    await db.query('ROLLBACK').catch(() => undefined);
+    if (shouldManageTx) {
+      await db.query('ROLLBACK').catch(() => undefined);
+    }
     throw err;
   }
 }

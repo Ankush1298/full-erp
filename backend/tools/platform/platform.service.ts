@@ -1,7 +1,17 @@
 import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import { AppError, resourceNotFound } from '../../src/shared/errors/http-errors.js';
 import { assertDisposableTestDatabase } from '../../src/shared/database/test-guard.js';
+import {
+  InvitationMail,
+  MailerNotConfiguredError,
+  type InvitationMailer,
+} from '../../src/shared/email/invitation-mailer.js';
 import { createTenant, grantAuthority, seedTenant, suspendTenant } from './platform-cli.js';
+import {
+  issueFirstAdminInvitation,
+  issueFirstAdminMfaTicket,
+  revokeFirstAdminInvitation,
+} from './first-admin.js';
 import { ERP_MODULE_CATALOG } from './module-registry.js';
 import type {
   CreateInstitutionInput,
@@ -33,8 +43,40 @@ export interface PlatformDb {
   ) => Promise<{ rows: T[]; rowCount: number | null }>;
 }
 
+export interface PlatformServiceOptions {
+  appOrigin?: string | undefined;
+  invitationMailer?: InvitationMailer | undefined;
+}
+
 export class PlatformService {
-  constructor(private readonly db: PlatformDb) {}
+  constructor(
+    private readonly db: PlatformDb,
+    private readonly opts: PlatformServiceOptions = {},
+  ) {}
+
+  private resolveAppOrigin(requestOrigin?: string): string {
+    if (this.opts.appOrigin && this.opts.appOrigin.trim()) {
+      return this.opts.appOrigin.trim().replace(/\/$/, '');
+    }
+    const configured = (process.env['APP_ORIGINS'] ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (configured.length > 0) {
+      return configured[0]!.replace(/\/$/, '');
+    }
+    if (process.env['NODE_ENV'] === 'production') {
+      throw new AppError(
+        500,
+        'APP_ORIGIN_NOT_CONFIGURED',
+        'APP_ORIGINS must be configured in production to generate activation URLs.',
+      );
+    }
+    if (requestOrigin && requestOrigin.trim()) {
+      return requestOrigin.trim().replace(/\/$/, '');
+    }
+    return 'http://localhost:5173';
+  }
 
   /**
    * Fails closed if an automated test attempts to mutate a persistent or non-disposable database.
@@ -494,6 +536,106 @@ export class PlatformService {
         facultyCount = 0;
       }
 
+      // First Administrator Onboarding Status
+      let firstAdminOnboarding: {
+        userId: string;
+        email: string;
+        designation: string;
+        accountStatus: string;
+        activationStatus: 'ACTIVATED' | 'PENDING_ACTIVATION';
+        invitationStatus: 'NONE' | 'PENDING' | 'EXPIRED' | 'REVOKED' | 'ACCEPTED';
+        invitationExpiresAt?: string | undefined;
+        mfaEnrolled: boolean;
+        mfaBootstrapEligible: boolean;
+        canIssueInvitation: boolean;
+        canRevokeInvitation: boolean;
+      } | null = null;
+
+      try {
+        const adminRes = await tx.query<{
+          id: string;
+          email: string;
+          display_name: string;
+          status: string;
+          identity_id: string | null;
+          role_title: string | null;
+        }>(
+          `SELECT u.id, u.email, u.display_name, u.status, u.identity_id, r.name AS role_title
+             FROM app.users u
+             JOIN app.role_assignments ra ON ra.organization_id = u.organization_id AND ra.user_id = u.id
+             JOIN app.roles r ON r.organization_id = ra.organization_id AND r.id = ra.role_id
+            WHERE u.organization_id = $1
+              AND r.code = 'COLLEGE_ADMIN'
+              AND ra.scope_type = 'ORGANIZATION'
+              AND ra.status = 'ACTIVE'
+            ORDER BY u.created_at ASC
+            LIMIT 1`,
+          [org.id],
+        );
+
+        const adminRow = adminRes.rows[0];
+        if (adminRow) {
+          const inviteRes = await tx.query<{
+            expires_at: Date;
+            used_at: Date | null;
+            revoked_at: Date | null;
+          }>(
+            `SELECT expires_at, used_at, revoked_at
+               FROM app.invite_tokens
+              WHERE organization_id = $1 AND user_id = $2 AND purpose = 'ACCOUNT_INVITE'
+              ORDER BY created_at DESC
+              LIMIT 1`,
+            [org.id, adminRow.id],
+          );
+          const latestInvite = inviteRes.rows[0];
+          let invitationStatus: 'NONE' | 'PENDING' | 'EXPIRED' | 'REVOKED' | 'ACCEPTED' = 'NONE';
+          if (latestInvite) {
+            if (latestInvite.used_at) invitationStatus = 'ACCEPTED';
+            else if (latestInvite.revoked_at) invitationStatus = 'REVOKED';
+            else if (new Date(latestInvite.expires_at).getTime() <= Date.now())
+              invitationStatus = 'EXPIRED';
+            else invitationStatus = 'PENDING';
+          }
+
+          let mfaEnrolled = false;
+          try {
+            const mfaRes = await tx.query<{ ok: number }>(
+              `SELECT 1 AS ok FROM app.user_mfa_factors
+                WHERE organization_id = $1 AND user_id = $2 AND status = 'ACTIVE' AND verified_enrollment = true
+                LIMIT 1`,
+              [org.id, adminRow.id],
+            );
+            mfaEnrolled = mfaRes.rows.length > 0;
+          } catch {
+            mfaEnrolled = false;
+          }
+
+          const isActivated = Boolean(adminRow.identity_id) && adminRow.status === 'ACTIVE';
+          firstAdminOnboarding = {
+            userId: adminRow.id,
+            email: adminRow.email,
+            designation: adminRow.role_title || 'Administrator',
+            accountStatus: adminRow.status,
+            activationStatus: isActivated ? 'ACTIVATED' : 'PENDING_ACTIVATION',
+            invitationStatus,
+            ...(latestInvite?.expires_at
+              ? { invitationExpiresAt: new Date(latestInvite.expires_at).toISOString() }
+              : {}),
+            mfaEnrolled,
+            mfaBootstrapEligible:
+              adminRow.status === 'ACTIVE' && !mfaEnrolled && org.status === 'ACTIVE',
+            canIssueInvitation:
+              adminRow.status === 'INVITED' && !adminRow.identity_id && org.status === 'ACTIVE',
+            canRevokeInvitation:
+              adminRow.status === 'INVITED' &&
+              invitationStatus === 'PENDING' &&
+              org.status === 'ACTIVE',
+          };
+        }
+      } catch {
+        firstAdminOnboarding = null;
+      }
+
       return {
         id: org.id,
         name: org.name,
@@ -522,6 +664,7 @@ export class PlatformService {
           usersCount,
           facultyCount,
         },
+        firstAdminOnboarding,
       };
     });
   }
@@ -942,6 +1085,7 @@ export class PlatformService {
         dryRun: isDryRun,
         allowCritical: input.allowCritical ?? false,
         purgeOrphanGrants: input.purgeOrphanGrants ?? false,
+        manageTransaction: false,
       });
 
       if (!isDryRun) {
@@ -1076,6 +1220,115 @@ export class PlatformService {
         organizationName: r.org_name,
         metadata: r.metadata,
       }));
+    });
+  }
+
+  /**
+   * Issues or reissues the single-use first-administrator activation invitation for an ACTIVE tenant.
+   * Returns the raw token and acceptUrl once; never persists or logs the plaintext token.
+   */
+  async issueFirstAdminInvite(
+    orgId: string,
+    input: {
+      ttlHours?: number | undefined;
+      reason?: string | undefined;
+      sendEmail?: boolean | undefined;
+      requestOrigin?: string | undefined;
+    } = {},
+  ) {
+    const origin = this.resolveAppOrigin(input.requestOrigin);
+
+    const issued = await this.db.withSystem(async (tx) => {
+      await this.assertMutationAllowed(tx, 'issueFirstAdminInvite');
+
+      const result = await issueFirstAdminInvitation(tx, {
+        tenant: orgId,
+        ...(input.ttlHours !== undefined ? { ttlHours: input.ttlHours } : {}),
+        ...(input.reason ? { reason: input.reason } : {}),
+        manageTransaction: false,
+      });
+
+      const metaRes = await tx.query<{
+        email: string;
+        display_name: string;
+        org_name: string;
+      }>(
+        `SELECT u.email, u.display_name, o.name AS org_name
+           FROM app.users u
+           JOIN app.organizations o ON o.id = u.organization_id
+          WHERE u.id = $1 AND u.organization_id = $2`,
+        [result.userId, result.tenantId],
+      );
+      const meta = metaRes.rows[0];
+      return { result, meta };
+    });
+
+    const acceptUrlObj = new URL('/accept-invite', origin);
+    acceptUrlObj.searchParams.set('token', issued.result.token);
+    const acceptUrl = acceptUrlObj.toString();
+    let emailDelivery: 'SENT' | 'NOT_CONFIGURED' | 'FAILED' | 'SKIPPED' = 'SKIPPED';
+
+    if (input.sendEmail && issued.meta) {
+      if (!this.opts.invitationMailer) {
+        emailDelivery = 'NOT_CONFIGURED';
+      } else {
+        try {
+          await this.opts.invitationMailer.send(
+            new InvitationMail(
+              issued.meta.email,
+              issued.meta.display_name,
+              issued.meta.org_name,
+              issued.result.token,
+              new Date(issued.result.expiresAt),
+            ),
+          );
+          emailDelivery = 'SENT';
+        } catch (err) {
+          emailDelivery = err instanceof MailerNotConfiguredError ? 'NOT_CONFIGURED' : 'FAILED';
+        }
+      }
+    }
+
+    return {
+      tenantId: issued.result.tenantId,
+      userId: issued.result.userId,
+      invitationId: issued.result.invitationId,
+      expiresAt: issued.result.expiresAt,
+      reissued: issued.result.reissued,
+      token: issued.result.token,
+      acceptUrl,
+      emailDelivery,
+    };
+  }
+
+  /**
+   * Withdraws any unused pending first-administrator invitation for the tenant.
+   */
+  async revokeFirstAdminInvite(orgId: string, input: { reason?: string | undefined } = {}) {
+    return this.db.withSystem(async (tx) => {
+      await this.assertMutationAllowed(tx, 'revokeFirstAdminInvite');
+      return revokeFirstAdminInvitation(tx, {
+        tenant: orgId,
+        ...(input.reason ? { reason: input.reason } : {}),
+        manageTransaction: false,
+      });
+    });
+  }
+
+  /**
+   * Issues the one-time MFA bootstrap ticket for an activated first administrator who has not yet enrolled MFA.
+   */
+  async issueFirstAdminMfaBootstrapTicket(
+    orgId: string,
+    input: { reason?: string | undefined } = {},
+  ) {
+    return this.db.withSystem(async (tx) => {
+      await this.assertMutationAllowed(tx, 'issueFirstAdminMfaBootstrapTicket');
+      return issueFirstAdminMfaTicket(tx, {
+        tenant: orgId,
+        ...(input.reason ? { reason: input.reason } : {}),
+        manageTransaction: false,
+      });
     });
   }
 }

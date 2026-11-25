@@ -13,11 +13,13 @@ const ReasonSchema = Type.String({ minLength: 5, maxLength: 500 });
 
 export const CLASSIFICATIONS = ['INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as const;
 export const VISIBILITIES = ['OWNER_VISIBLE', 'STAFF_ONLY'] as const;
+export const ENTITY_TYPES = ['student', 'employee', 'institution'] as const;
 
-const StorageClassSchema = Type.Union(STORAGE_CLASSES.map((c) => Type.Literal(c)));
-const ClassificationSchema = Type.Union(CLASSIFICATIONS.map((c) => Type.Literal(c)));
-const VisibilitySchema = Type.Union(VISIBILITIES.map((v) => Type.Literal(v)));
-const ContentTypeSchema = Type.Union(ALLOWED_CONTENT_TYPES.map((t) => Type.Literal(t)));
+export const StorageClassSchema = Type.Union(STORAGE_CLASSES.map((c) => Type.Literal(c)));
+export const ClassificationSchema = Type.Union(CLASSIFICATIONS.map((c) => Type.Literal(c)));
+export const VisibilitySchema = Type.Union(VISIBILITIES.map((v) => Type.Literal(v)));
+export const ContentTypeSchema = Type.Union(ALLOWED_CONTENT_TYPES.map((t) => Type.Literal(t)));
+export const EntityTypeSchema = Type.Union(ENTITY_TYPES.map((t) => Type.Literal(t)));
 
 export const UploadIdParamSchema = Type.Object(
   { id: UuidV7Schema },
@@ -39,16 +41,17 @@ export type StudentIdParam = Static<typeof StudentIdParamSchema>;
 
 /**
  * The intended link (doc 03 §12.3 step 1): the entity the upload is FOR, so the server can authorize the upload and
- * apply the per-purpose policy. Only `student` targets exist in this slice. No tenant field is accepted.
+ * apply the per-purpose policy. Supports student, employee, and institution entities. No tenant field is accepted.
  */
-const IntendedLinkSchema = Type.Object(
+export const IntendedLinkSchema = Type.Object(
   {
-    entityType: Type.Literal('student'),
+    entityType: EntityTypeSchema,
     entityId: UuidV7Schema,
     purpose: Type.String({ pattern: PURPOSE_PATTERN }),
   },
   { additionalProperties: false },
 );
+export type IntendedLink = Static<typeof IntendedLinkSchema>;
 
 export const InitiateUploadBodySchema = Type.Object(
   {
@@ -116,6 +119,8 @@ export const DownloadUrlResponseSchema = Type.Object(
 export const LinkDocumentBodySchema = Type.Object(
   {
     fileId: UuidV7Schema,
+    entityType: Type.Optional(EntityTypeSchema),
+    entityId: Type.Optional(UuidV7Schema),
     purpose: Type.String({ pattern: PURPOSE_PATTERN }),
     visibility: Type.Optional(VisibilitySchema),
     reason: ReasonSchema,
@@ -153,10 +158,68 @@ export const DocumentListItemSchema = Type.Object(
 );
 export type DocumentListItem = Static<typeof DocumentListItemSchema>;
 
+export const ListDocumentsQuerySchema = Type.Object(
+  {
+    view: Type.Optional(Type.Union([Type.Literal('my'), Type.Literal('institutional')])),
+    entityType: Type.Optional(EntityTypeSchema),
+    entityId: Type.Optional(UuidV7Schema),
+    workflow: Type.Optional(
+      Type.Union([
+        Type.Literal('ADMISSION'),
+        Type.Literal('EMPLOYMENT'),
+        Type.Literal('FINANCE'),
+        Type.Literal('ACADEMIC'),
+        Type.Literal('COMPLIANCE'),
+      ]),
+    ),
+    purpose: Type.Optional(Type.String({ pattern: PURPOSE_PATTERN })),
+  },
+  { additionalProperties: false },
+);
+export type ListDocumentsQuery = Static<typeof ListDocumentsQuerySchema>;
+
 export const ListDocumentsResponseSchema = Type.Object(
   {
     success: Type.Literal(true),
     data: Type.Array(DocumentListItemSchema),
+  },
+  { additionalProperties: false },
+);
+
+export const DocumentRequirementSchema = Type.Object(
+  {
+    code: Type.String(),
+    title: Type.String(),
+    description: Type.String(),
+    workflow: Type.Union([
+      Type.Literal('ADMISSION'),
+      Type.Literal('EMPLOYMENT'),
+      Type.Literal('FINANCE'),
+      Type.Literal('ACADEMIC'),
+      Type.Literal('COMPLIANCE'),
+    ]),
+    targetRole: Type.Union([
+      Type.Literal('STUDENT'),
+      Type.Literal('FACULTY'),
+      Type.Literal('STAFF'),
+      Type.Literal('PARENT'),
+      Type.Literal('INSTITUTION'),
+    ]),
+    isMandatory: Type.Boolean(),
+    allowedMimeTypes: Type.Array(Type.String()),
+    maxSizeBytes: Type.Integer(),
+    classification: ClassificationSchema,
+    storageClass: StorageClassSchema,
+    defaultPurpose: Type.String(),
+  },
+  { additionalProperties: false },
+);
+export type DocumentRequirement = Static<typeof DocumentRequirementSchema>;
+
+export const ListDocumentRequirementsResponseSchema = Type.Object(
+  {
+    success: Type.Literal(true),
+    data: Type.Array(DocumentRequirementSchema),
   },
   { additionalProperties: false },
 );

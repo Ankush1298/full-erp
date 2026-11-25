@@ -1,5 +1,57 @@
 # Anesa Project Activity Log
 
+## [2026-11-25] Platform Super Admin First-Administrator Onboarding Completion (v1.0.0-rc.1)
+
+- **Actor**: Principal Engineer & Release Manager
+- **Status**: Complete & Verified (`PLATFORM SUPER ADMIN ONBOARDING E2E VERIFIED`)
+- **Summary**:
+  - Exposed end-to-end First Administrator Onboarding directly in the Platform Super Admin Control Center (`/platform/institutions/:id` and `/platform/institutions`), reusing `backend/tools/platform/first-admin.ts` without duplicating token generation or authentication logic.
+  - Added transaction-aware `manageTransaction` support to `issueFirstAdminInvitation`, `revokeFirstAdminInvitation`, and `issueFirstAdminMfaTicket`, plus `POST /api/v1/platform/institutions/:id/first-admin/invite`, `POST /api/v1/platform/institutions/:id/first-admin/invite/revoke`, and `POST /api/v1/platform/institutions/:id/first-admin/mfa-ticket` endpoints and `firstAdminOnboarding` detail telemetry in `PlatformService`.
+  - Enforced `APP_ORIGINS` fail-closed resolution for activation URLs in production and optional SMTP delivery via `InvitationMailer` with one-time copy-link fallback in ephemeral React state.
+  - Added next-step onboarding banner on institution provisioning in `PlatformInstitutionsPage.tsx` and the **First Administrator Onboarding** panel in `PlatformInstitutionDetailPage.tsx`.
+  - Verified end-to-end in headless Chrome against disposable PostgreSQL + App API + Platform API + Vite (provision school -> send invitation -> revoke -> reject revoked token -> reissue -> accept invite & set password -> reject reused token -> issue MFA bootstrap ticket -> principal login & TOTP enrollment -> Platform UI reflects `Activated`, `ACCEPTED`, `MFA Enrolled`).
+
+## [2026-11-25] Feature Freeze & Release Candidate Packaging (v1.0.0-rc.1)
+
+- **Actor**: Principal Engineer, Security Reviewer & Release Manager
+- **Status**: Feature Freeze Active (`v1.0.0-rc.1` Packaged & Ready for Owner Commit/Tag Approval)
+- **Summary**:
+  - Formal feature freeze enacted for `v1.0.0-rc.1`. All 9 release deliverables archived in version-controlled `docs/releases/v1.0.0-rc.1/` with repository-relative links.
+  - Confirmed all production authorization reconciliation and denial-policy callers execute inside managed transactions (`withSystem`, `withTenant`, or explicit `BEGIN ... COMMIT`). Documented the low-level autocommit contract limitation in `docs/releases/v1.0.0-rc.1/known-limitations-and-deferred-features.md` and `docs/releases/v1.0.0-rc.1/security-verification-report.md`.
+  - Executed real-browser smoke test against disposable embedded PostgreSQL + Vite + headless Chrome (`Admin` login with TOTP MFA enrollment, Document Center navigation, real HTTP `PUT` upload + download URL authorization, `Student` and `Guardian` workspace and `STAFF_ONLY` access restrictions).
+  - Resolved two real-browser Document Center upload defects uncovered during smoke testing: `initiateUpload` in `apps/web/src/lib/api/documents-api.ts` now always supplies an `idempotency-key` header (preventing HTTP 428), and `DocumentsPage.tsx` now uploads file bytes via HTTP `PUT` to presigned HTTP(S) storage URLs before calling `completeUpload` (preventing HTTP 409).
+  - Preserved exact verification evidence: 3,583/3,583 automated tests (1,897 integration, 1,156 backend unit, 530 frontend), `pnpm audit` (10 low/moderate transitive `fast-uri` advisories, 0 high/critical), clean Prettier/ESLint/TypeScript/Secret-Scan/Build gates, and full protection of `campusos_demo` and its six institutional fixtures.
+
+## [2026-11-25] Final Pilot Release Readiness, Role-Aware Document Center & Authorization Transaction-Boundary Hardening (v1.0.0-rc.1)
+
+- **Actor**: Principal Engineer, Security Reviewer & Release Manager
+- **Status**: Complete & Verified (`RELEASE CANDIDATE READY — 3,583 / 3,583 SUITES GREEN; GO FOR CONTROLLED PILOT`)
+- **Governing Directive**: Finish existing product, close authorization transaction-boundary gaps, verify Role-Aware Document Center security and browser accessibility, complete comprehensive ERP readiness audit across 30 modules, verify backup/DR automated proofs, and prepare Anesa Campus OS `v1.0.0-rc.1` for controlled institutional pilot deployment. Real-school institutional acceptance remains strictly pending live pilot execution.
+- **1. Authorization Transaction Boundaries & Concurrency Synchronization**:
+  - **Standalone Development Role Seeding (`backend/scripts/seed-roles.ts`)**: Enforced explicit PostgreSQL transaction boundaries (`await client.query('BEGIN')` ... `COMMIT` / `ROLLBACK`). Safety pre-flight checks (`verifyLocalDevDatabaseUrl`, `probeLocalDevDatabase`) execute strictly prior to transaction opening. The transaction-scoped advisory lock (`pg_advisory_xact_lock`) remains active throughout role and MFA provisioning.
+  - **Standalone CLI Tenant Provisioning (`backend/tools/platform/cli.ts` & `platform-cli.ts`)**: Added `manageTransaction` option to `createTenant` and `seedTenant`. Standalone CLI calls wrap execution in an atomic transaction with all-or-nothing rollback on errors. `PlatformService.createInstitution` preserves outer transaction ownership via `this.db.withSystem` without nested transaction conflicts.
+  - **Denial Policy Lock Synchronization (`backend/src/shared/authorization/reconcile.ts`)**: Mutual exclusion verified across concurrent PostgreSQL connections for both absent and existing settings rows. Deterministic bulk tenant ordering (`ORDER BY id ASC`) prevents deadlocks in multi-tenant background syncs.
+- **2. Role-Aware Document Center & Governance Architecture**:
+  - Implemented dual workspace modes: _My Documents_ (user-owned personal records, contracts, fee receipts) and _Institutional Documents_ (campus governance records, fire safety NOCs, affiliation approvals).
+  - Enforced least privilege, guardian access boundaries, malware scanning quarantine (ClamAV daemon via `INSTREAM` protocol), client-side and server-side SHA-256 integrity verification, and strict classification tiering (`PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `RESTRICTED`).
+  - Browser verification confirmed page governance banner, dynamic role-governed category tabs, accessible dialog modal, and WCAG-compliant color contrast.
+- **3. Complete ERP Module Readiness Audit (30 Modules)**:
+  - Audited 30 modules across 11 architectural vectors (Backend, Frontend, API, RBAC, Multi-Tenancy, Database Integrity, Validation, Automated Tests, Workflows, Institutional Config, and UI States).
+  - 29 modules classified as **READY** (96.7%); 1 module classified as **READY WITH NON-BLOCKING LIMITATIONS** (Timetable basic recurring schedule operational; automated AI heuristic scheduling optimization deferred). 0 blocked, 0 unimplemented.
+- **4. Automated Test & Build Quality Metrics**:
+  - **Backend Integration Suite**: **1,897 / 1,897 passed (100%)** across 105 test files.
+  - **Backend Unit Suite**: **1,156 / 1,156 passed (100%)** across 58 test files.
+  - **Frontend Web Suite**: **530 / 530 passed (100%)** across 44 test files.
+  - **Total Automated Baseline**: **3,583 passed tests** across 207 suites (**0 failures, 0 regressions**).
+  - Code Quality: Prettier (`format:check`), ESLint (`lint`), TypeScript (`typecheck`), and Secret Scanning (`check:secrets`) all passed with exit code `0`.
+  - Production Builds: Web client Vite bundle and Backend Node/Fastify distribution compiled cleanly.
+- **5. Persistent Database Protection & Invariant Commitments**:
+  - Verified `campusos_demo` and all six persistent institutions remained untouched.
+  - Integration tests executed exclusively on disposable embedded PostgreSQL instances.
+  - Zero modifications to previously applied database migrations (0001–0055). Zero deletions of user data.
+- **6. Release Deliverables Generated**:
+  - Created 9 formal release deliverables in the artifacts directory: Pilot Readiness Report, Module Readiness Matrix, Security Verification Report, Production Deployment Runbook, Backup & Disaster Recovery Runbook, First-School Onboarding Checklist, Known Limitations and Deferred Features, Release Notes for `v1.0.0-rc.1`, and Release Go/No-Go Decision Sheet.
+
 ## [2026-11-16] Final Module Readiness Audit, Cross-Module E2E Rehearsal & Demonstration Release Gate
 
 - **Actor**: Antigravity Quality & Release Engineering Agent

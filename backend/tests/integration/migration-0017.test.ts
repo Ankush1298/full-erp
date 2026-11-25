@@ -7,11 +7,6 @@ import { uuidv7 } from '../../src/shared/ids/uuidv7.js';
 import { DEFAULT_MIGRATIONS_DIR, migrate } from '../../tools/db/migrate.js';
 import { dropAll, freshDatabase, sql, type FreshDb } from '../support/fresh-db.js';
 
-// Migration 0017 on a database that ALREADY holds a student row (a "legacy" row from before 0017). Own throw-away
-// database from tests/support/fresh-db.ts, never the shared integration database: it commits rows.
-// This proves the expand-step promises: legacy rows are neither stamped nor backfilled, the NOT VALID checks guard
-// new row versions, and the later contract step (not part of this phase) would be refused while a NULL remains.
-
 let db: FreshDb;
 const ORG = uuidv7();
 const USER = uuidv7();
@@ -28,7 +23,6 @@ async function code(p: Promise<unknown>): Promise<{ code?: string; message?: str
 
 beforeAll(async () => {
   db = await freshDatabase();
-  // everything BEFORE 0017
   const dir = mkdtempSync(join(tmpdir(), 'campusos-mig17-'));
   for (const f of readdirSync(DEFAULT_MIGRATIONS_DIR).filter((x) => Number(x.slice(0, 4)) < 17)) {
     cpSync(join(DEFAULT_MIGRATIONS_DIR, f), join(dir, f));
@@ -36,11 +30,10 @@ beforeAll(async () => {
   const before = await migrate({
     connectionString: db.migrator,
     dir,
-    allowContract: ['0009'], // the directory holds 0001-0016 only: 0019 does not exist in it
+    allowContract: ['0009'],
   });
   expect(before.applied.at(-1)).toBe('0016');
 
-  // a legacy student, inserted with only the pre-0017 columns (superuser: the owner cannot see tenant rows)
   await sql(
     db.admin,
     `INSERT INTO app.organizations (id, name, slug) VALUES ($1, 'Legacy College', $2)`,
@@ -63,7 +56,6 @@ beforeAll(async () => {
     [STUDENT, ORG, USER],
   );
 
-  // now 0017 (and the ordinary 0018) on top; the 0019 contract step (and 0020 behind it) stays deferred (it has its own test file)
   const after = await migrate({ connectionString: db.migrator });
   expect(after.applied).toEqual(['0017', '0018']);
   expect(after.deferred).toEqual([
@@ -102,6 +94,8 @@ beforeAll(async () => {
     '0051',
     '0052',
     '0053',
+    '0054',
+    '0055',
   ]);
 }, 180_000);
 
@@ -126,21 +120,22 @@ describe('0017 on a database with a legacy student row', () => {
     const checks = await sql<{ conname: string; convalidated: boolean }>(
       db.admin,
       `SELECT conname, convalidated FROM pg_constraint
-        WHERE conrelid = 'app.students'::regclass AND conname LIKE 'students\\_%\\_ck' ORDER BY conname`,
+        WHERE conrelid = 'app.students'::regclass AND conname LIKE 'students_%_ck' ORDER BY conname`,
     );
     expect(checks).toEqual([
       { conname: 'students_admission_date_ck', convalidated: false },
+      { conname: 'students_admission_number_check', convalidated: true },
       { conname: 'students_status_changed_at_ck', convalidated: false },
+      { conname: 'students_status_check', convalidated: true },
+      { conname: 'students_version_check', convalidated: true },
     ]);
 
-    // a status change on the legacy row is refused: it would write a row version with a NULL admission_date
     const blocked = await code(
       sql(db.admin, "UPDATE app.students SET status = 'ACTIVE' WHERE id = $1", [STUDENT]),
     );
     expect(blocked.code).toBe('23514');
     expect(blocked.message).toMatch(/students_admission_date_ck/);
 
-    // a new student without admission_date is refused too
     const other = uuidv7();
     await sql(
       db.admin,
@@ -163,7 +158,6 @@ describe('0017 on a database with a legacy student row', () => {
     expect(missing.code).toBe('23514');
   });
 
-  // Covers the runtime role on a legacy row (status change and no-op status write, both refused while the dates are NULL).
   it('the runtime role cannot update a legacy row either, whatever it changes, until the row is backfilled', async () => {
     const asStaff = async (statement: string): Promise<{ code?: string; message?: string }> => {
       const c = new pg.Client({ connectionString: db.runtime });
@@ -181,7 +175,6 @@ describe('0017 on a database with a legacy student row', () => {
         await c.end();
       }
     };
-    // a status change, and a no-op status "change": both write a new row version that still has NULL dates
     for (const statement of [
       "UPDATE app.students SET status = 'ACTIVE' WHERE id = $1",
       'UPDATE app.students SET status = status WHERE id = $1',
@@ -200,7 +193,6 @@ describe('0017 on a database with a legacy student row', () => {
   });
 
   it('after an operator-style backfill of BOTH columns the checks validate', async () => {
-    // Illustrative only: the real rule is operator-approved and applied outside the migration.
     await sql(
       db.admin,
       `UPDATE app.students SET admission_date = created_at::date, status_changed_at = created_at WHERE id = $1`,
@@ -216,7 +208,7 @@ describe('0017 on a database with a legacy student row', () => {
     );
     const checks = await sql<{ convalidated: boolean }>(
       db.admin,
-      `SELECT convalidated FROM pg_constraint WHERE conrelid = 'app.students'::regclass AND conname LIKE 'students\\_%\\_ck'`,
+      `SELECT convalidated FROM pg_constraint WHERE conrelid = 'app.students'::regclass AND conname LIKE 'students_%_ck'`,
     );
     expect(checks.every((c) => c.convalidated)).toBe(true);
   });
