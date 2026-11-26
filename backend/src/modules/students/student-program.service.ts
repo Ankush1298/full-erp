@@ -545,3 +545,22 @@ export async function closeActiveEnrolmentForStatusChange(
   }
   return toDto(await writeClose(tx, ctx, row, outcome, today, reason, meta));
 }
+
+/**
+ * Closes a student's ACTIVE enrolment upon academic graduation/rollover inside the caller's transaction.
+ * Preserves version optimistic locking, CLOSED student_program_events history, and tier-2 audit events.
+ */
+export async function closeActiveEnrolmentForGraduation(
+  tx: TenantTx,
+  ctx: TrustedContext,
+  studentId: string,
+  endDate: string,
+  meta: AuditRequestMeta,
+): Promise<StudentProgramDto | null> {
+  ensureTrusted(ctx);
+  AuthorizationEngine.assertStaffActor(ctx);
+  const row = await lockActiveEnrolment(tx, ctx.tenantId, studentId);
+  if (!row) return null;
+  if (endDate < row.start_date) throw invalid('endDate must not be earlier than startDate.');
+  return toDto(await writeClose(tx, ctx, row, 'COMPLETED', endDate, 'Graduated', meta));
+}

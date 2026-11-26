@@ -5,6 +5,7 @@ import { AuthorizationEngine } from '../../shared/authorization/engine.js';
 import { recordAudit, type AuditRequestMeta } from '../../shared/audit/index.js';
 import { uuidv7 } from '../../shared/ids/uuidv7.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import { closeActiveEnrolmentForGraduation } from '../students/student-program.service.js';
 import type {
   PromotionPolicy,
   UpdatePromotionPolicyBody,
@@ -957,14 +958,13 @@ export class PromotionService {
             [ctx.tenantId, student.enrollmentId, sourceEndDate],
           );
 
-          // c. Complete student program
-          await tx.query(
-            `UPDATE app.student_programs
-                SET status = 'COMPLETED', end_date = $3::date, exit_reason = 'Graduated'
-              WHERE organization_id = $1
-                AND student_id = $2
-                AND status = 'ACTIVE'`,
-            [ctx.tenantId, student.studentId, sourceEndDate],
+          // c. Complete student program through StudentProgramService (preserves events & audit trail)
+          await closeActiveEnrolmentForGraduation(
+            tx,
+            ctx,
+            student.studentId,
+            sourceEndDate,
+            meta ?? {},
           );
 
           graduatedCount++;

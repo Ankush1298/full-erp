@@ -830,12 +830,47 @@ describe('Automatic Academic Year Promotion & Session Rollover System', () => {
     );
     expect(enr5Old[0]?.status).toBe('COMPLETED');
 
-    // Student program status completed!
-    const prog5 = await adminQuery<{ status: string }>(
-      `SELECT status FROM app.student_programs WHERE id = $1`,
+    // Student program status completed via StudentProgramService (with version increment, CLOSED event, and audit)!
+    const prog5 = await adminQuery<{
+      status: string;
+      exit_reason: string | null;
+      version: number;
+      end_date: string | null;
+    }>(
+      `SELECT status, exit_reason, version, end_date::text FROM app.student_programs WHERE id = $1`,
       [students.stu5_graduated.spId],
     );
     expect(prog5[0]?.status).toBe('COMPLETED');
+    expect(prog5[0]?.exit_reason).toBe('Graduated');
+    expect(prog5[0]?.version).toBe(2);
+    expect(prog5[0]?.end_date).toBe('2027-03-31');
+
+    const spEvents5 = await adminQuery<{
+      event_type: string;
+      from_status: string | null;
+      to_status: string;
+      reason: string | null;
+    }>(
+      `SELECT event_type, from_status, to_status, reason
+         FROM app.student_program_events
+        WHERE organization_id = $1 AND student_program_id = $2`,
+      [T.orgId, students.stu5_graduated.spId],
+    );
+    expect(spEvents5).toEqual([
+      {
+        event_type: 'CLOSED',
+        from_status: 'ACTIVE',
+        to_status: 'COMPLETED',
+        reason: 'Graduated',
+      },
+    ]);
+
+    const spAudit5 = await adminQuery<{ action: string }>(
+      `SELECT action FROM app.audit_events
+        WHERE organization_id = $1 AND resource_type = 'student_program' AND resource_id = $2`,
+      [T.orgId, students.stu5_graduated.spId],
+    );
+    expect(spAudit5.map((a) => a.action)).toEqual(['student_program.close']);
 
     // No live enrollment in target term S27
     const enr5New = await adminQuery(
@@ -859,6 +894,19 @@ describe('Automatic Academic Year Promotion & Session Rollover System', () => {
       [T.orgId, students.stu1_promoted.studentId, SC.s27],
     );
     expect(enr1Count[0]?.count).toBe('1');
+
+    // Confirm graduated student 5 still has only 1 CLOSED program event and 1 student_program.close audit event
+    const spEventCount5 = await adminQuery<{ count: string }>(
+      `SELECT count(*)::text AS count FROM app.student_program_events WHERE organization_id = $1 AND student_program_id = $2`,
+      [T.orgId, students.stu5_graduated.spId],
+    );
+    expect(spEventCount5[0]?.count).toBe('1');
+
+    const spAuditCount5 = await adminQuery<{ count: string }>(
+      `SELECT count(*)::text AS count FROM app.audit_events WHERE organization_id = $1 AND resource_type = 'student_program' AND resource_id = $2 AND action = 'student_program.close'`,
+      [T.orgId, students.stu5_graduated.spId],
+    );
+    expect(spAuditCount5[0]?.count).toBe('1');
   });
 
   it('lists rollover batch in history and provides audit trail', async () => {

@@ -837,22 +837,17 @@ export async function executeTenantReconciliation(
   const BATCH_SIZE = 100;
   for (let i = 0; i < itemsToInsert.length; i += BATCH_SIZE) {
     const chunk = itemsToInsert.slice(i, i + BATCH_SIZE);
-    const valuePlaceholders: string[] = [];
-    const values: unknown[] = [plan.organizationId];
-    let paramIndex = 2;
-
-    for (const item of chunk) {
-      valuePlaceholders.push(`($1, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2})`);
-      values.push(item.roleId, item.permissionCode, item.scopeMode);
-      paramIndex += 3;
-    }
+    const roleIds = chunk.map((c) => c.roleId);
+    const permCodes = chunk.map((c) => c.permissionCode);
+    const scopeModes = chunk.map((c) => c.scopeMode);
 
     const insertRes = await db.query(
       `INSERT INTO app.role_permissions (organization_id, role_id, permission_code, scope_mode)
-       VALUES ${valuePlaceholders.join(', ')}
+       SELECT $1::uuid, u.role_id, u.permission_code, u.scope_mode
+         FROM unnest($2::uuid[], $3::text[], $4::text[]) AS u(role_id, permission_code, scope_mode)
        ON CONFLICT (organization_id, role_id, permission_code) DO NOTHING
        RETURNING role_id, permission_code, scope_mode`,
-      values,
+      [plan.organizationId, roleIds, permCodes, scopeModes],
     );
 
     for (const row of insertRes.rows) {

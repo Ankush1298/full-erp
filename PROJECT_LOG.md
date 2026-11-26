@@ -1,5 +1,18 @@
 # Anesa Project Activity Log
 
+## [2026-11-26] CI Migration Deadlock & Security Gate Repairs (v1.0.0-rc.1)
+
+- **Actor**: Principal Engineer & Security Reviewer
+- **Status**: Complete & Verified (`LOCAL VERIFICATION PASSED — REMOTE GITHUB CI PENDING`)
+- **Summary**:
+  - **CI Migration Deadlock (`40P01`)**: Isolated migration `0054` and `0055` SQL execution tests in `backend/tests/integration/school-migration-reconciliation.test.ts` into a dedicated `freshDatabase()` (`backend/tests/support/fresh-db.ts`) so `LOCK TABLE ... ACCESS EXCLUSIVE` / `ALTER TABLE ... NO FORCE RLS` never contend with parallel integration workers on the shared database.
+  - **Security Gate #1 (`academic-structure-static.test.ts:306`)**: Added `tests/integration/school-migration-reconciliation.test.ts` to the authorized contract-migration test allowlist after verifying it confines `contractVersions()` strictly to `freshDatabase()`.
+  - **Security Gate #2 (`reconcile.ts` / `static-architecture.test.ts:48`)**: Replaced dynamic `VALUES ${valuePlaceholders.join(', ')}` interpolation in `reconcile.ts` with a static parameterized `SELECT ... FROM unnest($2::uuid[], $3::text[], $4::text[])` batch insert.
+  - **Security Gate #3 (`document.schemas.ts` & `document.service.ts` / `static-architecture.test.ts:197`)**: Confirmed `targetRole` literals are document-requirement audience metadata (no ad hoc role authorization) and added a narrow, file- and field-bound `targetRole` vocabulary exemption with regression tests.
+  - **Security Gate #4 (`withdrawal.service.ts` / `static-architecture.test.ts:311`)**: Confirmed `'student.withdrawal.request'` is an audit event `action` string (not a permission literal) and added a narrow audit-action exemption for `withdrawal.service.ts`.
+  - **Security Gate #5 (`promotion.service.ts` / `student-program-static.test.ts:53`)**: Routed graduation program completion out of `promotion.service.ts` through a new `closeActiveEnrolmentForGraduation` helper in `student-program.service.ts`, restoring single-writer `StudentProgramService` ownership, `student_program_events` history, optimistic locking, and tier-2 audit events.
+  - **Verification Scope Note**: Browser E2E (`first-admin-onboarding-browser.mjs`) and dependency audit (`pnpm audit`) were not rerun during this security-gate repair pass (no browser/UI or `package.json`/lockfile changes).
+
 ## [2026-11-25] Platform Super Admin First-Administrator Onboarding Completion (v1.0.0-rc.1)
 
 - **Actor**: Principal Engineer & Release Manager

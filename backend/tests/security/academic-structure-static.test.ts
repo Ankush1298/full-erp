@@ -311,12 +311,18 @@ describe('contract gate: no code path authorises a contract migration implicitly
       'tests/integration/migration-contract.test.ts',
       'tests/integration/migrations.test.ts',
       'tests/integration/person-record-exclusivity.test.ts',
+      'tests/integration/school-migration-reconciliation.test.ts',
       'tests/integration/student-atomicity.test.ts',
       'tests/security/academic-structure-static.test.ts',
       'tests/support/global-db.ts',
       'tests/support/rehearsal-stack.ts', // browser-rehearsal stack: migrates only a throw-away PostgreSQL it creates itself (doc 47 A2)
       'tests/unit/migrate-plan.test.ts',
     ]);
+    const schoolMigTest = tests.find(
+      (f) => f.path === 'tests/integration/school-migration-reconciliation.test.ts',
+    );
+    expect(schoolMigTest?.text).toMatch(/\bfreshDatabase\(/);
+    expect(schoolMigTest?.text).toMatch(/migrate\(\{\s*connectionString:\s*migDb\.migrator/);
   });
 });
 

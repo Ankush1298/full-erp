@@ -176,16 +176,29 @@ describe('authorization architecture guardrails (Slice 3)', () => {
   const EMPLOYEE_TYPES_FILE = 'src/modules/people/employee.schemas.ts';
   const EMPLOYEE_TYPES_DECLARATION =
     /export const EMPLOYEE_TYPES = \[\s*'FACULTY',\s*'STAFF',\s*'ADMIN',\s*'VISITING',?\s*\] as const;/g;
+  const DOCUMENT_REQUIREMENTS_SCHEMA_FILE = 'src/modules/documents/document.schemas.ts';
+  const DOCUMENT_REQUIREMENTS_TARGET_ROLE_SCHEMA =
+    /targetRole:\s*Type\.Union\(\[\s*Type\.Literal\('STUDENT'\),\s*Type\.Literal\('FACULTY'\),\s*Type\.Literal\('STAFF'\),\s*Type\.Literal\('PARENT'\),\s*Type\.Literal\('INSTITUTION'\),?\s*\]\)/g;
+  const DOCUMENT_REQUIREMENTS_SERVICE_FILE = 'src/modules/documents/document.service.ts';
+  const DOCUMENT_REQUIREMENTS_TARGET_ROLE_FIELD =
+    /targetRole:\s*'(?:STUDENT|PARENT|FACULTY|STAFF)'/g;
 
   // Disambiguate designation category ('ADMIN') from role name 'ADMIN' (any file), and apply the narrow
-  // employee_type exemption above (that one file only).
+  // employee_type and document requirement targetRole audience-vocabulary exemptions (exact files only).
   const stripExemptVocabulary = (path: string, s: string): string => {
     const stripped = s
       .replace(/Type\.Literal\(['"`]ADMIN['"`]\)/g, '')
       .replace(/category\s*!==\s*['"`]ADMIN['"`]/g, '');
-    return path === EMPLOYEE_TYPES_FILE
-      ? stripped.replace(EMPLOYEE_TYPES_DECLARATION, '')
-      : stripped;
+    if (path === EMPLOYEE_TYPES_FILE) {
+      return stripped.replace(EMPLOYEE_TYPES_DECLARATION, '');
+    }
+    if (path === DOCUMENT_REQUIREMENTS_SCHEMA_FILE) {
+      return stripped.replace(DOCUMENT_REQUIREMENTS_TARGET_ROLE_SCHEMA, '');
+    }
+    if (path === DOCUMENT_REQUIREMENTS_SERVICE_FILE) {
+      return stripped.replace(DOCUMENT_REQUIREMENTS_TARGET_ROLE_FIELD, '');
+    }
+    return stripped;
   };
 
   it('routes and hooks contain no ad hoc role checks (no role names, no actorKind/role comparisons)', () => {
@@ -247,6 +260,25 @@ describe('authorization architecture guardrails (Slice 3)', () => {
     expect(real!.text).toContain('export const EMPLOYEE_TYPES = '); // the declaration is present
   });
 
+  it('the document targetRole audience-vocabulary exemption is bound to its exact files and values', () => {
+    const schemaDecl =
+      "targetRole: Type.Union([Type.Literal('STUDENT'), Type.Literal('FACULTY'), Type.Literal('STAFF'), Type.Literal('PARENT'), Type.Literal('INSTITUTION')])";
+    const fieldDecl = "targetRole: 'STUDENT'";
+    const guarded = (path: string, text: string): boolean =>
+      roleNames.test(stripExemptVocabulary(path, text));
+
+    expect(guarded(DOCUMENT_REQUIREMENTS_SCHEMA_FILE, schemaDecl)).toBe(false);
+    expect(guarded(DOCUMENT_REQUIREMENTS_SERVICE_FILE, fieldDecl)).toBe(false);
+    // Identical text in any other file is still caught
+    expect(guarded('src/modules/documents/document.routes.ts', schemaDecl)).toBe(true);
+    expect(guarded('src/modules/documents/document.routes.ts', fieldDecl)).toBe(true);
+    // Ad hoc role/actorKind checks in the exempt files are still caught
+    expect(guarded(DOCUMENT_REQUIREMENTS_SERVICE_FILE, "if (ctx.role === 'FACULTY') {}")).toBe(
+      true,
+    );
+    expect(guarded(DOCUMENT_REQUIREMENTS_SCHEMA_FILE, "const check = 'COLLEGE_ADMIN';")).toBe(true);
+  });
+
   it('request data (body/query/params/headers) never supplies tenant, identity, role, permission or scope', () => {
     const trusted =
       /\b(?:req|request)\.(?:body|query|params|headers)\b[^;]*?(?:tenant[_-]?id|user[_-]?id|student[_-]?id|organization[_-]?id|campus[_-]?id|department[_-]?id|\brole|\bpermission|\bscope|actor[_-]?kind)/i;
@@ -302,11 +334,18 @@ describe('authorization architecture guardrails (Slice 3)', () => {
     expect(used.length).toBeGreaterThan(2);
     for (const p of used) expect(PERMISSION_CODES.has(p), p).toBe(true);
     // permission literals never appear outside the catalog/matrix/routes as free-floating strings
+    // (narrowly exempt the audit event action name 'student.withdrawal.request' in withdrawal.service.ts)
     const literal = /['"]((?:session|student|org|role)\.[a-z_]+(?:\.[a-z_]+)?)['"]/g;
+    const stripAuditActionLiteral = (path: string, s: string): string =>
+      path === 'src/modules/students/withdrawal.service.ts'
+        ? s.replace(/action:\s*'student\.withdrawal\.request'/g, '')
+        : s;
     const stray = code.filter(
       (f) =>
         !inAuthz(f.path) &&
-        ![...f.text.matchAll(literal)].every((m) => PERMISSION_CODES.has(m[1]!)),
+        ![...stripAuditActionLiteral(f.path, f.text).matchAll(literal)].every((m) =>
+          PERMISSION_CODES.has(m[1]!),
+        ),
     );
     expect(stray.map((f) => f.path)).toEqual([]);
   });
